@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "dns-orchestrator",
+  "productName": "DNS Orchestrator",
   "version": "0.0.1-alpha",
   "identifier": "net.esaps.dns-orchestrator",
   "build": {
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "dns-orchestrator",
-        "width": 800,
-        "height": 600
+        "title": "DNS Orchestrator",
+        "width": 1000,
+        "height": 600,
+        "minWidth": 800,
+        "minHeight": 500
       }
     ],
     "security": {
@@ -30,6 +32,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.13"
+    }
   }
 }

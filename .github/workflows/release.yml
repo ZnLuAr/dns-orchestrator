@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+
+          # Windows x64
+          - platform: windows-latest
+            args: --target x86_64-pc-windows-msvc
+            rust_target: x86_64-pc-windows-msvc
+
+          # Windows ARM64
+          - platform: windows-latest
+            args: --target aarch64-pc-windows-msvc
+            rust_target: aarch64-pc-windows-msvc
+
+          # Linux x64
+          - platform: ubuntu-22.04
+            args: --target x86_64-unknown-linux-gnu
+            rust_target: x86_64-unknown-linux-gnu
+
+          # Linux ARM64
+          - platform: ubuntu-22.04
+            args: --target aarch64-unknown-linux-gnu
+            rust_target: aarch64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Linux dependencies
+      - name: Install Linux dependencies (x64)
+        if: matrix.platform == 'ubuntu-22.04' && matrix.rust_target == 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      # Linux ARM64 cross-compilation dependencies
+      - name: Install Linux ARM64 cross-compilation dependencies
+        if: matrix.platform == 'ubuntu-22.04' && matrix.rust_target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo dpkg --add-architecture arm64
+
+          # Add ARM64 repositories
+          sudo sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            libc6-dev-arm64-cross \
+            libwebkit2gtk-4.1-dev:arm64 \
+            libssl-dev:arm64 \
+            libappindicator3-dev:arm64 \
+            librsvg2-dev:arm64 \
+            patchelf
+
+      - name: Setup Linux ARM64 environment
+        if: matrix.platform == 'ubuntu-22.04' && matrix.rust_target == 'aarch64-unknown-linux-gnu'
+        run: |
+          echo "PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'DNS Orchestrator ${{ github.ref_name }}'
+          releaseBody: |
+            See the assets below to download the app for your platform.
+
+            ## Platforms
+            - **macOS**: `.dmg` (Apple Silicon)
+            - **Windows**: `.msi` / `.exe` (x64, ARM64)
+            - **Linux**: `.deb` / `.AppImage` (x64, ARM64)
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

@@ -1,0 +1,572 @@
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use hmac::{Hmac, Mac};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+
+use super::DnsProvider;
+use crate::error::{DnsError, Result};
+use crate::types::{
+    CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain, DomainStatus, UpdateDnsRecordRequest,
+};
+
+const DNSPOD_API_HOST: &str = "dnspod.tencentcloudapi.com";
+const DNSPOD_SERVICE: &str = "dnspod";
+const DNSPOD_VERSION: &str = "2021-03-23";
+
+type HmacSha256 = Hmac<Sha256>;
+
+// ============ 腾讯云 API 响应结构 ============
+
+#[derive(Debug, Deserialize)]
+struct TencentResponse<T> {
+    #[serde(rename = "Response")]
+    response: TencentResponseInner<T>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TencentResponseInner<T> {
+    #[serde(flatten)]
+    data: Option<T>,
+    #[serde(rename = "Error")]
+    error: Option<TencentError>,
+    #[serde(rename = "RequestId")]
+    #[allow(dead_code)]
+    request_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TencentError {
+    #[serde(rename = "Code")]
+    code: String,
+    #[serde(rename = "Message")]
+    message: String,
+}
+
+// ============ DNSPod 域名相关结构 ============
+
+#[derive(Debug, Deserialize)]
+struct DomainListResponse {
+    #[serde(rename = "DomainList")]
+    domain_list: Option<Vec<DnspodDomain>>,
+    #[serde(rename = "DomainCountInfo")]
+    #[allow(dead_code)]
+    domain_count_info: Option<DomainCountInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DomainCountInfo {
+    #[serde(rename = "AllTotal")]
+    #[allow(dead_code)]
+    all_total: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DnspodDomain {
+    #[serde(rename = "DomainId")]
+    domain_id: u64,
+    #[serde(rename = "Name")]
+    name: String,
+    #[serde(rename = "Status")]
+    status: String,
+    #[serde(rename = "RecordCount")]
+    record_count: Option<u32>,
+}
+
+// ============ DNSPod 记录相关结构 ============
+
+#[derive(Debug, Deserialize)]
+struct RecordListResponse {
+    #[serde(rename = "RecordList")]
+    record_list: Option<Vec<DnspodRecord>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DnspodRecord {
+    #[serde(rename = "RecordId")]
+    record_id: u64,
+    #[serde(rename = "Name")]
+    name: String,
+    #[serde(rename = "Type")]
+    record_type: String,
+    #[serde(rename = "Value")]
+    value: String,
+    #[serde(rename = "TTL")]
+    ttl: u32,
+    #[serde(rename = "MX")]
+    mx: Option<u16>,
+    #[serde(rename = "UpdatedOn")]
+    updated_on: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateRecordResponse {
+    #[serde(rename = "RecordId")]
+    record_id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModifyRecordResponse {
+    #[serde(rename = "RecordId")]
+    record_id: u64,
+}
+
+// ============ DNSPod Provider 实现 ============
+
+/// 腾讯云 DNSPod Provider
+pub struct DnspodProvider {
+    client: Client,
+    secret_id: String,
+    secret_key: String,
+    account_id: String,
+}
+
+impl DnspodProvider {
+    pub fn new(credentials: HashMap<String, String>) -> Self {
+        let secret_id = credentials.get("secretId").cloned().unwrap_or_default();
+        let secret_key = credentials.get("secretKey").cloned().unwrap_or_default();
+        let account_id = uuid::Uuid::new_v4().to_string();
+
+        Self {
+            client: Client::new(),
+            secret_id,
+            secret_key,
+            account_id,
+        }
+    }
+
+    pub fn with_account_id(credentials: HashMap<String, String>, account_id: String) -> Self {
+        let secret_id = credentials.get("secretId").cloned().unwrap_or_default();
+        let secret_key = credentials.get("secretKey").cloned().unwrap_or_default();
+
+        Self {
+            client: Client::new(),
+            secret_id,
+            secret_key,
+            account_id,
+        }
+    }
+
+    /// 生成 TC3-HMAC-SHA256 签名
+    fn sign(&self, action: &str, payload: &str, timestamp: i64) -> String {
+        let date = DateTime::from_timestamp(timestamp, 0)
+            .unwrap_or_else(Utc::now)
+            .format("%Y-%m-%d")
+            .to_string();
+
+        // 1. 拼接规范请求串
+        let http_request_method = "POST";
+        let canonical_uri = "/";
+        let canonical_query_string = "";
+        let canonical_headers = format!(
+            "content-type:application/json; charset=utf-8\nhost:{}\nx-tc-action:{}\n",
+            DNSPOD_API_HOST,
+            action.to_lowercase()
+        );
+        let signed_headers = "content-type;host;x-tc-action";
+        let hashed_payload = hex::encode(Sha256::digest(payload.as_bytes()));
+        let canonical_request = format!(
+            "{}\n{}\n{}\n{}\n{}\n{}",
+            http_request_method,
+            canonical_uri,
+            canonical_query_string,
+            canonical_headers,
+            signed_headers,
+            hashed_payload
+        );
+
+        // 2. 拼接待签名字符串
+        let algorithm = "TC3-HMAC-SHA256";
+        let credential_scope = format!("{}/{}/tc3_request", date, DNSPOD_SERVICE);
+        let hashed_canonical_request = hex::encode(Sha256::digest(canonical_request.as_bytes()));
+        let string_to_sign = format!(
+            "{}\n{}\n{}\n{}",
+            algorithm, timestamp, credential_scope, hashed_canonical_request
+        );
+
+        // 3. 计算签名
+        let secret_date = Self::hmac_sha256(format!("TC3{}", self.secret_key).as_bytes(), date.as_bytes());
+        let secret_service = Self::hmac_sha256(&secret_date, DNSPOD_SERVICE.as_bytes());
+        let secret_signing = Self::hmac_sha256(&secret_service, b"tc3_request");
+        let signature = hex::encode(Self::hmac_sha256(&secret_signing, string_to_sign.as_bytes()));
+
+        // 4. 拼接 Authorization
+        format!(
+            "{} Credential={}/{}, SignedHeaders={}, Signature={}",
+            algorithm, self.secret_id, credential_scope, signed_headers, signature
+        )
+    }
+
+    fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+        let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
+        mac.update(data);
+        mac.finalize().into_bytes().to_vec()
+    }
+
+    /// 执行腾讯云 API 请求
+    async fn request<T: for<'de> Deserialize<'de>, B: Serialize>(
+        &self,
+        action: &str,
+        body: &B,
+    ) -> Result<T> {
+        let payload = serde_json::to_string(body)
+            .map_err(|e| DnsError::SerializationError(e.to_string()))?;
+
+        let timestamp = Utc::now().timestamp();
+        let authorization = self.sign(action, &payload, timestamp);
+
+        let url = format!("https://{}", DNSPOD_API_HOST);
+        log::debug!("POST {} Action: {}", url, action);
+        log::debug!("Request Body: {}", payload);
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Content-Type", "application/json; charset=utf-8")
+            .header("Host", DNSPOD_API_HOST)
+            .header("X-TC-Action", action)
+            .header("X-TC-Version", DNSPOD_VERSION)
+            .header("X-TC-Timestamp", timestamp.to_string())
+            .header("Authorization", authorization)
+            .body(payload)
+            .send()
+            .await
+            .map_err(|e| DnsError::ApiError(format!("请求失败: {}", e)))?;
+
+        let status = response.status();
+        log::debug!("Response Status: {}", status);
+
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| DnsError::ApiError(format!("读取响应失败: {}", e)))?;
+
+        log::debug!("Response Body: {}", response_text);
+
+        let tc_response: TencentResponse<T> = serde_json::from_str(&response_text).map_err(|e| {
+            log::error!("JSON 解析失败: {}", e);
+            log::error!("原始响应: {}", response_text);
+            DnsError::ApiError(format!("解析响应失败: {}", e))
+        })?;
+
+        if let Some(error) = tc_response.response.error {
+            log::error!("API 错误: {} - {}", error.code, error.message);
+            return Err(DnsError::ApiError(format!(
+                "{}: {}",
+                error.code, error.message
+            )));
+        }
+
+        tc_response
+            .response
+            .data
+            .ok_or_else(|| DnsError::ApiError("响应中缺少数据".to_string()))
+    }
+
+    /// 将 DNSPod 域名状态转换为内部状态
+    fn convert_domain_status(status: &str) -> DomainStatus {
+        match status {
+            "ENABLE" | "enable" => DomainStatus::Active,
+            "PAUSE" | "pause" => DomainStatus::Paused,
+            "SPAM" | "spam" => DomainStatus::Error,
+            _ => DomainStatus::Pending,
+        }
+    }
+
+    /// 将 DNSPod 记录类型转换为内部类型
+    fn convert_record_type(record_type: &str) -> Result<DnsRecordType> {
+        match record_type.to_uppercase().as_str() {
+            "A" => Ok(DnsRecordType::A),
+            "AAAA" => Ok(DnsRecordType::Aaaa),
+            "CNAME" => Ok(DnsRecordType::Cname),
+            "MX" => Ok(DnsRecordType::Mx),
+            "TXT" => Ok(DnsRecordType::Txt),
+            "NS" => Ok(DnsRecordType::Ns),
+            "SRV" => Ok(DnsRecordType::Srv),
+            "CAA" => Ok(DnsRecordType::Caa),
+            _ => Err(DnsError::ApiError(format!(
+                "不支持的记录类型: {}",
+                record_type
+            ))),
+        }
+    }
+
+    /// 将内部记录类型转换为 DNSPod API 格式
+    fn record_type_to_string(record_type: &DnsRecordType) -> String {
+        match record_type {
+            DnsRecordType::A => "A",
+            DnsRecordType::Aaaa => "AAAA",
+            DnsRecordType::Cname => "CNAME",
+            DnsRecordType::Mx => "MX",
+            DnsRecordType::Txt => "TXT",
+            DnsRecordType::Ns => "NS",
+            DnsRecordType::Srv => "SRV",
+            DnsRecordType::Caa => "CAA",
+        }
+        .to_string()
+    }
+}
+
+#[async_trait]
+impl DnsProvider for DnspodProvider {
+    fn id(&self) -> &'static str {
+        "dnspod"
+    }
+
+    async fn validate_credentials(&self) -> Result<bool> {
+        // 通过获取域名列表来验证凭证
+        #[derive(Serialize)]
+        struct DescribeDomainListRequest {
+            #[serde(rename = "Offset")]
+            offset: u32,
+            #[serde(rename = "Limit")]
+            limit: u32,
+        }
+
+        let req = DescribeDomainListRequest {
+            offset: 0,
+            limit: 1,
+        };
+
+        match self
+            .request::<DomainListResponse, _>("DescribeDomainList", &req)
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(DnsError::ApiError(msg)) if msg.contains("AuthFailure") => Ok(false),
+            Err(e) => {
+                log::warn!("凭证验证失败: {}", e);
+                Ok(false)
+            }
+        }
+    }
+
+    async fn list_domains(&self) -> Result<Vec<Domain>> {
+        #[derive(Serialize)]
+        struct DescribeDomainListRequest {
+            #[serde(rename = "Offset")]
+            offset: u32,
+            #[serde(rename = "Limit")]
+            limit: u32,
+        }
+
+        let req = DescribeDomainListRequest {
+            offset: 0,
+            limit: 3000, // 获取所有域名
+        };
+
+        let response: DomainListResponse = self.request("DescribeDomainList", &req).await?;
+
+        let domains = response
+            .domain_list
+            .unwrap_or_default()
+            .into_iter()
+            .map(|d| Domain {
+                id: d.domain_id.to_string(),
+                name: d.name,
+                account_id: self.account_id.clone(),
+                provider: crate::types::DnsProvider::Dnspod,
+                status: Self::convert_domain_status(&d.status),
+                record_count: d.record_count,
+            })
+            .collect();
+
+        Ok(domains)
+    }
+
+    async fn get_domain(&self, domain_id: &str) -> Result<Domain> {
+        // DNSPod API 需要域名字符串，先从域名列表中查找
+        let domains = self.list_domains().await?;
+
+        domains
+            .into_iter()
+            .find(|d| d.id == domain_id)
+            .ok_or_else(|| DnsError::DomainNotFound(domain_id.to_string()))
+    }
+
+    async fn list_records(&self, domain_id: &str) -> Result<Vec<DnsRecord>> {
+        #[derive(Serialize)]
+        struct DescribeRecordListRequest {
+            #[serde(rename = "Domain")]
+            domain: String,
+            #[serde(rename = "Offset")]
+            offset: u32,
+            #[serde(rename = "Limit")]
+            limit: u32,
+        }
+
+        // 先获取域名信息以获取域名名称
+        let domain_info = self.get_domain(domain_id).await?;
+
+        let req = DescribeRecordListRequest {
+            domain: domain_info.name,
+            offset: 0,
+            limit: 3000,
+        };
+
+        let response: RecordListResponse = self.request("DescribeRecordList", &req).await?;
+
+        let records = response
+            .record_list
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|r| {
+                let record_type = Self::convert_record_type(&r.record_type).ok()?;
+                Some(DnsRecord {
+                    id: r.record_id.to_string(),
+                    domain_id: domain_id.to_string(),
+                    record_type,
+                    name: r.name,
+                    value: r.value,
+                    ttl: r.ttl,
+                    priority: r.mx,
+                    proxied: None,
+                    created_at: None,
+                    updated_at: r.updated_on,
+                })
+            })
+            .collect();
+
+        Ok(records)
+    }
+
+    async fn create_record(&self, req: &CreateDnsRecordRequest) -> Result<DnsRecord> {
+        #[derive(Serialize)]
+        struct CreateRecordRequest {
+            #[serde(rename = "Domain")]
+            domain: String,
+            #[serde(rename = "SubDomain")]
+            sub_domain: String,
+            #[serde(rename = "RecordType")]
+            record_type: String,
+            #[serde(rename = "RecordLine")]
+            record_line: String,
+            #[serde(rename = "Value")]
+            value: String,
+            #[serde(rename = "TTL")]
+            ttl: u32,
+            #[serde(rename = "MX", skip_serializing_if = "Option::is_none")]
+            mx: Option<u16>,
+        }
+
+        // 获取域名信息
+        let domain_info = self.get_domain(&req.domain_id).await?;
+
+        let api_req = CreateRecordRequest {
+            domain: domain_info.name,
+            sub_domain: req.name.clone(),
+            record_type: Self::record_type_to_string(&req.record_type),
+            record_line: "默认".to_string(),
+            value: req.value.clone(),
+            ttl: req.ttl,
+            mx: req.priority,
+        };
+
+        let response: CreateRecordResponse = self.request("CreateRecord", &api_req).await?;
+
+        let now = chrono::Utc::now().to_rfc3339();
+        Ok(DnsRecord {
+            id: response.record_id.to_string(),
+            domain_id: req.domain_id.clone(),
+            record_type: req.record_type.clone(),
+            name: req.name.clone(),
+            value: req.value.clone(),
+            ttl: req.ttl,
+            priority: req.priority,
+            proxied: None,
+            created_at: Some(now.clone()),
+            updated_at: Some(now),
+        })
+    }
+
+    async fn update_record(
+        &self,
+        record_id: &str,
+        req: &UpdateDnsRecordRequest,
+    ) -> Result<DnsRecord> {
+        #[derive(Serialize)]
+        struct ModifyRecordRequest {
+            #[serde(rename = "Domain")]
+            domain: String,
+            #[serde(rename = "RecordId")]
+            record_id: u64,
+            #[serde(rename = "SubDomain")]
+            sub_domain: String,
+            #[serde(rename = "RecordType")]
+            record_type: String,
+            #[serde(rename = "RecordLine")]
+            record_line: String,
+            #[serde(rename = "Value")]
+            value: String,
+            #[serde(rename = "TTL")]
+            ttl: u32,
+            #[serde(rename = "MX", skip_serializing_if = "Option::is_none")]
+            mx: Option<u16>,
+        }
+
+        let record_id_num: u64 = record_id
+            .parse()
+            .map_err(|_| DnsError::RecordNotFound(record_id.to_string()))?;
+
+        // 获取域名信息
+        let domain_info = self.get_domain(&req.domain_id).await?;
+
+        let api_req = ModifyRecordRequest {
+            domain: domain_info.name,
+            record_id: record_id_num,
+            sub_domain: req.name.clone(),
+            record_type: Self::record_type_to_string(&req.record_type),
+            record_line: "默认".to_string(),
+            value: req.value.clone(),
+            ttl: req.ttl,
+            mx: req.priority,
+        };
+
+        let _response: ModifyRecordResponse = self.request("ModifyRecord", &api_req).await?;
+
+        let now = chrono::Utc::now().to_rfc3339();
+        Ok(DnsRecord {
+            id: record_id.to_string(),
+            domain_id: req.domain_id.clone(),
+            record_type: req.record_type.clone(),
+            name: req.name.clone(),
+            value: req.value.clone(),
+            ttl: req.ttl,
+            priority: req.priority,
+            proxied: None,
+            created_at: None,
+            updated_at: Some(now),
+        })
+    }
+
+    async fn delete_record(&self, record_id: &str, domain_id: &str) -> Result<()> {
+        #[derive(Serialize)]
+        struct DeleteRecordRequest {
+            #[serde(rename = "Domain")]
+            domain: String,
+            #[serde(rename = "RecordId")]
+            record_id: u64,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct DeleteRecordResponse {}
+
+        let record_id_num: u64 = record_id
+            .parse()
+            .map_err(|_| DnsError::RecordNotFound(record_id.to_string()))?;
+
+        // 获取域名信息
+        let domain_info = self.get_domain(domain_id).await?;
+
+        let api_req = DeleteRecordRequest {
+            domain: domain_info.name,
+            record_id: record_id_num,
+        };
+
+        let _response: DeleteRecordResponse = self.request("DeleteRecord", &api_req).await?;
+
+        Ok(())
+    }
+}
