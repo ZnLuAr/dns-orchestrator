@@ -112,15 +112,18 @@ export default {
     themeSystem: "跟随系统",
     // Language
     language: "语言",
+    languageDesc: "选择你偏好的语言",
     languageZhCN: "简体中文",
     languageEnUS: "English",
     languageJaJP: "日本語",
     // Notifications
     notifications: "通知",
+    notificationsDesc: "管理通知偏好设置",
     operationNotifications: "操作通知",
     operationNotificationsDesc: "显示操作成功/失败的提示",
     // About
     about: "关于",
+    aboutDesc: "版本与更新",
     version: "版本",
     // Update
     checkUpdate: "检查更新",
@@ -139,10 +142,24 @@ export default {
     platformNotSupportedDesc: "请访问 GitHub Releases 手动下载",
     downloadFailed: "下载失败",
     downloadFailedDesc: "{{error}}",
+    downloadProgress: "正在下载更新",
+    installing: "正在安装，即将重启...",
+    retrying: "下载失败，正在重试 ({{current}}/{{max}})",
+    retryFailed: "重试失败",
+    retryFailedDesc: "已重试 {{count}} 次，请稍后再试",
   },
   main: {
     selectDomain: "请从左侧选择一个域名",
     selectDomainHint: "选择账号后，会显示该账号下的所有域名",
     manageDns: "管理 {{domain}} 的 DNS 记录",
+  },
+  statusBar: {
+    ready: "就绪",
+    checking: "检查更新中...",
+    available: "有新版本",
+    clickToUpdate: "点击更新",
+    downloading: "下载中",
+    retrying: "重试中",
+    installing: "正在安装...",
   },
 };

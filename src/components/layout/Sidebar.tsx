@@ -4,12 +4,11 @@ import { useAccountStore, useDomainStore } from "@/stores";
 import { AccountList } from "@/components/account/AccountList";
 import { AccountForm } from "@/components/account/AccountForm";
 import { DomainList } from "@/components/domain/DomainList";
-import { SettingsSheet } from "@/components/settings/SettingsSheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Globe, Plus, Settings } from "lucide-react";
+import { Globe, Plus } from "lucide-react";
 
 export function Sidebar() {
   const { t } = useTranslation();
@@ -32,7 +31,6 @@ export function Sidebar() {
   } = useDomainStore();
 
   const [showAccountForm, setShowAccountForm] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   // 切换账户时先清除域名选择，避免用旧的 domainId 请求新账户
   const handleSelectAccount = useCallback(
@@ -123,21 +121,8 @@ export function Sidebar() {
         )}
       </ScrollArea>
 
-      {/* Footer */}
-      <div className="p-4 border-t">
-        <Button
-          variant="ghost"
-          className="w-full justify-start"
-          onClick={() => setShowSettings(true)}
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          {t("settings.title")}
-        </Button>
-      </div>
-
       {/* Dialogs */}
       <AccountForm open={showAccountForm} onOpenChange={setShowAccountForm} />
-      <SettingsSheet open={showSettings} onOpenChange={setShowSettings} />
     </aside>
   );
 }

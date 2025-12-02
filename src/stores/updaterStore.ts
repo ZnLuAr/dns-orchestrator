@@ -19,6 +19,8 @@ const clearSkippedVersion = (): void => {
   localStorage.removeItem(SKIPPED_VERSION_KEY);
 };
 
+const MAX_RETRIES = 3;
+
 interface UpdaterState {
   checking: boolean;
   downloading: boolean;
@@ -27,6 +29,8 @@ interface UpdaterState {
   error: string | null;
   upToDate: boolean;
   isPlatformUnsupported: boolean;
+  retryCount: number;
+  maxRetries: number;
   checkForUpdates: () => Promise<Update | null>;
   downloadAndInstall: () => Promise<void>;
   skipVersion: () => void;
@@ -42,6 +46,8 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
   error: null,
   upToDate: false,
   isPlatformUnsupported: false,
+  retryCount: 0,
+  maxRetries: MAX_RETRIES,
 
   checkForUpdates: async () => {
     set({ checking: true, error: null, upToDate: false, isPlatformUnsupported: false });
@@ -91,9 +97,9 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
     const { available } = get();
     if (!available) return;
 
-    set({ downloading: true, progress: 0, error: null });
+    set({ downloading: true, progress: 0, error: null, retryCount: 0 });
 
-    try {
+    const attemptDownload = async (): Promise<void> => {
       let downloaded = 0;
       let contentLength = 0;
 
@@ -118,17 +124,42 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             break;
         }
       });
+    };
 
-      // 安装完成后清除跳过的版本记录，并重启应用
-      console.log("[Updater] Install complete, relaunching...");
-      clearSkippedVersion();
-      await relaunch();
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error("[Updater] Download/install failed:", errorMessage, e);
-      set({ error: errorMessage, downloading: false });
-      throw e; // 抛出错误以便上层处理
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`[Updater] Retry attempt ${attempt}/${MAX_RETRIES}...`);
+          set({ retryCount: attempt, progress: 0 });
+          // 等待 2 秒后重试
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        await attemptDownload();
+
+        // 安装完成后清除跳过的版本记录，并重启应用
+        console.log("[Updater] Install complete, relaunching...");
+        clearSkippedVersion();
+        await relaunch();
+        return; // 成功，退出函数
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error(String(e));
+        console.error(`[Updater] Download attempt ${attempt + 1} failed:`, lastError.message);
+
+        if (attempt === MAX_RETRIES) {
+          // 已达到最大重试次数，放弃
+          console.error("[Updater] All retry attempts failed");
+          break;
+        }
+      }
     }
+
+    // 所有重试都失败了
+    const errorMessage = lastError?.message || "Download failed";
+    set({ error: errorMessage, downloading: false, retryCount: MAX_RETRIES });
+    throw lastError || new Error(errorMessage);
   },
 
   skipVersion: () => {
@@ -148,6 +179,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
       error: null,
       upToDate: false,
       isPlatformUnsupported: false,
+      retryCount: 0,
     });
   },
 

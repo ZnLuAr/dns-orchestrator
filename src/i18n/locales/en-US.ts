@@ -112,15 +112,18 @@ export default {
     themeSystem: "System",
     // Language
     language: "Language",
+    languageDesc: "Choose your preferred language",
     languageZhCN: "简体中文",
     languageEnUS: "English",
     languageJaJP: "日本語",
     // Notifications
     notifications: "Notifications",
+    notificationsDesc: "Manage notification preferences",
     operationNotifications: "Operation Notifications",
     operationNotificationsDesc: "Show success/failure notifications for operations",
     // About
     about: "About",
+    aboutDesc: "Version and updates",
     version: "Version",
     // Update
     checkUpdate: "Check for Updates",
@@ -139,10 +142,24 @@ export default {
     platformNotSupportedDesc: "Please download manually from GitHub Releases",
     downloadFailed: "Download failed",
     downloadFailedDesc: "{{error}}",
+    downloadProgress: "Downloading update",
+    installing: "Installing, restarting soon...",
+    retrying: "Download failed, retrying ({{current}}/{{max}})",
+    retryFailed: "Retry failed",
+    retryFailedDesc: "Retried {{count}} times, please try again later",
   },
   main: {
     selectDomain: "Please select a domain from the left",
     selectDomainHint: "After selecting an account, all domains under that account will be displayed",
     manageDns: "Manage DNS records for {{domain}}",
+  },
+  statusBar: {
+    ready: "Ready",
+    checking: "Checking for updates...",
+    available: "New version",
+    clickToUpdate: "Click to update",
+    downloading: "Downloading",
+    retrying: "Retrying",
+    installing: "Installing...",
   },
 };
