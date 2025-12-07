@@ -94,6 +94,22 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      # 读取 release note 文件
+      - name: Read release notes
+        if: github.event_name == 'push'
+        id: release-notes
+        run: |
+          VERSION="${{ github.ref_name }}"
+          NOTES_FILE="docs/release-note/${VERSION}.md"
+
+          if [ -f "$NOTES_FILE" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            cat "$NOTES_FILE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
+          fi
+
       # Tag push: Build and release
       - name: Build and release
         if: github.event_name == 'push'
@@ -106,7 +122,9 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'DNS Orchestrator ${{ github.ref_name }}'
           releaseBody: |
-            See the assets below to download the app for your platform.
+            ${{ steps.release-notes.outputs.notes }}
+
+            ---
 
             ## Platforms
             - **macOS**: `.dmg` (Apple Silicon / Intel)
@@ -257,10 +275,11 @@ jobs:
             APK_NAME=$(gh release view ${{ github.ref_name }} --repo ${{ github.repository }} --json assets -q '.assets[] | select(.name | endswith(".apk")) | .name' | head -1)
 
             if [ -n "$APK_NAME" ]; then
+              APK_SIGNATURE="none"
               APK_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${APK_NAME}"
 
               # 使用 jq 添加 Android 平台
-              jq --arg url "$APK_URL" '.platforms.android = {"url": $url}' latest.json > latest.json.tmp
+              jq --arg sig "$APK_SIGNATURE" --arg url "$APK_URL" '.platforms.android = {"signature": $sig, "url": $url}' latest.json > latest.json.tmp
               mv latest.json.tmp latest.json
 
               echo "Updated latest.json with Android URL: $APK_URL"
