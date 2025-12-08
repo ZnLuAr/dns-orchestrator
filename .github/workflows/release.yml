@@ -3,17 +3,20 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       platform:
-        description: '选择要构建的平台'
+        description: "选择要构建的平台"
         required: true
-        default: 'all'
+        default: "all"
         type: choice
         options:
           - all
           - desktop
+          - windows
+          - macos
+          - linux
           - android
 
 jobs:
@@ -25,16 +28,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS Apple Silicon
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-            rust_target: aarch64-apple-darwin
-
-          # macOS Intel
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-            rust_target: x86_64-apple-darwin
-
           # Windows x64
           - platform: windows-latest
             args: --target x86_64-pc-windows-msvc
@@ -47,11 +40,11 @@ jobs:
 
           # Linux x64
           - platform: ubuntu-22.04
-            args: ''
+            args: ""
 
           # Linux ARM64 (native runner)
           - platform: ubuntu-22.04-arm
-            args: ''
+            args: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -67,7 +60,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -121,7 +114,154 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'DNS Orchestrator ${{ github.ref_name }}'
+          releaseName: "DNS Orchestrator ${{ github.ref_name }}"
+          releaseBody: |
+            ${{ steps.release-notes.outputs.notes }}
+
+            ---
+
+            ## Platforms
+            - **macOS**: `.dmg` (Apple Silicon / Intel)
+            - **Windows**: `.msi` / `.exe` (x64, ARM64)
+            - **Linux**: `.deb` / `.AppImage` (x64, ARM64)
+            - **Android**: `.apk`
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+          updaterJsonPreferNsis: true
+
+      # Manual trigger: Build only (no release)
+      - name: Build only
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm tauri build ${{ matrix.args }}
+
+      - name: Upload artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
+          path: |
+            src-tauri/target/release/bundle/
+
+  # MacOS 构建
+  release-macos:
+    if: github.event_name == 'push' || inputs.platform == 'macos' || inputs.platform == 'desktop' || inputs.platform == 'all'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+
+          # macOS Intel
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+            rust_target: x86_64-apple-darwin
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Import Apple Developer Certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+      - name: Verify Certificate
+        run: |
+          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" || true)
+          if [ -z "$CERT_INFO" ]; then
+            echo "Error: Developer ID Application certificate not found!"
+            echo "Available identities:"
+            security find-identity -v -p codesigning build.keychain
+            exit 1
+          fi
+          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+          echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
+          echo "Found certificate: $CERT_ID"
+
+      - name: Setup Notarization
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$APPLE_API_KEY_CONTENT" | base64 --decode > ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
+          echo "APPLE_API_KEY_PATH=$HOME/private_keys/AuthKey_${{ secrets.APPLE_API_KEY }}.p8" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      # 读取 release note 文件
+      - name: Read release notes
+        if: github.event_name == 'push'
+        id: release-notes
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          NOTES_FILE="docs/release-note/${VERSION}.md"
+
+          if [ -f "$NOTES_FILE" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            cat "$NOTES_FILE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      # Tag push: Build and release
+      - name: Build and release
+        if: github.event_name == 'push'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 签名
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
+          # 公证 (App Store Connect API)
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
+          # Tauri 更新签名
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "DNS Orchestrator ${{ github.ref_name }}"
           releaseBody: |
             ${{ steps.release-notes.outputs.notes }}
 
@@ -169,8 +309,8 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -184,7 +324,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -248,7 +388,7 @@ jobs:
   # 更新 latest.json 添加 Android 平台
   update-latest-json:
     if: github.event_name == 'push'
-    needs: [release, release-android]
+    needs: [release, release-macos, release-android]
     permissions:
       contents: write
     runs-on: ubuntu-latest
