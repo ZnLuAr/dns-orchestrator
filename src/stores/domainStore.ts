@@ -98,10 +98,10 @@ export const useDomainStore = create<DomainState>((set, get) => ({
                 domainsByAccount: {
                   ...state.domainsByAccount,
                   [account.id]: {
-                    domains: response.data?.items,
+                    domains: response.data!.items,
                     lastUpdated: Date.now(),
-                    page: response.data?.page,
-                    hasMore: response.data?.hasMore,
+                    page: response.data!.page,
+                    hasMore: response.data!.hasMore,
                   },
                 },
               }))
@@ -139,10 +139,10 @@ export const useDomainStore = create<DomainState>((set, get) => ({
           domainsByAccount: {
             ...state.domainsByAccount,
             [accountId]: {
-              domains: response.data?.items,
+              domains: response.data!.items,
               lastUpdated: Date.now(),
-              page: response.data?.page,
-              hasMore: response.data?.hasMore,
+              page: response.data!.page,
+              hasMore: response.data!.hasMore,
             },
           },
         }))

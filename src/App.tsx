@@ -26,7 +26,7 @@ function getNavView(view: View): "main" | "domains" | "settings" | "toolbox" | "
 
 function App() {
   const { checkForUpdates, showUpdateDialog, setShowUpdateDialog } = useUpdaterStore()
-  const { accounts, selectAccount } = useAccountStore()
+  const { accounts, selectAccount, fetchAccounts } = useAccountStore()
   const { selectDomain, loadFromStorage, refreshAllAccounts } = useDomainStore()
   const [currentView, setCurrentView] = useState<View>("main")
   const isMobile = useIsMobile()
@@ -41,9 +41,11 @@ function App() {
   useEffect(() => {
     initTheme()
     initDebugMode()
+    // 加载账户列表
+    fetchAccounts()
     // 从 localStorage 加载域名缓存
     loadFromStorage()
-  }, [loadFromStorage])
+  }, [fetchAccounts, loadFromStorage])
 
   // 账户加载完成后，后台刷新域名
   useEffect(() => {
