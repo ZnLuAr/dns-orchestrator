@@ -13,6 +13,7 @@ import { UpdateDialog } from "@/components/ui/update-dialog"
 import { TIMING } from "@/constants"
 import { useIsMobile } from "@/hooks/useMediaQuery"
 import { initDebugMode } from "@/lib/debug"
+import { logger } from "@/lib/logger"
 import { initTheme, useAccountStore, useDomainStore } from "@/stores"
 import { useUpdaterStore } from "@/stores/updaterStore"
 
@@ -66,7 +67,7 @@ function App() {
       try {
         await checkForUpdates()
       } catch (error) {
-        console.error("Update check failed:", error)
+        logger.error("Update check failed:", error)
       }
     }, TIMING.UPDATE_CHECK_DELAY)
 
@@ -127,7 +128,7 @@ function App() {
       case "main":
         return <HomePage onNavigate={handleNavigate} onQuickAccess={handleQuickAccess} />
       case "domains":
-        return <DomainSelectorPage onSelect={handleSelectDomain} />
+        return <DomainSelectorPage onBack={() => setCurrentView("main")} onSelect={handleSelectDomain} />
       case "domains-detail":
         if (selectedDomainInfo) {
           return (
@@ -139,7 +140,7 @@ function App() {
           )
         }
         // 如果没有选中信息，回到列表
-        return <DomainSelectorPage onSelect={handleSelectDomain} />
+        return <DomainSelectorPage onBack={() => setCurrentView("main")} onSelect={handleSelectDomain} />
       case "settings":
         return <SettingsPage onBack={() => setCurrentView("main")} />
       case "toolbox":

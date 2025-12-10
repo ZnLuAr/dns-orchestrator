@@ -9,15 +9,10 @@ pub use dns_orchestrator_provider::{
     // DNS 记录类型
     CreateDnsRecordRequest, DnsRecord, DnsRecordType, UpdateDnsRecordRequest,
     // Provider 元数据类型
-    FieldType, ProviderCredentials, ProviderMetadata,
+    ProviderCredentials, ProviderMetadata,
     // Domain 相关（重命名避免冲突）
     Domain as LibDomain, DomainStatus, ProviderType,
 };
-
-// ============ 类型别名（保持兼容性）============
-
-/// Provider 类型枚举别名
-pub type DnsProvider = ProviderType;
 
 // ============ 应用层 Provider 相关类型 ============
 
@@ -32,7 +27,7 @@ pub enum AccountStatus {
 pub struct Account {
     pub id: String,
     pub name: String,
-    pub provider: DnsProvider,
+    pub provider: ProviderType,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
@@ -46,7 +41,7 @@ pub struct Account {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAccountRequest {
     pub name: String,
-    pub provider: DnsProvider,
+    pub provider: ProviderType,
     pub credentials: HashMap<String, String>,
 }
 
@@ -59,7 +54,7 @@ pub struct Domain {
     pub name: String,
     #[serde(rename = "accountId")]
     pub account_id: String,
-    pub provider: DnsProvider,
+    pub provider: ProviderType,
     pub status: DomainStatus,
     #[serde(rename = "recordCount", skip_serializing_if = "Option::is_none")]
     pub record_count: Option<u32>,
@@ -85,13 +80,6 @@ impl Domain {
 pub struct ApiResponse<T> {
     pub success: bool,
     pub data: Option<T>,
-    pub error: Option<ApiError>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiError {
-    pub code: String,
-    pub message: String,
 }
 
 impl<T> ApiResponse<T> {
@@ -99,18 +87,6 @@ impl<T> ApiResponse<T> {
         Self {
             success: true,
             data: Some(data),
-            error: None,
-        }
-    }
-
-    pub fn error(code: &str, message: &str) -> Self {
-        Self {
-            success: false,
-            data: None,
-            error: Some(ApiError {
-                code: code.to_string(),
-                message: message.to_string(),
-            }),
         }
     }
 }
@@ -262,7 +238,7 @@ pub struct BatchDeleteFailure {
 pub struct ExportedAccount {
     pub id: String,
     pub name: String,
-    pub provider: DnsProvider,
+    pub provider: ProviderType,
     pub created_at: String,
     pub updated_at: String,
     /// 凭证数据（导出时包含）
@@ -350,7 +326,7 @@ pub struct ImportPreview {
 #[serde(rename_all = "camelCase")]
 pub struct ImportPreviewAccount {
     pub name: String,
-    pub provider: DnsProvider,
+    pub provider: ProviderType,
     /// 是否与现有账号名称冲突
     pub has_conflict: bool,
 }

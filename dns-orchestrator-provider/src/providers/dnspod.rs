@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::{DnsError, ProviderError, Result};
+use crate::error::{ProviderError, Result};
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper, RawApiError};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain, DomainStatus, PaginatedResponse,
@@ -234,8 +234,10 @@ impl DnspodProvider {
         action: &str,
         body: &B,
     ) -> Result<T> {
-        let payload =
-            serde_json::to_string(body).map_err(|e| DnsError::SerializationError(e.to_string()))?;
+        let payload = serde_json::to_string(body).map_err(|e| ProviderError::SerializationError {
+            provider: self.provider_name().to_string(),
+            detail: e.to_string(),
+        })?;
 
         let timestamp = Utc::now().timestamp();
         let authorization = self.sign(action, &payload, timestamp);
@@ -363,7 +365,7 @@ impl DnsProvider for DnspodProvider {
             .await
         {
             Ok(_) => Ok(true),
-            Err(DnsError::Provider(ProviderError::InvalidCredentials { .. })) => Ok(false),
+            Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
             Err(e) => {
                 log::warn!("凭证验证失败: {e}");
                 Ok(false)
@@ -427,7 +429,10 @@ impl DnsProvider for DnspodProvider {
             .items
             .into_iter()
             .find(|d| d.id == domain_id)
-            .ok_or_else(|| DnsError::DomainNotFound(domain_id.to_string()))
+            .ok_or_else(|| ProviderError::DomainNotFound {
+                provider: self.provider_name().to_string(),
+                domain: domain_id.to_string(),
+            })
     }
 
     async fn list_records(
@@ -503,7 +508,7 @@ impl DnsProvider for DnspodProvider {
                 ))
             }
             // "NoDataOfRecord" 表示记录列表为空，返回空结果而不是错误
-            Err(DnsError::Provider(ProviderError::Unknown { raw_code, .. }))
+            Err(ProviderError::Unknown { raw_code, .. })
                 if raw_code.as_deref() == Some("ResourceNotFound.NoDataOfRecord") =>
             {
                 Ok(PaginatedResponse::new(
@@ -591,9 +596,11 @@ impl DnsProvider for DnspodProvider {
             mx: Option<u16>,
         }
 
-        let record_id_num: u64 = record_id
-            .parse()
-            .map_err(|_| DnsError::RecordNotFound(record_id.to_string()))?;
+        let record_id_num: u64 = record_id.parse().map_err(|_| ProviderError::RecordNotFound {
+            provider: self.provider_name().to_string(),
+            record_id: record_id.to_string(),
+            raw_message: None,
+        })?;
 
         // 获取域名信息
         let domain_info = self.get_domain(&req.domain_id).await?;
@@ -638,9 +645,11 @@ impl DnsProvider for DnspodProvider {
         #[derive(Debug, Deserialize)]
         struct DeleteRecordResponse {}
 
-        let record_id_num: u64 = record_id
-            .parse()
-            .map_err(|_| DnsError::RecordNotFound(record_id.to_string()))?;
+        let record_id_num: u64 = record_id.parse().map_err(|_| ProviderError::RecordNotFound {
+            provider: self.provider_name().to_string(),
+            record_id: record_id.to_string(),
+            raw_message: None,
+        })?;
 
         // 获取域名信息
         let domain_info = self.get_domain(domain_id).await?;

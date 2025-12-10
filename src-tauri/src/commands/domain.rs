@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::error::{DnsError, LibDnsError, ProviderError};
+use crate::error::{DnsError, ProviderError};
 use crate::types::{AccountStatus, ApiResponse, Domain, PaginatedResponse, PaginationParams};
 use crate::AppState;
 
@@ -53,14 +53,14 @@ pub async fn list_domains(
             );
             Ok(ApiResponse::success(response))
         }
-        Err(LibDnsError::Provider(ProviderError::InvalidCredentials { provider })) => {
+        Err(ProviderError::InvalidCredentials { provider }) => {
             // 凭证失效，更新账户状态
             mark_account_invalid(&state, &account_id, "凭证已失效").await;
             Err(DnsError::Provider(ProviderError::InvalidCredentials {
                 provider,
             }))
         }
-        Err(e) => Err(DnsError::Library(e)),
+        Err(e) => Err(DnsError::Provider(e)),
     }
 }
 

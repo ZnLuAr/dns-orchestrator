@@ -1,4 +1,12 @@
-import { ChevronRight, Globe, Loader2, RefreshCw, Search, TriangleAlert } from "lucide-react"
+import {
+  ArrowLeft,
+  ChevronRight,
+  Globe,
+  Loader2,
+  RefreshCw,
+  Search,
+  TriangleAlert,
+} from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { getProviderName, ProviderIcon } from "@/components/account/ProviderIcon"
@@ -13,6 +21,7 @@ import { useAccountStore, useDomainStore } from "@/stores"
 import type { Account, Domain, DomainStatus } from "@/types"
 
 interface DomainSelectorPageProps {
+  onBack: () => void
   onSelect: (accountId: string, domainId: string, domainName: string) => void
 }
 
@@ -27,7 +36,7 @@ const statusConfig: Record<
   unknown: { labelKey: "domain.status.unknown", variant: "outline" },
 }
 
-export function DomainSelectorPage({ onSelect }: DomainSelectorPageProps) {
+export function DomainSelectorPage({ onBack, onSelect }: DomainSelectorPageProps) {
   const { t } = useTranslation()
   const { accounts, isLoading: isAccountsLoading } = useAccountStore()
   const {
@@ -228,7 +237,10 @@ export function DomainSelectorPage({ onSelect }: DomainSelectorPageProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
+      <div className="flex items-center gap-2 border-b bg-background px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
         <Globe className="h-5 w-5 text-primary" />
         <h2 className="flex-1 font-semibold text-xl">{t("nav.domains")}</h2>
         <Button

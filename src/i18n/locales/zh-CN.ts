@@ -146,6 +146,8 @@ export default {
     updateFailed: "更新记录失败",
     deleteSuccess: "记录已删除",
     deleteFailed: "删除记录失败",
+    batchDeleteSuccess: "成功删除 {{count}} 条记录",
+    batchDeletePartial: "成功删除 {{success}} 条记录，{{failed}} 条失败",
   },
   domain: {
     title: "域名",
@@ -377,6 +379,12 @@ export default {
     missing_nonce: "缺少加密 nonce",
     decryption_failed: "解密失败，请检查密码是否正确",
     parse_accounts_failed: "解析账号数据失败: {{detail}}",
+    // 字段级验证错误
+    field: {
+      missing: "{{label}} 不能为空",
+      empty: "{{label}} 不能为空",
+      invalid_format: "{{label}} 格式无效: {{reason}}",
+    },
     // Provider 错误（统一错误类型）
     provider: {
       // 通用错误（所有 Provider 共享）

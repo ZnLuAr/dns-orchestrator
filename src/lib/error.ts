@@ -1,5 +1,13 @@
 import i18n from "@/i18n"
-import type { ApiError, DnsErrorCode, ProviderErrorDetails } from "@/types"
+import { createLogger } from "@/lib/logger"
+import type {
+  ApiError,
+  CredentialValidationDetails,
+  DnsErrorCode,
+  ProviderErrorDetails,
+} from "@/types"
+
+const log = createLogger({ module: "Error" })
 
 /**
  * 将 PascalCase 转换为 snake_case
@@ -100,24 +108,25 @@ function parseErrorCode(message: string): { code: string; detail?: string } | nu
 export function getErrorMessage(error: ApiError | undefined): string {
   if (!error) return i18n.t("errors.unknown")
 
-  // DEBUG: 打印收到的错误对象
-  console.log("[getErrorMessage] error:", JSON.stringify(error, null, 2))
+  log.debug("getErrorMessage input:", JSON.stringify(error, null, 2))
 
   // 处理 ProviderError
   if (isProviderError(error)) {
-    console.log(
-      "[getErrorMessage] isProviderError: true, details:",
-      JSON.stringify(error.details, null, 2)
-    )
+    log.debug("isProviderError: true, details:", JSON.stringify(error.details, null, 2))
     return getProviderErrorMessage(error.details)
   }
 
-  console.log("[getErrorMessage] isProviderError: false")
+  // 直接尝试用 error.code 查找翻译（支持 PascalCase 的 DnsError 变体）
+  const snakeCaseCode = toSnakeCase(error.code)
+  const directKey = `errors.${snakeCaseCode}`
+  if (i18n.exists(directKey)) {
+    return i18n.t(directKey)
+  }
 
   const raw = extractRawMessage(error)
   if (!raw) return i18n.t("errors.unknown")
 
-  // 尝试解析错误码
+  // 尝试解析错误码（用于 SCREAMING_SNAKE_CASE 格式）
   const parsed = parseErrorCode(raw)
   if (parsed) {
     const key = `errors.${parsed.code.toLowerCase()}`
@@ -142,9 +151,7 @@ export function isErrorCode(error: ApiError | undefined, code: DnsErrorCode): bo
  * 处理 Tauri 抛出的各种错误格式
  */
 export function extractErrorMessage(err: unknown): string {
-  // DEBUG
-  console.log("[extractErrorMessage] err:", err)
-  console.log("[extractErrorMessage] typeof err:", typeof err)
+  log.debug("extractErrorMessage input:", err, "type:", typeof err)
 
   if (!err) return i18n.t("errors.unknown")
 
@@ -214,4 +221,18 @@ export function isCredentialError(err: unknown): boolean {
   }
 
   return false
+}
+
+/**
+ * 从 CredentialValidationDetails 获取字段级错误消息
+ */
+export function getFieldErrorMessage(details: CredentialValidationDetails): string {
+  switch (details.type) {
+    case "missingField":
+      return i18n.t("errors.field.missing", { label: details.label })
+    case "emptyField":
+      return i18n.t("errors.field.empty", { label: details.label })
+    case "invalidFormat":
+      return i18n.t("errors.field.invalid_format", { label: details.label, reason: details.reason })
+  }
 }

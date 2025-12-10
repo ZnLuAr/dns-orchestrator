@@ -42,7 +42,7 @@ mod traits;
 mod types;
 
 // Re-export error types
-pub use error::{DnsError, ProviderError, Result};
+pub use error::{ProviderError, Result};
 
 // Re-export factory functions
 pub use factory::{create_provider, get_all_provider_metadata};
@@ -52,9 +52,10 @@ pub use traits::DnsProvider;
 
 // Re-export types
 pub use types::{
-    CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain, DomainStatus, FieldType,
-    PaginatedResponse, PaginationParams, ProviderCredentialField, ProviderCredentials,
-    ProviderFeatures, ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, CredentialValidationError, DnsRecord, DnsRecordType, Domain,
+    DomainStatus, FieldType, PaginatedResponse, PaginationParams, ProviderCredentialField,
+    ProviderCredentials, ProviderFeatures, ProviderMetadata, ProviderType, RecordQueryParams,
+    UpdateDnsRecordRequest,
 };
 
 // Re-export concrete providers (behind feature flags)

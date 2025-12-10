@@ -227,6 +227,43 @@ pub struct ProviderMetadata {
 
 // ============ 凭证类型 ============
 
+/// 凭证验证错误
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum CredentialValidationError {
+    /// 缺失必需字段
+    MissingField {
+        provider: ProviderType,
+        field: String,
+        label: String,
+    },
+    /// 字段值为空
+    EmptyField {
+        provider: ProviderType,
+        field: String,
+        label: String,
+    },
+    /// 字段格式无效
+    InvalidFormat {
+        provider: ProviderType,
+        field: String,
+        label: String,
+        reason: String,
+    },
+}
+
+impl std::fmt::Display for CredentialValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingField { label, .. } => write!(f, "缺少必填字段: {label}"),
+            Self::EmptyField { label, .. } => write!(f, "字段不能为空: {label}"),
+            Self::InvalidFormat { label, reason, .. } => write!(f, "{label}: {reason}"),
+        }
+    }
+}
+
+impl std::error::Error for CredentialValidationError {}
+
 /// 凭证枚举 - 类型安全的凭证定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "provider", content = "credentials")]
@@ -258,44 +295,65 @@ impl ProviderCredentials {
     pub fn from_map(
         provider: &ProviderType,
         map: &std::collections::HashMap<String, String>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, CredentialValidationError> {
         match provider {
             ProviderType::Cloudflare => Ok(Self::Cloudflare {
-                api_token: map
-                    .get("apiToken")
-                    .cloned()
-                    .ok_or("missing apiToken")?,
+                api_token: Self::get_required_field(provider, map, "apiToken", "API Token")?,
             }),
             ProviderType::Aliyun => Ok(Self::Aliyun {
-                access_key_id: map
-                    .get("accessKeyId")
-                    .cloned()
-                    .ok_or("missing accessKeyId")?,
-                access_key_secret: map
-                    .get("accessKeySecret")
-                    .cloned()
-                    .ok_or("missing accessKeySecret")?,
+                access_key_id: Self::get_required_field(
+                    provider,
+                    map,
+                    "accessKeyId",
+                    "Access Key ID",
+                )?,
+                access_key_secret: Self::get_required_field(
+                    provider,
+                    map,
+                    "accessKeySecret",
+                    "Access Key Secret",
+                )?,
             }),
             ProviderType::Dnspod => Ok(Self::Dnspod {
-                secret_id: map
-                    .get("secretId")
-                    .cloned()
-                    .ok_or("missing secretId")?,
-                secret_key: map
-                    .get("secretKey")
-                    .cloned()
-                    .ok_or("missing secretKey")?,
+                secret_id: Self::get_required_field(provider, map, "secretId", "Secret ID")?,
+                secret_key: Self::get_required_field(provider, map, "secretKey", "Secret Key")?,
             }),
             ProviderType::Huaweicloud => Ok(Self::Huaweicloud {
-                access_key_id: map
-                    .get("accessKeyId")
-                    .cloned()
-                    .ok_or("missing accessKeyId")?,
-                secret_access_key: map
-                    .get("secretAccessKey")
-                    .cloned()
-                    .ok_or("missing secretAccessKey")?,
+                access_key_id: Self::get_required_field(
+                    provider,
+                    map,
+                    "accessKeyId",
+                    "Access Key ID",
+                )?,
+                secret_access_key: Self::get_required_field(
+                    provider,
+                    map,
+                    "secretAccessKey",
+                    "Secret Access Key",
+                )?,
             }),
+        }
+    }
+
+    /// 从 HashMap 中获取必需字段，校验非空
+    fn get_required_field(
+        provider: &ProviderType,
+        map: &std::collections::HashMap<String, String>,
+        key: &str,
+        label: &str,
+    ) -> Result<String, CredentialValidationError> {
+        match map.get(key) {
+            None => Err(CredentialValidationError::MissingField {
+                provider: provider.clone(),
+                field: key.to_string(),
+                label: label.to_string(),
+            }),
+            Some(v) if v.trim().is_empty() => Err(CredentialValidationError::EmptyField {
+                provider: provider.clone(),
+                field: key.to_string(),
+                label: label.to_string(),
+            }),
+            Some(v) => Ok(v.clone()),
         }
     }
 

@@ -1,5 +1,4 @@
 use serde::Serialize;
-use thiserror::Error;
 
 /// Provider 统一错误类型
 /// 用于将各 DNS Provider 的原始错误映射到统一的错误类型
@@ -44,6 +43,9 @@ pub enum ProviderError {
 
     /// 响应解析失败
     ParseError { provider: String, detail: String },
+
+    /// 序列化/反序列化失败
+    SerializationError { provider: String, detail: String },
 
     /// 未知错误（fallback）
     Unknown {
@@ -92,6 +94,9 @@ impl std::fmt::Display for ProviderError {
             Self::ParseError { provider, detail } => {
                 write!(f, "[{provider}] Parse error: {detail}")
             }
+            Self::SerializationError { provider, detail } => {
+                write!(f, "[{provider}] Serialization error: {detail}")
+            }
             Self::Unknown {
                 provider,
                 raw_message,
@@ -105,27 +110,5 @@ impl std::fmt::Display for ProviderError {
 
 impl std::error::Error for ProviderError {}
 
-/// DNS 错误类型（库层面，不包含应用层错误）
-#[derive(Error, Debug, Serialize)]
-#[serde(tag = "code", content = "details")]
-pub enum DnsError {
-    #[error("Provider not found: {0}")]
-    ProviderNotFound(String),
-
-    #[error("Domain not found: {0}")]
-    DomainNotFound(String),
-
-    #[error("Record not found: {0}")]
-    RecordNotFound(String),
-
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-
-    #[error("{0}")]
-    Provider(#[from] ProviderError),
-}
-
-pub type Result<T> = std::result::Result<T, DnsError>;
+/// 库的统一 Result 类型
+pub type Result<T> = std::result::Result<T, ProviderError>;

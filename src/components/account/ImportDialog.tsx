@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { getErrorMessage } from "@/lib/error"
+import { extractErrorMessage, getErrorMessage } from "@/lib/error"
 import { accountService } from "@/services"
 import type { ImportAccountsRequest, ImportPreview } from "@/types"
 import { getProviderName, ProviderIcon } from "./ProviderIcon"
@@ -76,7 +76,7 @@ export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDial
         toast.error(getErrorMessage(response.error))
       }
     } catch (err) {
-      toast.error(String(err))
+      toast.error(extractErrorMessage(err))
     } finally {
       setIsLoading(false)
     }
@@ -96,7 +96,7 @@ export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDial
         toast.error(getErrorMessage(response.error))
       }
     } catch (err) {
-      toast.error(String(err))
+      toast.error(extractErrorMessage(err))
     } finally {
       setIsLoading(false)
     }
@@ -135,7 +135,7 @@ export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDial
         setStep("preview")
       }
     } catch (err) {
-      toast.error(String(err))
+      toast.error(extractErrorMessage(err))
       setStep("preview")
     }
   }

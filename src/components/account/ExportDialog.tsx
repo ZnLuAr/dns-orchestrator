@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
-import { getErrorMessage } from "@/lib/error"
+import { extractErrorMessage, getErrorMessage } from "@/lib/error"
 import { accountService } from "@/services"
 import type { Account, ExportAccountsRequest } from "@/types"
 import { getProviderName, ProviderIcon } from "./ProviderIcon"
@@ -115,7 +115,7 @@ export function ExportDialog({ open, onOpenChange, accounts }: ExportDialogProps
       onOpenChange(false)
       resetForm()
     } catch (err) {
-      toast.error(String(err))
+      toast.error(extractErrorMessage(err))
     } finally {
       setIsExporting(false)
     }

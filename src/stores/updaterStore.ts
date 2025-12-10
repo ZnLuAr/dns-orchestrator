@@ -100,58 +100,58 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
     set({ checking: true, error: null, upToDate: false, isPlatformUnsupported: false })
     try {
       const currentPlatform = getPlatform()
-      logger.debug("[Updater] Platform:", currentPlatform)
+      logger.debug("Platform:", currentPlatform)
 
       if (currentPlatform === "android") {
         // Android 平台：调用自定义命令
-        logger.debug("[Updater] Checking for Android updates...")
+        logger.debug("Checking for Android updates...")
         const update = await invoke<AndroidUpdate | null>("check_android_update", {
           currentVersion: ENV.appVersion,
         })
-        logger.debug("[Updater] Android check result:", update)
+        logger.debug("Android check result:", update)
 
         if (update) {
           const skippedVersion = getSkippedVersion()
           if (skippedVersion === update.version) {
-            logger.debug("[Updater] Version is skipped")
+            logger.debug("Version is skipped")
             set({ available: null, checking: false, upToDate: true })
             return null
           }
-          logger.debug("[Updater] Update available:", update.version)
+          logger.debug("Update available:", update.version)
           set({ available: update, checking: false, upToDate: false, showUpdateDialog: true })
           return update
         } else {
-          logger.debug("[Updater] No update available")
+          logger.debug("No update available")
           set({ available: null, checking: false, upToDate: true })
           return null
         }
       } else {
         // 桌面平台：使用 tauri-plugin-updater
-        logger.debug("[Updater] Checking for desktop updates...")
+        logger.debug("Checking for desktop updates...")
         const update = await check()
-        logger.debug("[Updater] Check result:", update)
+        logger.debug("Check result:", update)
 
         if (update) {
           const skippedVersion = getSkippedVersion()
-          logger.debug("[Updater] Skipped version:", skippedVersion)
-          logger.debug("[Updater] Update version:", update.version)
+          logger.debug("Skipped version:", skippedVersion)
+          logger.debug("Update version:", update.version)
 
           if (skippedVersion === update.version) {
-            logger.debug("[Updater] Version is skipped, treating as no update")
+            logger.debug("Version is skipped, treating as no update")
             set({ available: null, checking: false, upToDate: true })
             return null
           }
-          logger.debug("[Updater] Update available:", update.version)
+          logger.debug("Update available:", update.version)
           set({ available: update, checking: false, upToDate: false, showUpdateDialog: true })
         } else {
-          logger.debug("[Updater] No update available")
+          logger.debug("No update available")
           set({ available: null, checking: false, upToDate: true })
         }
         return update
       }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e)
-      console.error("[Updater] Check failed:", errorMessage, e)
+      logger.error("Check failed:", errorMessage, e)
 
       const isPlatformError =
         errorMessage.includes("platform") && errorMessage.includes("was not found")
@@ -191,7 +191,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             await new Promise((resolve) => setTimeout(resolve, 2000))
           }
 
-          logger.debug("[Updater] Starting Android APK download...")
+          logger.debug("Starting Android APK download...")
           downloaded = 0
           contentLength = 0
 
@@ -200,7 +200,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
           onProgress.onmessage = (event) => {
             if (event.event === "Started") {
               contentLength = event.data.content_length ?? 0
-              logger.debug("[Updater] Download started, size:", contentLength)
+              logger.debug("Download started, size:", contentLength)
             } else if (event.event === "Progress") {
               downloaded += event.data.chunk_length ?? 0
               if (contentLength > 0) {
@@ -208,7 +208,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
                 set({ progress })
               }
             } else if (event.event === "Finished") {
-              logger.debug("[Updater] Download finished")
+              logger.debug("Download finished")
               set({ progress: 100 })
             }
           }
@@ -218,13 +218,13 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             url: available.url,
             onProgress,
           })
-          logger.debug("[Updater] APK downloaded to:", apkPath)
+          logger.debug("APK downloaded to:", apkPath)
           break // 下载成功，跳出重试循环
         } catch (e) {
           lastError = e instanceof Error ? e : new Error(String(e))
 
           // 详细错误日志
-          console.error(`[Updater] Download attempt ${attempt + 1}/${MAX_RETRIES} failed:`, {
+          logger.error(`Download attempt ${attempt + 1}/${MAX_RETRIES} failed:`, {
             error: lastError.message,
             stack: lastError.stack,
             url: available.url,
@@ -235,7 +235,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
           })
 
           if (attempt === MAX_RETRIES - 1) {
-            console.error("[Updater] All download retry attempts failed", {
+            logger.error("All download retry attempts failed", {
               totalAttempts: MAX_RETRIES,
               lastError: {
                 message: lastError.message,
@@ -254,13 +254,13 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
       // 阶段 2: 安装 APK（不重试下载）
       if (apkPath) {
         try {
-          logger.debug("[Updater] Installing APK...")
+          logger.debug("Installing APK...")
           await invoke("install_apk", { path: apkPath })
           clearSkippedVersion()
           set({ downloading: false })
         } catch (e) {
           const installError = e instanceof Error ? e : new Error(String(e))
-          console.error("[Updater] Install failed:", {
+          logger.error("Install failed:", {
             error: installError.message,
             stack: installError.stack,
             apkPath,
@@ -277,23 +277,23 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
         let downloaded = 0
         let contentLength = 0
 
-        logger.debug("[Updater] Starting download and install...")
+        logger.debug("Starting download and install...")
         await available.downloadAndInstall((event) => {
           switch (event.event) {
             case "Started":
               contentLength = event.data.contentLength ?? 0
-              logger.debug("[Updater] Download started, size:", contentLength)
+              logger.debug("Download started, size:", contentLength)
               break
             case "Progress":
               downloaded += event.data.chunkLength
               if (contentLength > 0) {
                 const progress = Math.round((downloaded / contentLength) * 100)
                 set({ progress })
-                logger.debug("[Updater] Download progress:", `${progress}%`)
+                logger.debug("Download progress:", `${progress}%`)
               }
               break
             case "Finished":
-              logger.debug("[Updater] Download finished")
+              logger.debug("Download finished")
               set({ progress: 100 })
               break
           }
@@ -312,16 +312,16 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
 
           await attemptDownload()
 
-          logger.debug("[Updater] Install complete, relaunching...")
+          logger.debug("Install complete, relaunching...")
           clearSkippedVersion()
           await relaunch()
           return
         } catch (e) {
           lastError = e instanceof Error ? e : new Error(String(e))
-          console.error(`[Updater] Download attempt ${attempt + 1} failed:`, lastError.message)
+          logger.error(`Download attempt ${attempt + 1} failed:`, lastError.message)
 
           if (attempt === MAX_RETRIES) {
-            console.error("[Updater] All retry attempts failed")
+            logger.error("All retry attempts failed")
             break
           }
         }

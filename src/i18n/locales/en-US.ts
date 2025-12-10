@@ -150,6 +150,8 @@ export default {
     updateFailed: "Failed to update record",
     deleteSuccess: "Record deleted",
     deleteFailed: "Failed to delete record",
+    batchDeleteSuccess: "Successfully deleted {{count}} records",
+    batchDeletePartial: "Deleted {{success}} records, {{failed}} failed",
   },
   domain: {
     title: "Domains",
@@ -383,6 +385,12 @@ export default {
     missing_nonce: "Missing encryption nonce",
     decryption_failed: "Decryption failed, please check your password",
     parse_accounts_failed: "Failed to parse account data: {{detail}}",
+    // Field-level validation errors
+    field: {
+      missing: "{{label}} is required",
+      empty: "{{label}} cannot be empty",
+      invalid_format: "{{label}} format invalid: {{reason}}",
+    },
     // Provider errors (unified error types)
     provider: {
       // Common errors (shared by all providers)

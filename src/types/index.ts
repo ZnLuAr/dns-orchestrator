@@ -18,12 +18,21 @@ export type DnsErrorCode =
   | "DomainNotFound"
   | "RecordNotFound"
   | "CredentialError"
+  | "CredentialValidation" // 凭证验证错误（结构化）
   | "ApiError"
   | "InvalidCredentials"
   | "SerializationError"
   | "ValidationError"
   | "ImportExportError"
+  | "NoAccountsSelected" // 导出时没有选中账号
+  | "UnsupportedFileVersion" // 导入时版本不支持
   | "Provider" // ProviderError 变体
+
+/** 凭证验证错误详情 */
+export type CredentialValidationDetails =
+  | { type: "missingField"; provider: string; field: string; label: string }
+  | { type: "emptyField"; provider: string; field: string; label: string }
+  | { type: "invalidFormat"; provider: string; field: string; label: string; reason: string }
 
 /** Provider 错误码 */
 export type ProviderErrorCode =
@@ -35,6 +44,7 @@ export type ProviderErrorCode =
   | "QuotaExceeded"
   | "DomainNotFound"
   | "ParseError"
+  | "SerializationError"
   | "Unknown"
 
 /** Provider 错误详情（根据 code 不同，结构不同） */
@@ -62,6 +72,7 @@ export type ProviderErrorDetails =
   | { code: "QuotaExceeded"; provider: string; raw_message?: string }
   | { code: "DomainNotFound"; provider: string; domain: string }
   | { code: "ParseError"; provider: string; detail: string }
+  | { code: "SerializationError"; provider: string; detail: string }
   | {
       code: "Unknown"
       provider: string
@@ -72,7 +83,11 @@ export type ProviderErrorDetails =
 /** API 错误（匹配后端 DnsError 序列化格式） */
 export interface ApiError {
   code: DnsErrorCode
-  details?: string | { provider: string; message: string } | ProviderErrorDetails
+  details?:
+    | string
+    | { provider: string; message: string }
+    | ProviderErrorDetails
+    | CredentialValidationDetails
 }
 
 /** 分页参数 */

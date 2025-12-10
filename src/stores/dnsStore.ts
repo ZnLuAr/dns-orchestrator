@@ -1,7 +1,9 @@
 import { toast } from "sonner"
 import { create } from "zustand"
 import { PAGINATION } from "@/constants"
+import i18n from "@/i18n"
 import { extractErrorMessage, getErrorMessage } from "@/lib/error"
+import { logger } from "@/lib/logger"
 import { dnsService } from "@/services"
 import type {
   BatchDeleteRequest,
@@ -167,7 +169,7 @@ export const useDnsStore = create<DnsState>((set, get) => ({
         })
       }
     } catch (err) {
-      console.error("加载更多记录失败:", err)
+      logger.error("加载更多记录失败:", err)
     } finally {
       if (get().currentDomainId === domainId) {
         set({ isLoadingMore: false })
@@ -184,7 +186,7 @@ export const useDnsStore = create<DnsState>((set, get) => ({
           records: [...state.records, response.data!],
           totalCount: state.totalCount + 1,
         }))
-        toast.success(`记录 "${response.data.name}" 添加成功`)
+        toast.success(i18n.t("dns.createSuccess", { name: response.data.name }))
         return response.data
       }
       const msg = getErrorMessage(response.error)
@@ -208,10 +210,10 @@ export const useDnsStore = create<DnsState>((set, get) => ({
         set((state) => ({
           records: state.records.map((r) => (r.id === recordId ? response.data! : r)),
         }))
-        toast.success("记录更新成功")
+        toast.success(i18n.t("dns.updateSuccess"))
         return true
       }
-      toast.error("更新记录失败")
+      toast.error(i18n.t("dns.updateFailed"))
       return false
     } catch (err) {
       toast.error(extractErrorMessage(err))
@@ -228,10 +230,10 @@ export const useDnsStore = create<DnsState>((set, get) => ({
           records: state.records.filter((r) => r.id !== recordId),
           totalCount: Math.max(0, state.totalCount - 1),
         }))
-        toast.success("记录已删除")
+        toast.success(i18n.t("dns.deleteSuccess"))
         return true
       }
-      toast.error("删除记录失败")
+      toast.error(i18n.t("dns.deleteFailed"))
       return false
     } catch (err) {
       toast.error(extractErrorMessage(err))
@@ -308,9 +310,9 @@ export const useDnsStore = create<DnsState>((set, get) => ({
         }))
 
         if (result.failedCount === 0) {
-          toast.success(`成功删除 ${result.successCount} 条记录`)
+          toast.success(i18n.t("dns.batchDeleteSuccess", { count: result.successCount }))
         } else {
-          toast.warning(`成功删除 ${result.successCount} 条记录，${result.failedCount} 条失败`)
+          toast.warning(i18n.t("dns.batchDeletePartial", { success: result.successCount, failed: result.failedCount }))
         }
         return result
       }

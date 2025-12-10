@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react"
 import { toast } from "sonner"
-import { getErrorMessage } from "@/lib/error"
+import { extractErrorMessage, getErrorMessage } from "@/lib/error"
 import { toolboxService } from "@/services"
 import { useToolboxStore } from "@/stores"
 import type { ApiResponse, QueryHistoryItem } from "@/types"
@@ -49,7 +49,7 @@ export function useToolboxQuery<TResult>(): UseToolboxQueryReturn<TResult> {
         toast.error(getErrorMessage(response.error))
         return null
       } catch (err) {
-        toast.error(String(err))
+        toast.error(extractErrorMessage(err))
         return null
       } finally {
         setIsLoading(false)

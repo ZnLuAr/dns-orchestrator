@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::{DnsError, ProviderError, Result};
+use crate::error::{ProviderError, Result};
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper, RawApiError};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain, DomainStatus, PaginatedResponse,
@@ -272,8 +272,10 @@ impl HuaweicloudProvider {
         path: &str,
         body: &B,
     ) -> Result<T> {
-        let payload =
-            serde_json::to_string(body).map_err(|e| DnsError::SerializationError(e.to_string()))?;
+        let payload = serde_json::to_string(body).map_err(|e| ProviderError::SerializationError {
+            provider: self.provider_name().to_string(),
+            detail: e.to_string(),
+        })?;
 
         let now = Utc::now();
         let timestamp = now.format("%Y%m%dT%H%M%SZ").to_string();
@@ -338,8 +340,10 @@ impl HuaweicloudProvider {
         path: &str,
         body: &B,
     ) -> Result<T> {
-        let payload =
-            serde_json::to_string(body).map_err(|e| DnsError::SerializationError(e.to_string()))?;
+        let payload = serde_json::to_string(body).map_err(|e| ProviderError::SerializationError {
+            provider: self.provider_name().to_string(),
+            detail: e.to_string(),
+        })?;
 
         let now = Utc::now();
         let timestamp = now.format("%Y%m%dT%H%M%SZ").to_string();
@@ -535,7 +539,7 @@ impl DnsProvider for HuaweicloudProvider {
             .await
         {
             Ok(_) => Ok(true),
-            Err(DnsError::Provider(ProviderError::InvalidCredentials { .. })) => Ok(false),
+            Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
             Err(e) => {
                 log::warn!("凭证验证失败: {e}");
                 Ok(false)
@@ -586,7 +590,10 @@ impl DnsProvider for HuaweicloudProvider {
             .items
             .into_iter()
             .find(|d| d.id == domain_id || d.name == domain_id)
-            .ok_or_else(|| DnsError::DomainNotFound(domain_id.to_string()))
+            .ok_or_else(|| ProviderError::DomainNotFound {
+                provider: self.provider_name().to_string(),
+                domain: domain_id.to_string(),
+            })
     }
 
     async fn list_records(

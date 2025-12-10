@@ -33,14 +33,18 @@ pub async fn create_account(
 ) -> Result<ApiResponse<Account>, DnsError> {
     // 1. 转换凭证并创建 provider 实例
     let credentials = ProviderCredentials::from_map(&request.provider, &request.credentials)
-        .map_err(|e| DnsError::CredentialError(e.to_string()))?;
+        .map_err(DnsError::CredentialValidation)?;
     let provider = create_provider(credentials)?;
 
     // 2. 验证凭证
     let is_valid = provider.validate_credentials().await?;
 
     if !is_valid {
-        return Ok(ApiResponse::error("INVALID_CREDENTIALS", "凭证验证失败"));
+        return Err(DnsError::Provider(
+            crate::error::ProviderError::InvalidCredentials {
+                provider: request.provider.to_string(),
+            },
+        ));
     }
 
     // 3. 生成账号 ID
@@ -143,7 +147,7 @@ pub async fn export_accounts(
         .collect();
 
     if selected_accounts.is_empty() {
-        return Ok(ApiResponse::error("NO_ACCOUNTS", "没有选中任何账号"));
+        return Err(DnsError::NoAccountsSelected);
     }
 
     // 2. 加载凭证并构建导出数据
@@ -240,10 +244,7 @@ pub async fn preview_import(
 
     // 2. 检查版本
     if export_file.header.version > 1 {
-        return Ok(ApiResponse::error(
-            "UNSUPPORTED_VERSION",
-            "不支持的文件版本",
-        ));
+        return Err(DnsError::UnsupportedFileVersion);
     }
 
     // 3. 如果加密但未提供密码，返回需要密码的提示

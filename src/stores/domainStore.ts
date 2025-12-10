@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { PAGINATION, STORAGE_KEYS } from "@/constants"
 import { extractErrorMessage, getErrorMessage, isCredentialError } from "@/lib/error"
+import { logger } from "@/lib/logger"
 import { domainService } from "@/services"
 import type { Domain } from "@/types"
 import { useAccountStore } from "./accountStore"
@@ -62,7 +63,7 @@ export const useDomainStore = create<DomainState>((set, get) => ({
         set({ domainsByAccount: parsed })
       }
     } catch (err) {
-      console.error("Failed to load domain cache from storage:", err)
+      logger.error("Failed to load domain cache from storage:", err)
     }
   },
 
@@ -72,7 +73,7 @@ export const useDomainStore = create<DomainState>((set, get) => ({
       const { domainsByAccount } = get()
       localStorage.setItem(STORAGE_KEYS.DOMAINS_CACHE, JSON.stringify(domainsByAccount))
     } catch (err) {
-      console.error("Failed to save domain cache to storage:", err)
+      logger.error("Failed to save domain cache to storage:", err)
     }
   },
 
@@ -187,7 +188,7 @@ export const useDomainStore = create<DomainState>((set, get) => ({
         get().saveToStorage()
       }
     } catch (err) {
-      console.error("加载更多域名失败:", extractErrorMessage(err))
+      logger.error("加载更多域名失败:", extractErrorMessage(err))
     } finally {
       set((state) => {
         const newSet = new Set(state.loadingMoreAccounts)

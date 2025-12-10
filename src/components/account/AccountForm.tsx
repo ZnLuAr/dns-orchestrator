@@ -28,7 +28,8 @@ interface AccountFormProps {
 
 export function AccountForm({ open, onOpenChange }: AccountFormProps) {
   const { t } = useTranslation()
-  const { createAccount, isLoading, providers, fetchProviders } = useAccountStore()
+  const { createAccount, isLoading, providers, fetchProviders, fieldErrors, clearFieldErrors } =
+    useAccountStore()
 
   const [provider, setProvider] = useState<string>("")
   const [name, setName] = useState("")
@@ -59,6 +60,10 @@ export function AccountForm({ open, onOpenChange }: AccountFormProps) {
 
   const handleCredentialChange = (key: string, value: string) => {
     setCredentials((prev) => ({ ...prev, [key]: value }))
+    // 用户输入时清除该字段的错误
+    if (fieldErrors[key]) {
+      clearFieldErrors()
+    }
   }
 
   const togglePasswordVisibility = (key: string) => {
@@ -88,8 +93,15 @@ export function AccountForm({ open, onOpenChange }: AccountFormProps) {
   const isValid =
     providerInfo?.requiredFields.every((field) => credentials[field.key]?.trim()) ?? false
 
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      clearFieldErrors()
+    }
+    onOpenChange(isOpen)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("account.addAccount")}</DialogTitle>
@@ -149,7 +161,7 @@ export function AccountForm({ open, onOpenChange }: AccountFormProps) {
                   value={credentials[field.key] || ""}
                   onChange={(e) => handleCredentialChange(field.key, e.target.value)}
                   placeholder={field.placeholder}
-                  className="pr-10"
+                  className={`pr-10 ${fieldErrors[field.key] ? "border-destructive" : ""}`}
                   required
                 />
                 {field.type === "password" && (
@@ -168,12 +180,17 @@ export function AccountForm({ open, onOpenChange }: AccountFormProps) {
                   </Button>
                 )}
               </div>
-              {field.helpText && <p className="text-muted-foreground text-xs">{field.helpText}</p>}
+              {fieldErrors[field.key] && (
+                <p className="text-destructive text-xs">{fieldErrors[field.key]}</p>
+              )}
+              {field.helpText && !fieldErrors[field.key] && (
+                <p className="text-muted-foreground text-xs">{field.helpText}</p>
+              )}
             </div>
           ))}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isLoading || !isValid}>

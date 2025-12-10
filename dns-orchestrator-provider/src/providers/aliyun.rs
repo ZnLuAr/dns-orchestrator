@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
-use crate::error::{DnsError, ProviderError, Result};
+use crate::error::{ProviderError, Result};
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper, RawApiError};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain, DomainStatus, PaginatedResponse,
@@ -72,8 +72,10 @@ fn flatten_value(prefix: &str, value: &serde_json::Value, result: &mut BTreeMap<
 
 /// 将结构体序列化为排序后的 query string
 fn serialize_to_query_string<T: Serialize>(params: &T) -> Result<String> {
-    let value =
-        serde_json::to_value(params).map_err(|e| DnsError::SerializationError(e.to_string()))?;
+    let value = serde_json::to_value(params).map_err(|e| ProviderError::SerializationError {
+        provider: "aliyun".to_string(),
+        detail: e.to_string(),
+    })?;
 
     let mut flat_map = BTreeMap::new();
     flatten_value("", &value, &mut flat_map);
@@ -431,7 +433,7 @@ impl DnsProvider for AliyunProvider {
             .await
         {
             Ok(_) => Ok(true),
-            Err(DnsError::Provider(ProviderError::InvalidCredentials { .. })) => Ok(false),
+            Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
             Err(e) => {
                 log::warn!("凭证验证失败: {e}");
                 Ok(false)
@@ -491,7 +493,10 @@ impl DnsProvider for AliyunProvider {
             .items
             .into_iter()
             .find(|d| d.id == domain_id || d.name == domain_id)
-            .ok_or_else(|| DnsError::DomainNotFound(domain_id.to_string()))
+            .ok_or_else(|| ProviderError::DomainNotFound {
+                provider: self.provider_name().to_string(),
+                domain: domain_id.to_string(),
+            })
     }
 
     async fn list_records(

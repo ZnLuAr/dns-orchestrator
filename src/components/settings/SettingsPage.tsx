@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch"
 import { EXTERNAL_LINKS } from "@/constants"
 import { type LanguageCode, supportedLanguages } from "@/i18n"
 import { ENV } from "@/lib/env"
+import { logger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { getUpdateNotes, useUpdaterStore } from "@/stores/updaterStore"
@@ -77,7 +78,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                   try {
                     await openUrl(EXTERNAL_LINKS.GITHUB_RELEASES)
                   } catch (err) {
-                    console.error("Failed to open URL:", err)
+                    logger.error("Failed to open URL:", err)
                   }
                 },
               },

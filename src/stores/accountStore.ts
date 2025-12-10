@@ -1,9 +1,11 @@
 import { toast } from "sonner"
 import { create } from "zustand"
 import { TIMING } from "@/constants"
-import { extractErrorMessage, getErrorMessage } from "@/lib/error"
+import i18n from "@/i18n"
+import { extractErrorMessage, getErrorMessage, getFieldErrorMessage } from "@/lib/error"
+import { logger } from "@/lib/logger"
 import { accountService } from "@/services"
-import type { Account, CreateAccountRequest } from "@/types"
+import type { Account, CreateAccountRequest, CredentialValidationDetails } from "@/types"
 import type { ProviderInfo } from "@/types/provider"
 import { useDomainStore } from "./domainStore"
 
@@ -15,6 +17,7 @@ interface AccountState {
   isLoading: boolean
   isDeleting: boolean
   error: string | null
+  fieldErrors: Record<string, string> // 字段级错误
   isExportDialogOpen: boolean
   isImportDialogOpen: boolean
 
@@ -24,6 +27,7 @@ interface AccountState {
   deleteAccount: (id: string) => Promise<boolean>
   selectAccount: (id: string | null) => void
   setExpandedAccountId: (id: string | null) => void
+  clearFieldErrors: () => void
   openExportDialog: () => void
   closeExportDialog: () => void
   openImportDialog: () => void
@@ -38,6 +42,7 @@ export const useAccountStore = create<AccountState>((set) => ({
   isLoading: false,
   isDeleting: false,
   error: null,
+  fieldErrors: {},
   isExportDialogOpen: false,
   isImportDialogOpen: false,
 
@@ -50,7 +55,7 @@ export const useAccountStore = create<AccountState>((set) => ({
         // 检查是否有加载失败的账户
         const failedAccounts = response.data.filter((a) => a.status === "error")
         if (failedAccounts.length > 0) {
-          toast.error(`${failedAccounts.length} 个账号加载失败，请检查 Keychain 权限`, {
+          toast.error(i18n.t("account.loadFailedCount", { count: failedAccounts.length }), {
             duration: TIMING.TOAST_DURATION,
           })
         }
@@ -74,22 +79,30 @@ export const useAccountStore = create<AccountState>((set) => ({
       if (response.success && response.data) {
         set({ providers: response.data })
       } else {
-        console.error("Failed to fetch providers:", getErrorMessage(response.error))
+        logger.error("Failed to fetch providers:", getErrorMessage(response.error))
       }
     } catch (err) {
-      console.error("Failed to fetch providers:", err)
+      logger.error("Failed to fetch providers:", err)
     }
   },
 
   createAccount: async (request) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, fieldErrors: {} })
     try {
       const response = await accountService.createAccount(request)
       if (response.success && response.data) {
         set((state) => ({ accounts: [...state.accounts, response.data!] }))
-        toast.success(`账号 "${response.data.name}" 添加成功`)
+        toast.success(i18n.t("account.createSuccess", { name: response.data.name }))
         return response.data
       }
+      // 处理凭证验证错误（字段级）
+      if (response.error?.code === "CredentialValidation" && response.error.details) {
+        const details = response.error.details as CredentialValidationDetails
+        const fieldError = getFieldErrorMessage(details)
+        set({ fieldErrors: { [details.field]: fieldError } })
+        return null
+      }
+      // 其他错误
       const msg = getErrorMessage(response.error)
       set({ error: msg })
       toast.error(msg)
@@ -115,10 +128,10 @@ export const useAccountStore = create<AccountState>((set) => ({
         }))
         // 清理域名缓存
         useDomainStore.getState().clearAccountCache(id)
-        toast.success("账号已删除")
+        toast.success(i18n.t("account.deleteSuccess"))
         return true
       }
-      toast.error("删除账号失败")
+      toast.error(i18n.t("account.deleteFailed"))
       return false
     } catch (err) {
       toast.error(extractErrorMessage(err))
@@ -130,6 +143,7 @@ export const useAccountStore = create<AccountState>((set) => ({
 
   selectAccount: (id) => set({ selectedAccountId: id }),
   setExpandedAccountId: (id) => set({ expandedAccountId: id }),
+  clearFieldErrors: () => set({ fieldErrors: {} }),
 
   openExportDialog: () => set({ isExportDialogOpen: true }),
   closeExportDialog: () => set({ isExportDialogOpen: false }),
