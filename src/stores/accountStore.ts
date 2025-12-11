@@ -1,5 +1,6 @@
 import { toast } from "sonner"
 import { create } from "zustand"
+import { removeRecentDomainsByAccount } from "@/components/home/HomePage"
 import { TIMING } from "@/constants"
 import i18n from "@/i18n"
 import { extractErrorMessage, getErrorMessage, getFieldErrorMessage } from "@/lib/error"
@@ -128,6 +129,8 @@ export const useAccountStore = create<AccountState>((set) => ({
         }))
         // 清理域名缓存
         useDomainStore.getState().clearAccountCache(id)
+        // 清理最近域名记录
+        removeRecentDomainsByAccount(id)
         toast.success(i18n.t("account.deleteSuccess"))
         return true
       }

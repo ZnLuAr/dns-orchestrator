@@ -6,6 +6,7 @@
 import { useEffect } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { ErrorBoundary } from "@/components/error"
+import { cleanupInvalidRecentDomains } from "@/components/home/HomePage"
 import { Toaster } from "@/components/ui/sonner"
 import { StatusBar } from "@/components/ui/status-bar"
 import { UpdateDialog } from "@/components/ui/update-dialog"
@@ -46,8 +47,29 @@ export function RootLayout() {
     loadFromStorage()
   }, [fetchAccounts, loadFromStorage])
 
-  // 账户加载完成后，后台刷新域名
+  // 账户加载完成后，清理无效记录并后台刷新域名
   useEffect(() => {
+    // 清理无效的最近域名记录（包括账户为空的情况）
+    cleanupInvalidRecentDomains(accounts.map((a) => a.id))
+
+    // 清理无效的域名缓存
+    const { domainsByAccount, clearAllCache, clearAccountCache } = useDomainStore.getState()
+    const validAccountIds = new Set(accounts.map((a) => a.id))
+    const cachedAccountIds = Object.keys(domainsByAccount)
+
+    if (accounts.length === 0 && cachedAccountIds.length > 0) {
+      // 如果账户全部删除，清理所有缓存
+      clearAllCache()
+    } else {
+      // 否则只清理不存在的账户缓存
+      for (const accountId of cachedAccountIds) {
+        if (!validAccountIds.has(accountId)) {
+          clearAccountCache(accountId)
+        }
+      }
+    }
+
+    // 刷新有效账户的域名
     if (accounts.length > 0) {
       const validAccounts = accounts.filter((a) => a.status !== "error")
       if (validAccounts.length > 0) {

@@ -37,6 +37,20 @@ export function addRecentDomain(domain: Omit<RecentDomain, "timestamp">) {
   localStorage.setItem(STORAGE_KEYS.RECENT_DOMAINS, JSON.stringify(updated))
 }
 
+export function removeRecentDomainsByAccount(accountId: string) {
+  const recent = getRecentDomains()
+  const filtered = recent.filter((d) => d.accountId !== accountId)
+  localStorage.setItem(STORAGE_KEYS.RECENT_DOMAINS, JSON.stringify(filtered))
+}
+
+export function cleanupInvalidRecentDomains(validAccountIds: string[]) {
+  const recent = getRecentDomains()
+  const filtered = recent.filter((d) => validAccountIds.includes(d.accountId))
+  if (filtered.length !== recent.length) {
+    localStorage.setItem(STORAGE_KEYS.RECENT_DOMAINS, JSON.stringify(filtered))
+  }
+}
+
 export function HomePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -50,9 +64,11 @@ export function HomePage() {
     0
   )
 
+  // 账户变化后重新读取最近域名（清理无效记录后刷新显示）
+  // biome-ignore lint/correctness/useExhaustiveDependencies: accounts 用于触发重新读取
   useEffect(() => {
     setRecentDomains(getRecentDomains())
-  }, [])
+  }, [accounts])
 
   const handleQuickAccess = (accountId: string, domainId: string) => {
     navigate(`/domains/${accountId}/${domainId}`)
