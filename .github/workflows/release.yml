@@ -21,8 +21,64 @@ on:
           - android
 
 jobs:
+  # 准备 release body（只在 tag push 时运行）
+  prepare-release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      body: ${{ steps.release-notes.outputs.body }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate release body
+        id: release-notes
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NO_V="${VERSION#v}"
+          REPO="${{ github.repository }}"
+          BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
+          NOTES_FILE="docs/release-notes/${VERSION}.md"
+
+          if [ -f "$NOTES_FILE" ]; then
+            NOTES=$(cat "$NOTES_FILE")
+          else
+            NOTES="Release $VERSION"
+          fi
+
+          {
+            echo 'body<<EOF'
+            echo "${NOTES}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## Downloads"
+            echo ""
+            echo "### macOS"
+            echo "- [Apple Silicon (.dmg)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_aarch64.dmg)"
+            echo "- [Intel (.dmg)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_x64.dmg)"
+            echo ""
+            echo "### Windows"
+            echo "- [x64 Installer (.exe)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_x64-setup.exe)"
+            echo "- [x64 MSI (.msi)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_x64_en-US.msi)"
+            echo "- [ARM64 Installer (.exe)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_arm64-setup.exe)"
+            echo "- [ARM64 MSI (.msi)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_arm64_en-US.msi)"
+            echo ""
+            echo "### Linux"
+            echo "- [x64 DEB (.deb)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_amd64.deb)"
+            echo "- [x64 AppImage](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_amd64.AppImage)"
+            echo "- [ARM64 DEB (.deb)](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_arm64.deb)"
+            echo "- [ARM64 AppImage](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_arm64.AppImage)"
+            echo ""
+            echo "### Android"
+            echo "- [Universal APK](${BASE_URL}/DNS.Orchestrator_${VERSION_NO_V}_android.apk)"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
   release-windows:
-    if: github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'desktop' || inputs.platform == 'all'
+    needs: [prepare-release]
+    if: always() && (github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'desktop' || inputs.platform == 'all')
     permissions:
       contents: write
     strategy:
@@ -67,23 +123,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      # 读取 release note 文件
-      - name: Read release notes
-        if: github.event_name == 'push'
-        id: release-notes
-        shell: bash
-        run: |
-          VERSION="${{ github.ref_name }}"
-          NOTES_FILE="docs/release-notes/${VERSION}.md"
-
-          if [ -f "$NOTES_FILE" ]; then
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            cat "$NOTES_FILE" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
-          fi
-
       # Tag push: Build and release
       - name: Build and release
         if: github.event_name == 'push'
@@ -95,16 +134,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "DNS Orchestrator ${{ github.ref_name }}"
-          releaseBody: |
-            ${{ steps.release-notes.outputs.notes }}
-
-            ---
-
-            ## Platforms
-            - **macOS**: `.dmg` (Apple Silicon / Intel)
-            - **Windows**: `.msi` / `.exe` (x64, ARM64)
-            - **Linux**: `.deb` / `.AppImage` (x64, ARM64)
-            - **Android**: `.apk`
+          releaseBody: ${{ needs.prepare-release.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
@@ -125,7 +155,8 @@ jobs:
 
   # Linux 构建
   release-linux:
-    if: github.event_name == 'push' || inputs.platform == 'linux' || inputs.platform == 'desktop' || inputs.platform == 'all'
+    needs: [prepare-release]
+    if: always() && (github.event_name == 'push' || inputs.platform == 'linux' || inputs.platform == 'desktop' || inputs.platform == 'all')
     permissions:
       contents: write
     strategy:
@@ -180,23 +211,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      # 读取 release note 文件
-      - name: Read release notes
-        if: github.event_name == 'push'
-        id: release-notes
-        shell: bash
-        run: |
-          VERSION="${{ github.ref_name }}"
-          NOTES_FILE="docs/release-notes/${VERSION}.md"
-
-          if [ -f "$NOTES_FILE" ]; then
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            cat "$NOTES_FILE" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
-          fi
-
       # Tag push: Build and release
       - name: Build and release
         if: github.event_name == 'push'
@@ -208,16 +222,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "DNS Orchestrator ${{ github.ref_name }}"
-          releaseBody: |
-            ${{ steps.release-notes.outputs.notes }}
-
-            ---
-
-            ## Platforms
-            - **macOS**: `.dmg` (Apple Silicon / Intel)
-            - **Windows**: `.msi` / `.exe` (x64, ARM64)
-            - **Linux**: `.deb` / `.AppImage` (x64, ARM64)
-            - **Android**: `.apk`
+          releaseBody: ${{ needs.prepare-release.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
@@ -238,7 +243,8 @@ jobs:
 
   # MacOS 构建
   release-macos:
-    if: github.event_name == 'push' || inputs.platform == 'macos' || inputs.platform == 'desktop' || inputs.platform == 'all'
+    needs: [prepare-release]
+    if: always() && (github.event_name == 'push' || inputs.platform == 'macos' || inputs.platform == 'desktop' || inputs.platform == 'all')
     permissions:
       contents: write
     strategy:
@@ -318,23 +324,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      # 读取 release note 文件
-      - name: Read release notes
-        if: github.event_name == 'push'
-        id: release-notes
-        shell: bash
-        run: |
-          VERSION="${{ github.ref_name }}"
-          NOTES_FILE="docs/release-notes/${VERSION}.md"
-
-          if [ -f "$NOTES_FILE" ]; then
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            cat "$NOTES_FILE" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
-          fi
-
       # Tag push: Build and release
       - name: Build and release
         if: github.event_name == 'push'
@@ -355,16 +344,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "DNS Orchestrator ${{ github.ref_name }}"
-          releaseBody: |
-            ${{ steps.release-notes.outputs.notes }}
-
-            ---
-
-            ## Platforms
-            - **macOS**: `.dmg` (Apple Silicon / Intel)
-            - **Windows**: `.msi` / `.exe` (x64, ARM64)
-            - **Linux**: `.deb` / `.AppImage` (x64, ARM64)
-            - **Android**: `.apk`
+          releaseBody: ${{ needs.prepare-release.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
