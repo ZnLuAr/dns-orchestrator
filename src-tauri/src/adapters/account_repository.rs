@@ -18,8 +18,8 @@ const ACCOUNTS_KEY: &str = "accounts";
 /// Tauri 账户仓库实现
 pub struct TauriAccountRepository {
     app_handle: AppHandle,
-    /// 内存缓存，避免频繁读取文件
-    cache: Arc<RwLock<Option<Vec<Account>>>>,
+    /// 内存缓存，使用 Arc<Vec> 避免频繁 clone 整个列表
+    cache: Arc<RwLock<Option<Arc<Vec<Account>>>>>,
 }
 
 impl TauriAccountRepository {
@@ -73,7 +73,8 @@ impl AccountRepository for TauriAccountRepository {
         {
             let cache = self.cache.read().await;
             if let Some(ref accounts) = *cache {
-                return Ok(accounts.clone());
+                // 只 clone Arc 指针，不 clone 整个 Vec
+                return Ok(Vec::clone(accounts));
             }
         }
 
@@ -83,7 +84,7 @@ impl AccountRepository for TauriAccountRepository {
         // 更新缓存
         {
             let mut cache = self.cache.write().await;
-            *cache = Some(accounts.clone());
+            *cache = Some(Arc::new(accounts.clone()));
         }
 
         Ok(accounts)
@@ -109,7 +110,7 @@ impl AccountRepository for TauriAccountRepository {
         // 更新缓存
         {
             let mut cache = self.cache.write().await;
-            *cache = Some(accounts);
+            *cache = Some(Arc::new(accounts));
         }
 
         Ok(())
@@ -130,7 +131,7 @@ impl AccountRepository for TauriAccountRepository {
         // 更新缓存
         {
             let mut cache = self.cache.write().await;
-            *cache = Some(accounts);
+            *cache = Some(Arc::new(accounts));
         }
 
         log::info!("Deleted account {id} from store");
@@ -143,7 +144,7 @@ impl AccountRepository for TauriAccountRepository {
         // 更新缓存
         {
             let mut cache = self.cache.write().await;
-            *cache = Some(accounts.to_vec());
+            *cache = Some(Arc::new(accounts.to_vec()));
         }
 
         Ok(())
@@ -171,7 +172,7 @@ impl AccountRepository for TauriAccountRepository {
         // 更新缓存
         {
             let mut cache = self.cache.write().await;
-            *cache = Some(accounts);
+            *cache = Some(Arc::new(accounts));
         }
 
         Ok(())

@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useDebouncedCallback } from "use-debounce"
@@ -19,7 +19,7 @@ import type { DnsRecord } from "@/types"
 import { DnsBatchActionBar } from "../DnsBatchActionBar"
 import { DnsRecordForm } from "../DnsRecordForm"
 import { DnsTableToolbar } from "../DnsTableToolbar"
-import { type SortField, useDnsTableSort } from "../useDnsTableSort"
+import { useDnsTableSort } from "../useDnsTableSort"
 import { DesktopTable } from "./DesktopTable"
 import { MobileCardList } from "./MobileCardList"
 import type { DnsRecordTableProps } from "./types"
@@ -123,17 +123,6 @@ export function DnsRecordTable({ accountId, domainId, supportsProxy }: DnsRecord
 
   const hasActiveFilters = !!(keyword || recordType)
 
-  // 排序图标组件
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />
-    }
-    if (sortDirection === "asc") {
-      return <ArrowUp className="ml-1 h-3 w-3" />
-    }
-    return <ArrowDown className="ml-1 h-3 w-3" />
-  }
-
   const handleDelete = (record: DnsRecord) => setDeletingRecord(record)
   const handleEdit = (record: DnsRecord) => {
     setEditingRecord(record)
@@ -217,7 +206,6 @@ export function DnsRecordTable({ accountId, domainId, supportsProxy }: DnsRecord
             onSelectAll={selectAllRecords}
             onClearSelection={clearSelection}
             setSentinelRef={setSentinelRef}
-            SortIcon={SortIcon}
           />
         )}
       </div>

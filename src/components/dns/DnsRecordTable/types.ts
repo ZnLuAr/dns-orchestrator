@@ -42,5 +42,4 @@ export interface DesktopTableProps {
   onSelectAll: () => void
   onClearSelection: () => void
   setSentinelRef: (node: HTMLElement | null) => void
-  SortIcon: React.ComponentType<{ field: SortField }>
 }

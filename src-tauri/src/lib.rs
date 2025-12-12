@@ -31,39 +31,14 @@ pub struct AppState {
 }
 
 impl AppState {
-    #[cfg(not(target_os = "android"))]
     pub fn new(app_handle: tauri::AppHandle) -> Self {
-        // 创建适配器
+        // 创建适配器（Android 版本需要 AppHandle）
+        #[cfg(not(target_os = "android"))]
         let credential_store = Arc::new(TauriCredentialStore::new());
-        let account_repository = Arc::new(TauriAccountRepository::new(app_handle));
-        let provider_registry = Arc::new(InMemoryProviderRegistry::new());
 
-        // 创建服务上下文
-        let ctx = Arc::new(ServiceContext::new(
-            credential_store,
-            account_repository,
-            provider_registry,
-        ));
-
-        // 创建各服务
-        let account_service = AccountService::new(Arc::clone(&ctx));
-        let domain_service = DomainService::new(Arc::clone(&ctx));
-        let dns_service = DnsService::new(Arc::clone(&ctx));
-        let toolbox_service = ToolboxService::new();
-
-        Self {
-            ctx,
-            account_service,
-            domain_service,
-            dns_service,
-            toolbox_service,
-        }
-    }
-
-    #[cfg(target_os = "android")]
-    pub fn new(app_handle: tauri::AppHandle) -> Self {
-        // 创建适配器（Android 使用带 AppHandle 的版本）
+        #[cfg(target_os = "android")]
         let credential_store = Arc::new(TauriCredentialStore::new(app_handle.clone()));
+
         let account_repository = Arc::new(TauriAccountRepository::new(app_handle));
         let provider_registry = Arc::new(InMemoryProviderRegistry::new());
 

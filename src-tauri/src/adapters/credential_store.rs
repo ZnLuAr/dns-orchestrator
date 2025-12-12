@@ -14,16 +14,23 @@ use dns_orchestrator_core::traits::{CredentialStore, CredentialsMap};
 mod desktop {
     use super::{async_trait, CoreError, CoreResult, CredentialStore, CredentialsMap, HashMap};
     use keyring::Entry;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
 
     const SERVICE_NAME: &str = "dns-orchestrator";
     const CREDENTIALS_KEY: &str = "all-credentials";
 
-    /// Tauri 桌面端凭证存储（使用系统 Keychain）
-    pub struct TauriCredentialStore;
+    /// Tauri 桌面端凭证存储（使用系统 Keychain + 内存缓存）
+    pub struct TauriCredentialStore {
+        /// 内存缓存，减少 Keychain 访问频率
+        cache: Arc<RwLock<Option<CredentialsMap>>>,
+    }
 
     impl TauriCredentialStore {
         pub fn new() -> Self {
-            Self
+            Self {
+                cache: Arc::new(RwLock::new(None)),
+            }
         }
 
         fn get_entry() -> CoreResult<Entry> {
@@ -65,14 +72,30 @@ mod desktop {
     #[async_trait]
     impl CredentialStore for TauriCredentialStore {
         async fn load_all(&self) -> CoreResult<CredentialsMap> {
-            tokio::task::spawn_blocking(|| {
+            // 先检查缓存
+            {
+                let cache = self.cache.read().await;
+                if let Some(ref creds) = *cache {
+                    return Ok(creds.clone());
+                }
+            }
+
+            // 从 Keychain 加载
+            let credentials = tokio::task::spawn_blocking(|| {
                 log::debug!("Loading all credentials from Keychain");
-                let credentials = Self::read_all_sync()?;
-                log::info!("Loaded {} accounts from Keychain", credentials.len());
-                Ok(credentials)
+                Self::read_all_sync()
             })
             .await
-            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))?
+            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??;
+
+            // 更新缓存
+            {
+                let mut cache = self.cache.write().await;
+                *cache = Some(credentials.clone());
+            }
+
+            log::info!("Loaded {} accounts from Keychain", credentials.len());
+            Ok(credentials)
         }
 
         async fn save(
@@ -80,66 +103,62 @@ mod desktop {
             account_id: &str,
             credentials: &HashMap<String, String>,
         ) -> CoreResult<()> {
-            let account_id = account_id.to_string();
-            let credentials = credentials.clone();
+            let mut all_credentials = self.load_all().await?;
+            all_credentials.insert(account_id.to_string(), credentials.clone());
 
+            let all_creds_for_save = all_credentials.clone();
             tokio::task::spawn_blocking(move || {
-                log::debug!("Saving credentials for account: {account_id}");
-
-                let mut all_credentials = Self::read_all_sync()?;
-                all_credentials.insert(account_id.clone(), credentials);
-                Self::write_all_sync(&all_credentials)?;
-
-                log::info!("Credentials saved for account: {account_id}");
-                Ok(())
+                Self::write_all_sync(&all_creds_for_save)
             })
             .await
-            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))?
+            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??;
+
+            // 更新缓存
+            {
+                let mut cache = self.cache.write().await;
+                *cache = Some(all_credentials);
+            }
+
+            log::info!("Credentials saved for account: {account_id}");
+            Ok(())
         }
 
         async fn load(&self, account_id: &str) -> CoreResult<HashMap<String, String>> {
-            let account_id = account_id.to_string();
+            let all_credentials = self.load_all().await?;
 
-            tokio::task::spawn_blocking(move || {
-                let all_credentials = Self::read_all_sync()?;
-
-                all_credentials.get(&account_id).cloned().ok_or_else(|| {
-                    CoreError::CredentialError(format!(
-                        "No credentials found for account: {account_id}"
-                    ))
-                })
+            all_credentials.get(account_id).cloned().ok_or_else(|| {
+                CoreError::CredentialError(format!(
+                    "No credentials found for account: {account_id}"
+                ))
             })
-            .await
-            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))?
         }
 
         async fn delete(&self, account_id: &str) -> CoreResult<()> {
-            let account_id = account_id.to_string();
+            let mut all_credentials = self.load_all().await?;
+            all_credentials.remove(account_id);
 
+            let all_creds_for_save = all_credentials.clone();
             tokio::task::spawn_blocking(move || {
-                log::debug!("Deleting credentials for account: {account_id}");
-
-                let mut all_credentials = Self::read_all_sync()?;
-                all_credentials.remove(&account_id);
-                Self::write_all_sync(&all_credentials)?;
-
-                log::info!("Credentials deleted for account: {account_id}");
-                Ok(())
+                Self::write_all_sync(&all_creds_for_save)
             })
             .await
-            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))?
+            .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??;
+
+            // 更新缓存
+            {
+                let mut cache = self.cache.write().await;
+                *cache = Some(all_credentials);
+            }
+
+            log::info!("Credentials deleted for account: {account_id}");
+            Ok(())
         }
 
         async fn exists(&self, account_id: &str) -> bool {
-            let account_id = account_id.to_string();
-
-            tokio::task::spawn_blocking(move || {
-                Self::read_all_sync()
-                    .map(|creds| creds.contains_key(&account_id))
-                    .unwrap_or(false)
-            })
-            .await
-            .unwrap_or(false)
+            self.load_all()
+                .await
+                .map(|creds| creds.contains_key(account_id))
+                .unwrap_or(false)
         }
     }
 }

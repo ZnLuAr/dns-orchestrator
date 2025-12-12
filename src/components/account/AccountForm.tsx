@@ -36,19 +36,14 @@ export function AccountForm({ open, onOpenChange }: AccountFormProps) {
   const [credentials, setCredentials] = useState<Record<string, string>>({})
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
 
-  // 获取提供商列表
+  // 获取提供商列表 + 默认选中第一个
   useEffect(() => {
     if (providers.length === 0) {
       fetchProviders()
-    }
-  }, [providers.length, fetchProviders])
-
-  // 默认选中第一个提供商
-  useEffect(() => {
-    if (providers.length > 0 && !provider) {
+    } else if (!provider) {
       setProvider(providers[0].id)
     }
-  }, [providers, provider])
+  }, [providers, provider, fetchProviders])
 
   const providerInfo = providers.find((p) => p.id === provider)
 

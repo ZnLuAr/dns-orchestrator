@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -10,7 +10,27 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DnsRecordRow } from "../DnsRecordRow"
+import type { SortField } from "../useDnsTableSort"
 import type { DesktopTableProps } from "./types"
+
+// 排序图标 - 提取到组件外部避免每次渲染重建
+function SortIcon({
+  field,
+  sortField,
+  sortDirection,
+}: {
+  field: SortField
+  sortField: SortField | null
+  sortDirection: "asc" | "desc" | null
+}) {
+  if (sortField !== field) {
+    return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />
+  }
+  if (sortDirection === "asc") {
+    return <ArrowUp className="ml-1 h-3 w-3" />
+  }
+  return <ArrowDown className="ml-1 h-3 w-3" />
+}
 
 export function DesktopTable({
   records,
@@ -21,6 +41,8 @@ export function DesktopTable({
   selectedRecordIds,
   hasActiveFilters,
   supportsProxy,
+  sortField,
+  sortDirection,
   onSort,
   onEdit,
   onDelete,
@@ -28,7 +50,6 @@ export function DesktopTable({
   onSelectAll,
   onClearSelection,
   setSentinelRef,
-  SortIcon,
 }: DesktopTableProps) {
   const { t } = useTranslation()
   const colSpan = (supportsProxy ? 6 : 5) + (isSelectMode ? 1 : 0)
@@ -54,7 +75,7 @@ export function DesktopTable({
           >
             <div className="flex items-center">
               {t("common.type")}
-              <SortIcon field="type" />
+              <SortIcon field="type" sortField={sortField} sortDirection={sortDirection} />
             </div>
           </TableHead>
           <TableHead
@@ -63,7 +84,7 @@ export function DesktopTable({
           >
             <div className="flex items-center">
               {t("dns.name")}
-              <SortIcon field="name" />
+              <SortIcon field="name" sortField={sortField} sortDirection={sortDirection} />
             </div>
           </TableHead>
           <TableHead
@@ -72,7 +93,7 @@ export function DesktopTable({
           >
             <div className="flex items-center">
               {t("dns.value")}
-              <SortIcon field="value" />
+              <SortIcon field="value" sortField={sortField} sortDirection={sortDirection} />
             </div>
           </TableHead>
           <TableHead
@@ -81,7 +102,7 @@ export function DesktopTable({
           >
             <div className="flex items-center">
               {t("dns.ttl")}
-              <SortIcon field="ttl" />
+              <SortIcon field="ttl" sortField={sortField} sortDirection={sortDirection} />
             </div>
           </TableHead>
           {supportsProxy && <TableHead className="w-12">{t("dns.proxy")}</TableHead>}

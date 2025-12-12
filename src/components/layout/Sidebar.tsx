@@ -1,4 +1,5 @@
 import { Globe, Home, PanelLeftClose, PanelLeftOpen, Settings, Users, Wrench } from "lucide-react"
+import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -50,8 +51,14 @@ export function Sidebar({ currentView, onNavigate, isMobile = false, onClose }: 
     setSidebarCollapsed(!sidebarCollapsed)
   }
 
-  const topItems = navItems.filter((item) => item.position === "top")
-  const bottomItems = navItems.filter((item) => item.position === "bottom")
+  // navItems 是静态数组，useMemo 避免每次渲染重新计算
+  const { topItems, bottomItems } = useMemo(
+    () => ({
+      topItems: navItems.filter((item) => item.position === "top"),
+      bottomItems: navItems.filter((item) => item.position === "bottom"),
+    }),
+    []
+  )
 
   const renderNavButton = (item: NavItemConfig) => {
     const Icon = item.icon
