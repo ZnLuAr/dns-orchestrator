@@ -66,6 +66,19 @@ export function DomainSelectorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 监听滚动事件，保存滚动位置
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
+    if (!viewport) return
+
+    const handleScroll = () => {
+      setScrollPosition(viewport.scrollTop)
+    }
+
+    viewport.addEventListener("scroll", handleScroll)
+    return () => viewport.removeEventListener("scroll", handleScroll)
+  }, [setScrollPosition])
+
   // 切换账户展开状态
   const toggleAccount = useCallback(
     (accountId: string) => {
@@ -86,16 +99,9 @@ export function DomainSelectorPage() {
   // 选择域名
   const handleSelectDomain = useCallback(
     (accountId: string, domainId: string) => {
-      // 保存滚动位置
-      if (scrollAreaRef.current) {
-        const viewport = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]")
-        if (viewport) {
-          setScrollPosition(viewport.scrollTop)
-        }
-      }
       navigate(`/domains/${accountId}/${domainId}`)
     },
-    [navigate, setScrollPosition]
+    [navigate]
   )
 
   // 加载更多域名

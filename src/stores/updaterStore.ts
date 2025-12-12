@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { TIMING } from "@/constants"
 import { ENV, getPlatform } from "@/lib/env"
 import { logger } from "@/lib/logger"
 
@@ -276,7 +277,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
           if (attempt > 0) {
             logger.debug(`[Updater] Download retry ${attempt}/${MAX_RETRIES - 1}...`)
             set({ retryCount: attempt, progress: 0 })
-            await new Promise((resolve) => setTimeout(resolve, 2000))
+            await new Promise((resolve) => setTimeout(resolve, TIMING.UPDATE_RETRY_DELAY))
           }
 
           logger.debug("Starting Android APK download...")
@@ -373,7 +374,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
           if (attempt > 0) {
             logger.debug(`[Updater] Retry attempt ${attempt}/${MAX_RETRIES}...`)
             set({ retryCount: attempt, progress: 0 })
-            await new Promise((resolve) => setTimeout(resolve, 2000))
+            await new Promise((resolve) => setTimeout(resolve, TIMING.UPDATE_RETRY_DELAY))
           }
 
           await attemptDownload()

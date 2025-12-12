@@ -1,54 +1,12 @@
 import { ChevronRight, Clock, Globe, Settings, Users, Wrench } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { ProviderIcon } from "@/components/account/ProviderIcon"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { LIMITS, STORAGE_KEYS } from "@/constants"
+import { getRecentDomains, type RecentDomain } from "@/lib/recent-domains"
 import { useAccountStore, useDomainStore } from "@/stores"
-
-interface RecentDomain {
-  accountId: string
-  domainId: string
-  domainName: string
-  accountName: string
-  provider: string
-  timestamp: number
-}
-
-export function getRecentDomains(): RecentDomain[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.RECENT_DOMAINS)
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
-  }
-}
-
-export function addRecentDomain(domain: Omit<RecentDomain, "timestamp">) {
-  const recent = getRecentDomains()
-  const filtered = recent.filter((d) => d.domainId !== domain.domainId)
-  const updated = [{ ...domain, timestamp: Date.now() }, ...filtered].slice(
-    0,
-    LIMITS.MAX_RECENT_DOMAINS
-  )
-  localStorage.setItem(STORAGE_KEYS.RECENT_DOMAINS, JSON.stringify(updated))
-}
-
-export function removeRecentDomainsByAccount(accountId: string) {
-  const recent = getRecentDomains()
-  const filtered = recent.filter((d) => d.accountId !== accountId)
-  localStorage.setItem(STORAGE_KEYS.RECENT_DOMAINS, JSON.stringify(filtered))
-}
-
-export function cleanupInvalidRecentDomains(validAccountIds: string[]) {
-  const recent = getRecentDomains()
-  const filtered = recent.filter((d) => validAccountIds.includes(d.accountId))
-  if (filtered.length !== recent.length) {
-    localStorage.setItem(STORAGE_KEYS.RECENT_DOMAINS, JSON.stringify(filtered))
-  }
-}
 
 export function HomePage() {
   const { t } = useTranslation()
@@ -58,9 +16,13 @@ export function HomePage() {
   const [recentDomains, setRecentDomains] = useState<RecentDomain[]>(getRecentDomains)
 
   // 计算总域名数
-  const totalDomains = Object.values(domainsByAccount).reduce(
-    (sum, cache) => sum + (cache?.domains?.length ?? 0),
-    0
+  const totalDomains = useMemo(
+    () =>
+      Object.values(domainsByAccount).reduce(
+        (sum, cache) => sum + (cache?.domains?.length ?? 0),
+        0
+      ),
+    [domainsByAccount]
   )
 
   // 账户变化后重新读取最近域名（清理无效记录后刷新显示）

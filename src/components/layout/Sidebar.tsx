@@ -27,9 +27,9 @@ interface NavItemConfig {
 const navItems: NavItemConfig[] = [
   { id: "main", icon: Home, labelKey: "nav.home", position: "top" },
   { id: "domains", icon: Globe, labelKey: "nav.domains", position: "top" },
-  { id: "toolbox", icon: Wrench, labelKey: "toolbox.title", position: "top" },
+  { id: "accounts", icon: Users, labelKey: "accounts.manage", position: "top" },
+  { id: "toolbox", icon: Wrench, labelKey: "toolbox.title", position: "bottom" },
   { id: "settings", icon: Settings, labelKey: "settings.title", position: "bottom" },
-  { id: "accounts", icon: Users, labelKey: "accounts.manage", position: "bottom" },
 ]
 
 export function Sidebar({ currentView, onNavigate, isMobile = false, onClose }: SidebarProps) {

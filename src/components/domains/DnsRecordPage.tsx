@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router-dom"
 import { DnsRecordTable } from "@/components/dns/DnsRecordTable"
-import { addRecentDomain } from "@/components/home/HomePage"
+import { addRecentDomain } from "@/lib/recent-domains"
 import { Button } from "@/components/ui/button"
 import { useAccountStore, useDomainStore } from "@/stores"
 

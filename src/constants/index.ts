@@ -13,6 +13,10 @@ export const TIMING = {
   TOAST_DURATION: 5000,
   /** 更新检查延迟 */
   UPDATE_CHECK_DELAY: 3000,
+  /** 滚动位置保存防抖延迟 */
+  SCROLL_SAVE_DEBOUNCE: 300,
+  /** 更新重试延迟 */
+  UPDATE_RETRY_DELAY: 2000,
 } as const
 
 /** DNS 配置 */

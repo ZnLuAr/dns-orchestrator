@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { PAGINATION, STORAGE_KEYS } from "@/constants"
+import { PAGINATION, STORAGE_KEYS, TIMING } from "@/constants"
 import { extractErrorMessage, getErrorMessage, isCredentialError } from "@/lib/error"
 import { logger } from "@/lib/logger"
 import { domainService } from "@/services"
@@ -12,6 +12,33 @@ interface AccountDomainCache {
   page: number
   hasMore: boolean
 }
+
+// 从 localStorage 读取初始缓存数据
+function getInitialCache(): { domainsByAccount: Record<string, AccountDomainCache>; scrollPosition: number } {
+  try {
+    const cached = localStorage.getItem(STORAGE_KEYS.DOMAINS_CACHE)
+    if (cached) {
+      const parsed = JSON.parse(cached)
+      // 兼容新旧格式
+      if (parsed.domainsByAccount) {
+        return {
+          domainsByAccount: parsed.domainsByAccount,
+          scrollPosition: parsed.scrollPosition ?? 0,
+        }
+      }
+      // 旧格式
+      return { domainsByAccount: parsed, scrollPosition: 0 }
+    }
+  } catch {
+    // 忽略解析错误
+  }
+  return { domainsByAccount: {}, scrollPosition: 0 }
+}
+
+const initialCache = getInitialCache()
+
+// 滚动位置保存的防抖 timer
+let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null
 
 interface DomainState {
   // 按账户分组的域名缓存
@@ -56,22 +83,31 @@ interface DomainState {
 }
 
 export const useDomainStore = create<DomainState>((set, get) => ({
-  domainsByAccount: {},
+  domainsByAccount: initialCache.domainsByAccount,
   selectedAccountId: null,
   selectedDomainId: null,
   loadingAccounts: new Set(),
   loadingMoreAccounts: new Set(),
   isBackgroundRefreshing: false,
   expandedAccounts: new Set(),
-  scrollPosition: 0,
+  scrollPosition: initialCache.scrollPosition,
 
   // 从 localStorage 加载缓存
   loadFromStorage: () => {
     try {
       const cached = localStorage.getItem(STORAGE_KEYS.DOMAINS_CACHE)
       if (cached) {
-        const parsed = JSON.parse(cached) as Record<string, AccountDomainCache>
-        set({ domainsByAccount: parsed })
+        const parsed = JSON.parse(cached)
+        // 兼容旧格式（直接是 domainsByAccount）和新格式（包含 scrollPosition）
+        if (parsed.domainsByAccount) {
+          set({
+            domainsByAccount: parsed.domainsByAccount as Record<string, AccountDomainCache>,
+            scrollPosition: parsed.scrollPosition ?? 0,
+          })
+        } else {
+          // 旧格式
+          set({ domainsByAccount: parsed as Record<string, AccountDomainCache> })
+        }
       }
     } catch (err) {
       logger.error("Failed to load domain cache from storage:", err)
@@ -81,8 +117,11 @@ export const useDomainStore = create<DomainState>((set, get) => ({
   // 保存到 localStorage
   saveToStorage: () => {
     try {
-      const { domainsByAccount } = get()
-      localStorage.setItem(STORAGE_KEYS.DOMAINS_CACHE, JSON.stringify(domainsByAccount))
+      const { domainsByAccount, scrollPosition } = get()
+      localStorage.setItem(
+        STORAGE_KEYS.DOMAINS_CACHE,
+        JSON.stringify({ domainsByAccount, scrollPosition })
+      )
     } catch (err) {
       logger.error("Failed to save domain cache to storage:", err)
     }
@@ -270,9 +309,17 @@ export const useDomainStore = create<DomainState>((set, get) => ({
     })
   },
 
-  // 设置滚动位置
+  // 设置滚动位置（带防抖保存）
   setScrollPosition: (position) => {
     set({ scrollPosition: position })
+    // 防抖：300ms 后才保存到 localStorage
+    if (scrollSaveTimer) {
+      clearTimeout(scrollSaveTimer)
+    }
+    scrollSaveTimer = setTimeout(() => {
+      get().saveToStorage()
+      scrollSaveTimer = null
+    }, TIMING.SCROLL_SAVE_DEBOUNCE)
   },
 
   // 检查账户是否展开
