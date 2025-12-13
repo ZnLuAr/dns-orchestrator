@@ -150,11 +150,9 @@ mod desktop {
             Ok(())
         }
 
-        async fn exists(&self, account_id: &str) -> bool {
-            self.load_all()
-                .await
-                .map(|creds| creds.contains_key(account_id))
-                .unwrap_or(false)
+        async fn exists(&self, account_id: &str) -> CoreResult<bool> {
+            let creds = self.load_all().await?;
+            Ok(creds.contains_key(account_id))
         }
     }
 }
@@ -291,11 +289,9 @@ mod android {
             Ok(())
         }
 
-        async fn exists(&self, account_id: &str) -> bool {
-            self.load_all()
-                .await
-                .map(|creds| creds.contains_key(account_id))
-                .unwrap_or(false)
+        async fn exists(&self, account_id: &str) -> CoreResult<bool> {
+            let creds = self.load_all().await?;
+            Ok(creds.contains_key(account_id))
         }
     }
 }

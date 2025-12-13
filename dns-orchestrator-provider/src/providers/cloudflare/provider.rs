@@ -7,16 +7,16 @@ use crate::error::Result;
 use crate::providers::common::{full_name_to_relative, parse_record_type, record_type_to_string};
 use crate::traits::{DnsProvider, ProviderErrorMapper};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, Domain, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DomainStatus, PaginatedResponse, PaginationParams,
+    ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
-use super::{CloudflareDnsRecord, CloudflareProvider, CloudflareZone};
+use super::{CloudflareDnsRecord, CloudflareProvider, CloudflareZone, MAX_PAGE_SIZE_RECORDS};
 
 impl CloudflareProvider {
-    /// 将 Cloudflare zone 转换为 Domain
+    /// 将 Cloudflare zone 转换为 ProviderDomain
     /// Cloudflare 状态：active, pending, initializing, moved
-    pub(crate) fn zone_to_domain(zone: CloudflareZone) -> Domain {
+    pub(crate) fn zone_to_domain(zone: CloudflareZone) -> ProviderDomain {
         let status = match zone.status.as_str() {
             "active" => DomainStatus::Active,
             "pending" | "initializing" => DomainStatus::Pending,
@@ -24,7 +24,7 @@ impl CloudflareProvider {
             _ => DomainStatus::Unknown,
         };
 
-        Domain {
+        ProviderDomain {
             id: zone.id,
             name: zone.name,
             provider: ProviderType::Cloudflare,
@@ -84,7 +84,10 @@ impl DnsProvider for CloudflareProvider {
         }
     }
 
-    async fn list_domains(&self, params: &PaginationParams) -> Result<PaginatedResponse<Domain>> {
+    async fn list_domains(
+        &self,
+        params: &PaginationParams,
+    ) -> Result<PaginatedResponse<ProviderDomain>> {
         let (zones, total_count): (Vec<CloudflareZone>, u32) =
             self.get_paginated("/zones", params).await?;
         let domains = zones.into_iter().map(Self::zone_to_domain).collect();
@@ -96,7 +99,7 @@ impl DnsProvider for CloudflareProvider {
         ))
     }
 
-    async fn get_domain(&self, domain_id: &str) -> Result<Domain> {
+    async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         let zone: CloudflareZone = self.get(&format!("/zones/{domain_id}")).await?;
         Ok(Self::zone_to_domain(zone))
     }
@@ -115,7 +118,7 @@ impl DnsProvider for CloudflareProvider {
             "/zones/{}/dns_records?page={}&per_page={}",
             domain_id,
             params.page,
-            params.page_size.min(100)
+            params.page_size.min(MAX_PAGE_SIZE_RECORDS)
         );
 
         // 添加搜索关键词（只搜索记录名称）

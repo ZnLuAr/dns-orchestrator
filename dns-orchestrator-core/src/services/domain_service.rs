@@ -6,7 +6,7 @@ use dns_orchestrator_provider::{DnsProvider, ProviderError};
 
 use crate::error::{CoreError, CoreResult};
 use crate::services::ServiceContext;
-use crate::types::{AccountStatus, Domain, PaginatedResponse, PaginationParams};
+use crate::types::{AccountStatus, AppDomain, PaginatedResponse, PaginationParams};
 
 /// 域名管理服务
 pub struct DomainService {
@@ -26,7 +26,7 @@ impl DomainService {
         account_id: &str,
         page: Option<u32>,
         page_size: Option<u32>,
-    ) -> CoreResult<PaginatedResponse<Domain>> {
+    ) -> CoreResult<PaginatedResponse<AppDomain>> {
         let provider = self.get_provider(account_id).await?;
 
         let params = PaginationParams {
@@ -36,10 +36,10 @@ impl DomainService {
 
         match provider.list_domains(&params).await {
             Ok(lib_response) => {
-                let domains: Vec<Domain> = lib_response
+                let domains: Vec<AppDomain> = lib_response
                     .items
                     .into_iter()
-                    .map(|d| Domain::from_lib(d, account_id.to_string()))
+                    .map(|d| AppDomain::from_provider(d, account_id.to_string()))
                     .collect();
 
                 Ok(PaginatedResponse::new(
@@ -62,11 +62,14 @@ impl DomainService {
     }
 
     /// 获取域名详情
-    pub async fn get_domain(&self, account_id: &str, domain_id: &str) -> CoreResult<Domain> {
+    pub async fn get_domain(&self, account_id: &str, domain_id: &str) -> CoreResult<AppDomain> {
         let provider = self.get_provider(account_id).await?;
 
-        let lib_domain = provider.get_domain(domain_id).await?;
-        Ok(Domain::from_lib(lib_domain, account_id.to_string()))
+        let provider_domain = provider.get_domain(domain_id).await?;
+        Ok(AppDomain::from_provider(
+            provider_domain,
+            account_id.to_string(),
+        ))
     }
 
     /// 获取 Provider 实例

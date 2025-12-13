@@ -2,11 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use dns_orchestrator_provider::{Domain as LibDomain, DomainStatus, ProviderType};
+use dns_orchestrator_provider::{DomainStatus, ProviderDomain, ProviderType};
 
-/// 应用层 Domain 类型（包含 `account_id`）
+/// 应用层域名类型（包含 `account_id`）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Domain {
+pub struct AppDomain {
     /// 域名 ID
     pub id: String,
     /// 域名名称
@@ -23,17 +23,17 @@ pub struct Domain {
     pub record_count: Option<u32>,
 }
 
-impl Domain {
-    /// 从库的 Domain 构造应用层 Domain
+impl AppDomain {
+    /// 从 Provider 层的 Domain 构造应用层 Domain
     #[must_use]
-    pub fn from_lib(lib_domain: LibDomain, account_id: String) -> Self {
+    pub fn from_provider(provider_domain: ProviderDomain, account_id: String) -> Self {
         Self {
-            id: lib_domain.id,
-            name: lib_domain.name,
+            id: provider_domain.id,
+            name: provider_domain.name,
             account_id,
-            provider: lib_domain.provider,
-            status: lib_domain.status,
-            record_count: lib_domain.record_count,
+            provider: provider_domain.provider,
+            status: provider_domain.status,
+            record_count: provider_domain.record_count,
         }
     }
 }

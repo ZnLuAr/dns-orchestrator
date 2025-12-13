@@ -122,7 +122,7 @@ pub enum DomainStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Domain {
+pub struct ProviderDomain {
     pub id: String,
     pub name: String,
     pub provider: ProviderType,

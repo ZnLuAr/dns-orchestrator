@@ -129,7 +129,7 @@ pub async fn export_accounts(
 
     let app_version = env!("CARGO_PKG_VERSION");
     let response = state
-        .account_service
+        .import_export_service
         .export_accounts(core_request, app_version)
         .await?;
 
@@ -144,7 +144,7 @@ pub async fn preview_import(
     password: Option<String>,
 ) -> Result<ApiResponse<ImportPreview>, DnsError> {
     let preview = state
-        .account_service
+        .import_export_service
         .preview_import(&content, password.as_deref())
         .await?;
 
@@ -162,7 +162,10 @@ pub async fn import_accounts(
         password: request.password,
     };
 
-    let result = state.account_service.import_accounts(core_request).await?;
+    let result = state
+        .import_export_service
+        .import_accounts(core_request)
+        .await?;
 
     Ok(ApiResponse::success(convert_import_result(result)))
 }

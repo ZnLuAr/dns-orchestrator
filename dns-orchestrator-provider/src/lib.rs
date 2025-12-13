@@ -52,9 +52,9 @@ pub use traits::DnsProvider;
 
 // Re-export types
 pub use types::{
-    CreateDnsRecordRequest, CredentialValidationError, DnsRecord, DnsRecordType, Domain,
-    DomainStatus, FieldType, PaginatedResponse, PaginationParams, ProviderCredentialField,
-    ProviderCredentials, ProviderFeatures, ProviderMetadata, ProviderType, RecordQueryParams,
+    CreateDnsRecordRequest, CredentialValidationError, DnsRecord, DnsRecordType, DomainStatus,
+    FieldType, PaginatedResponse, PaginationParams, ProviderCredentialField, ProviderCredentials,
+    ProviderDomain, ProviderFeatures, ProviderMetadata, ProviderType, RecordQueryParams,
     UpdateDnsRecordRequest,
 };
 

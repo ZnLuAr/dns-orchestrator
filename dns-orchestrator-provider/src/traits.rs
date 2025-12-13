@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::error::{ProviderError, Result};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, Domain, PaginatedResponse, PaginationParams,
+    CreateDnsRecordRequest, DnsRecord, PaginatedResponse, PaginationParams, ProviderDomain,
     RecordQueryParams, UpdateDnsRecordRequest,
 };
 
@@ -88,10 +88,13 @@ pub trait DnsProvider: Send + Sync {
     async fn validate_credentials(&self) -> Result<bool>;
 
     /// 获取域名列表 (分页)
-    async fn list_domains(&self, params: &PaginationParams) -> Result<PaginatedResponse<Domain>>;
+    async fn list_domains(
+        &self,
+        params: &PaginationParams,
+    ) -> Result<PaginatedResponse<ProviderDomain>>;
 
     /// 获取域名详情
-    async fn get_domain(&self, domain_id: &str) -> Result<Domain>;
+    async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain>;
 
     /// 获取 DNS 记录列表 (分页 + 搜索)
     async fn list_records(

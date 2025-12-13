@@ -45,5 +45,10 @@ pub trait CredentialStore: Send + Sync {
     ///
     /// # Arguments
     /// * `account_id` - 账户 ID
-    async fn exists(&self, account_id: &str) -> bool;
+    ///
+    /// # Returns
+    /// * `Ok(true)` - 凭证存在
+    /// * `Ok(false)` - 凭证不存在
+    /// * `Err(_)` - 检查失败
+    async fn exists(&self, account_id: &str) -> CoreResult<bool>;
 }

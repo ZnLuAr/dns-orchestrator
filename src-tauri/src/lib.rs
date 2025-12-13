@@ -13,7 +13,7 @@ use tauri::Manager;
 
 use adapters::{TauriAccountRepository, TauriCredentialStore};
 use dns_orchestrator_core::services::{
-    AccountService, DnsService, DomainService, ServiceContext, ToolboxService,
+    AccountService, DnsService, DomainService, ImportExportService, ServiceContext,
 };
 use dns_orchestrator_core::traits::InMemoryProviderRegistry;
 
@@ -23,12 +23,12 @@ pub struct AppState {
     pub ctx: Arc<ServiceContext>,
     /// 账户服务
     pub account_service: AccountService,
+    /// 导入导出服务
+    pub import_export_service: ImportExportService,
     /// 域名服务
     pub domain_service: DomainService,
     /// DNS 服务
     pub dns_service: DnsService,
-    /// 工具箱服务
-    pub toolbox_service: ToolboxService,
     /// 账户恢复是否完成
     pub restore_completed: AtomicBool,
 }
@@ -54,16 +54,16 @@ impl AppState {
 
         // 创建各服务
         let account_service = AccountService::new(Arc::clone(&ctx));
+        let import_export_service = ImportExportService::new(Arc::clone(&ctx));
         let domain_service = DomainService::new(Arc::clone(&ctx));
         let dns_service = DnsService::new(Arc::clone(&ctx));
-        let toolbox_service = ToolboxService::new();
 
         Self {
             ctx,
             account_service,
+            import_export_service,
             domain_service,
             dns_service,
-            toolbox_service,
             restore_completed: AtomicBool::new(false),
         }
     }

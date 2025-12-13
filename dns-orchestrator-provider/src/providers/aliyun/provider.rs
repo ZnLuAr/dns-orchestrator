@@ -8,13 +8,14 @@ use crate::error::{ProviderError, Result};
 use crate::providers::common::{parse_record_type, record_type_to_string};
 use crate::traits::{DnsProvider, ProviderErrorMapper};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, Domain, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DomainStatus, PaginatedResponse, PaginationParams,
+    ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::{
     AddDomainRecordResponse, AliyunProvider, DeleteDomainRecordResponse,
-    DescribeDomainRecordsResponse, DescribeDomainsResponse, UpdateDomainRecordResponse,
+    DescribeDomainRecordsResponse, DescribeDomainsResponse, MAX_PAGE_SIZE,
+    UpdateDomainRecordResponse,
 };
 
 impl AliyunProvider {
@@ -68,7 +69,10 @@ impl DnsProvider for AliyunProvider {
         }
     }
 
-    async fn list_domains(&self, params: &PaginationParams) -> Result<PaginatedResponse<Domain>> {
+    async fn list_domains(
+        &self,
+        params: &PaginationParams,
+    ) -> Result<PaginatedResponse<ProviderDomain>> {
         #[derive(Serialize)]
         struct DescribeDomainsRequest {
             #[serde(rename = "PageNumber")]
@@ -79,7 +83,7 @@ impl DnsProvider for AliyunProvider {
 
         let req = DescribeDomainsRequest {
             page_number: params.page,
-            page_size: params.page_size.min(100), // 阿里云最大支持 100
+            page_size: params.page_size.min(MAX_PAGE_SIZE),
         };
 
         let response: DescribeDomainsResponse = self.request("DescribeDomains", &req).await?;
@@ -90,7 +94,7 @@ impl DnsProvider for AliyunProvider {
             .and_then(|d| d.domain)
             .unwrap_or_default()
             .into_iter()
-            .map(|d| Domain {
+            .map(|d| ProviderDomain {
                 id: d.domain_id.unwrap_or_else(|| d.domain_name.clone()),
                 name: d.domain_name,
                 provider: ProviderType::Aliyun,
@@ -107,7 +111,7 @@ impl DnsProvider for AliyunProvider {
         ))
     }
 
-    async fn get_domain(&self, domain_id: &str) -> Result<Domain> {
+    async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         // 阿里云 API 需要域名名称，先从域名列表中查找
         // 使用大页面一次性获取用于查找
         let params = PaginationParams {
@@ -154,7 +158,7 @@ impl DnsProvider for AliyunProvider {
         let req = DescribeDomainRecordsRequest {
             domain_name: domain_info.name,
             page_number: params.page,
-            page_size: params.page_size.min(100), // 阿里云最大支持 100
+            page_size: params.page_size.min(MAX_PAGE_SIZE),
             rr_keyword: params.keyword.clone().filter(|k| !k.is_empty()),
             record_type: params
                 .record_type

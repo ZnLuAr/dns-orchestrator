@@ -1,12 +1,31 @@
 //! Provider 公共工具函数
 
+use std::time::Duration;
+
 use hmac::{Hmac, Mac};
+use reqwest::Client;
 use sha2::Sha256;
 
 use crate::error::{ProviderError, Result};
 use crate::types::DnsRecordType;
 
 type HmacSha256 = Hmac<Sha256>;
+
+// ============ HTTP Client ============
+
+/// 默认连接超时（秒）
+const DEFAULT_CONNECT_TIMEOUT_SECS: u64 = 10;
+/// 默认请求超时（秒）
+const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 30;
+
+/// 创建带超时配置的 HTTP Client
+pub fn create_http_client() -> Client {
+    Client::builder()
+        .connect_timeout(Duration::from_secs(DEFAULT_CONNECT_TIMEOUT_SECS))
+        .timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS))
+        .build()
+        .expect("Failed to create HTTP client")
+}
 
 // ============ 记录类型转换 ============
 

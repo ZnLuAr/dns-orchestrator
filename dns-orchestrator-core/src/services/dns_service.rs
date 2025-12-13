@@ -2,13 +2,14 @@
 
 use std::sync::Arc;
 
-use dns_orchestrator_provider::DnsProvider;
+use dns_orchestrator_provider::{DnsProvider, ProviderError};
 
 use crate::error::{CoreError, CoreResult};
 use crate::services::ServiceContext;
 use crate::types::{
-    BatchDeleteFailure, BatchDeleteRequest, BatchDeleteResult, CreateDnsRecordRequest, DnsRecord,
-    DnsRecordType, PaginatedResponse, RecordQueryParams, UpdateDnsRecordRequest,
+    AccountStatus, BatchDeleteFailure, BatchDeleteRequest, BatchDeleteResult,
+    CreateDnsRecordRequest, DnsRecord, DnsRecordType, PaginatedResponse, RecordQueryParams,
+    UpdateDnsRecordRequest,
 };
 
 /// DNS 记录管理服务
@@ -42,10 +43,10 @@ impl DnsService {
             record_type,
         };
 
-        provider
-            .list_records(domain_id, &params)
-            .await
-            .map_err(CoreError::Provider)
+        match provider.list_records(domain_id, &params).await {
+            Ok(response) => Ok(response),
+            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+        }
     }
 
     /// 创建 DNS 记录
@@ -55,10 +56,10 @@ impl DnsService {
         request: CreateDnsRecordRequest,
     ) -> CoreResult<DnsRecord> {
         let provider = self.get_provider(account_id).await?;
-        provider
-            .create_record(&request)
-            .await
-            .map_err(CoreError::Provider)
+        match provider.create_record(&request).await {
+            Ok(record) => Ok(record),
+            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+        }
     }
 
     /// 更新 DNS 记录
@@ -69,10 +70,10 @@ impl DnsService {
         request: UpdateDnsRecordRequest,
     ) -> CoreResult<DnsRecord> {
         let provider = self.get_provider(account_id).await?;
-        provider
-            .update_record(record_id, &request)
-            .await
-            .map_err(CoreError::Provider)
+        match provider.update_record(record_id, &request).await {
+            Ok(record) => Ok(record),
+            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+        }
     }
 
     /// 删除 DNS 记录
@@ -83,10 +84,10 @@ impl DnsService {
         domain_id: &str,
     ) -> CoreResult<()> {
         let provider = self.get_provider(account_id).await?;
-        provider
-            .delete_record(record_id, domain_id)
-            .await
-            .map_err(CoreError::Provider)
+        match provider.delete_record(record_id, domain_id).await {
+            Ok(()) => Ok(()),
+            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+        }
     }
 
     /// 批量删除 DNS 记录
@@ -111,7 +112,7 @@ impl DnsService {
                 async move {
                     match provider.delete_record(&record_id, &domain_id).await {
                         Ok(()) => Ok(record_id),
-                        Err(e) => Err((record_id, e.to_string())),
+                        Err(e) => Err((record_id, e)),
                     }
                 }
             })
@@ -122,8 +123,15 @@ impl DnsService {
         for result in results {
             match result {
                 Ok(_) => success_count += 1,
-                Err((record_id, reason)) => {
-                    failures.push(BatchDeleteFailure { record_id, reason });
+                Err((record_id, e)) => {
+                    // 检查是否是凭证失效
+                    if let ProviderError::InvalidCredentials { .. } = &e {
+                        self.mark_account_invalid(account_id, "凭证已失效").await;
+                    }
+                    failures.push(BatchDeleteFailure {
+                        record_id,
+                        reason: e.to_string(),
+                    });
                 }
             }
         }
@@ -142,5 +150,27 @@ impl DnsService {
             .get(account_id)
             .await
             .ok_or_else(|| CoreError::AccountNotFound(account_id.to_string()))
+    }
+
+    /// 处理 Provider 错误，如果是凭证失效则更新账户状态
+    async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
+        if let ProviderError::InvalidCredentials { .. } = &err {
+            self.mark_account_invalid(account_id, "凭证已失效").await;
+        }
+        CoreError::Provider(err)
+    }
+
+    /// 标记账户为无效状态
+    async fn mark_account_invalid(&self, account_id: &str, error_msg: &str) {
+        let _ = self
+            .ctx
+            .account_repository
+            .update_status(
+                account_id,
+                AccountStatus::Error,
+                Some(error_msg.to_string()),
+            )
+            .await;
+        log::warn!("Account {account_id} marked as invalid: {error_msg}");
     }
 }

@@ -10,11 +10,12 @@ use crate::providers::common::{
 };
 use crate::traits::{DnsProvider, ProviderErrorMapper};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain, DomainStatus, PaginatedResponse,
-    PaginationParams, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
+    PaginationParams, ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::HuaweicloudProvider;
+use super::MAX_PAGE_SIZE;
 use super::types::{CreateRecordSetResponse, ListRecordSetsResponse, ListZonesResponse};
 
 impl HuaweicloudProvider {
@@ -57,10 +58,13 @@ impl DnsProvider for HuaweicloudProvider {
         }
     }
 
-    async fn list_domains(&self, params: &PaginationParams) -> Result<PaginatedResponse<Domain>> {
+    async fn list_domains(
+        &self,
+        params: &PaginationParams,
+    ) -> Result<PaginatedResponse<ProviderDomain>> {
         // 华为云使用 offset/limit 分页
         let offset = (params.page - 1) * params.page_size;
-        let limit = params.page_size.min(500); // 华为云最大支持 500
+        let limit = params.page_size.min(MAX_PAGE_SIZE);
         let query = format!("type=public&offset={offset}&limit={limit}");
 
         let response: ListZonesResponse = self.get("/v2/zones", &query).await?;
@@ -71,7 +75,7 @@ impl DnsProvider for HuaweicloudProvider {
             .zones
             .unwrap_or_default()
             .into_iter()
-            .map(|z| Domain {
+            .map(|z| ProviderDomain {
                 id: z.id,
                 name: normalize_domain_name(&z.name),
                 provider: ProviderType::Huaweicloud,
@@ -88,7 +92,7 @@ impl DnsProvider for HuaweicloudProvider {
         ))
     }
 
-    async fn get_domain(&self, domain_id: &str) -> Result<Domain> {
+    async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         // 使用大页面一次性获取用于查找
         let params = PaginationParams {
             page: 1,
@@ -117,7 +121,7 @@ impl DnsProvider for HuaweicloudProvider {
 
         // 华为云使用 offset/limit 分页
         let offset = (params.page - 1) * params.page_size;
-        let limit = params.page_size.min(500); // 华为云最大支持 500
+        let limit = params.page_size.min(MAX_PAGE_SIZE);
         let mut query = format!("offset={offset}&limit={limit}");
 
         // 添加搜索关键词（华为云支持 name 参数模糊匹配）

@@ -3,11 +3,13 @@
 mod account_service;
 mod dns_service;
 mod domain_service;
+mod import_export_service;
 mod toolbox;
 
 pub use account_service::{AccountService, RestoreResult};
 pub use dns_service::DnsService;
 pub use domain_service::DomainService;
+pub use import_export_service::ImportExportService;
 pub use toolbox::ToolboxService;
 
 use std::sync::Arc;

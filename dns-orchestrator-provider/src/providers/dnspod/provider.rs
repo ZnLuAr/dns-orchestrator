@@ -7,12 +7,12 @@ use crate::error::{ProviderError, Result};
 use crate::providers::common::{parse_record_type, record_type_to_string};
 use crate::traits::{DnsProvider, ProviderErrorMapper};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, Domain, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DomainStatus, PaginatedResponse, PaginationParams,
+    ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::{
-    CreateRecordResponse, DnspodProvider, DomainListResponse, ModifyRecordResponse,
+    CreateRecordResponse, DnspodProvider, DomainListResponse, MAX_PAGE_SIZE, ModifyRecordResponse,
     RecordListResponse,
 };
 
@@ -62,7 +62,10 @@ impl DnsProvider for DnspodProvider {
         }
     }
 
-    async fn list_domains(&self, params: &PaginationParams) -> Result<PaginatedResponse<Domain>> {
+    async fn list_domains(
+        &self,
+        params: &PaginationParams,
+    ) -> Result<PaginatedResponse<ProviderDomain>> {
         #[derive(Serialize)]
         struct DescribeDomainListRequest {
             #[serde(rename = "Offset")]
@@ -75,7 +78,7 @@ impl DnsProvider for DnspodProvider {
         let offset = (params.page - 1) * params.page_size;
         let req = DescribeDomainListRequest {
             offset,
-            limit: params.page_size.min(100),
+            limit: params.page_size.min(MAX_PAGE_SIZE),
         };
 
         let response: DomainListResponse = self.request("DescribeDomainList", &req).await?;
@@ -89,7 +92,7 @@ impl DnsProvider for DnspodProvider {
             .domain_list
             .unwrap_or_default()
             .into_iter()
-            .map(|d| Domain {
+            .map(|d| ProviderDomain {
                 id: d.domain_id.to_string(),
                 name: d.name,
                 provider: ProviderType::Dnspod,
@@ -106,7 +109,7 @@ impl DnsProvider for DnspodProvider {
         ))
     }
 
-    async fn get_domain(&self, domain_id: &str) -> Result<Domain> {
+    async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         let params = PaginationParams {
             page: 1,
             page_size: 100,
@@ -149,7 +152,7 @@ impl DnsProvider for DnspodProvider {
         let req = DescribeRecordListRequest {
             domain: domain_info.name,
             offset,
-            limit: params.page_size.min(100),
+            limit: params.page_size.min(MAX_PAGE_SIZE),
             keyword: params.keyword.clone().filter(|k| !k.is_empty()),
             record_type: params
                 .record_type

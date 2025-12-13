@@ -22,7 +22,7 @@ pub use traits::{AccountRepository, CredentialStore, ProviderRegistry};
 
 // Re-export provider 库的公共类型
 pub use dns_orchestrator_provider::{
-    CreateDnsRecordRequest, DnsProvider, DnsRecord, DnsRecordType, Domain as LibDomain,
-    DomainStatus, PaginatedResponse, PaginationParams, ProviderCredentials, ProviderError,
-    ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsProvider, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
+    PaginationParams, ProviderCredentials, ProviderDomain, ProviderError, ProviderMetadata,
+    ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };

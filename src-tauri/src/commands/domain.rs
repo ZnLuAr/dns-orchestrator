@@ -5,7 +5,7 @@ use crate::types::{ApiResponse, Domain, PaginatedResponse};
 use crate::AppState;
 
 // 从 core 类型转换到本地类型的辅助函数
-fn convert_domain(core_domain: dns_orchestrator_core::types::Domain) -> Domain {
+fn convert_domain(core_domain: dns_orchestrator_core::types::AppDomain) -> Domain {
     Domain {
         id: core_domain.id,
         name: core_domain.name,

@@ -6,7 +6,9 @@ use crate::error::Result;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 use crate::types::PaginationParams;
 
-use super::{CF_API_BASE, CloudflareDnsRecord, CloudflareProvider, CloudflareResponse};
+use super::{
+    CF_API_BASE, CloudflareDnsRecord, CloudflareProvider, CloudflareResponse, MAX_PAGE_SIZE_ZONES,
+};
 
 impl CloudflareProvider {
     /// 执行 GET 请求
@@ -72,7 +74,7 @@ impl CloudflareProvider {
             CF_API_BASE,
             path,
             params.page,
-            params.page_size.min(50)
+            params.page_size.min(MAX_PAGE_SIZE_ZONES)
         );
         log::debug!("GET {url}");
 

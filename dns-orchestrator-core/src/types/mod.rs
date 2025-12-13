@@ -7,7 +7,7 @@ mod response;
 mod toolbox;
 
 pub use account::{Account, AccountStatus, CreateAccountRequest};
-pub use domain::Domain;
+pub use domain::AppDomain;
 pub use export::{
     ExportAccountsRequest, ExportAccountsResponse, ExportFile, ExportFileHeader, ExportedAccount,
     ImportAccountsRequest, ImportFailure, ImportPreview, ImportPreviewAccount, ImportResult,
@@ -20,7 +20,7 @@ pub use toolbox::{
 
 // Re-export provider 库的公共类型
 pub use dns_orchestrator_provider::{
-    CreateDnsRecordRequest, DnsRecord, DnsRecordType, Domain as LibDomain, DomainStatus,
-    PaginatedResponse, PaginationParams, ProviderCredentials, ProviderMetadata, ProviderType,
+    CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
+    PaginationParams, ProviderCredentials, ProviderDomain, ProviderMetadata, ProviderType,
     RecordQueryParams, UpdateDnsRecordRequest,
 };

@@ -1,10 +1,9 @@
-use tauri::State;
+use dns_orchestrator_core::services::ToolboxService;
 
 use crate::types::{
     ApiResponse, CertChainItem, DnsLookupRecord, DnsLookupResult, IpGeoInfo, IpLookupResult,
     SslCertInfo, SslCheckResult, WhoisResult,
 };
-use crate::AppState;
 
 // 类型转换辅助函数
 fn convert_whois_result(result: dns_orchestrator_core::types::WhoisResult) -> WhoisResult {
@@ -102,13 +101,8 @@ fn convert_ssl_check_result(
 
 /// WHOIS 查询
 #[tauri::command]
-pub async fn whois_lookup(
-    state: State<'_, AppState>,
-    domain: String,
-) -> Result<ApiResponse<WhoisResult>, String> {
-    let result = state
-        .toolbox_service
-        .whois_lookup(&domain)
+pub async fn whois_lookup(domain: String) -> Result<ApiResponse<WhoisResult>, String> {
+    let result = ToolboxService::whois_lookup(&domain)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -118,14 +112,11 @@ pub async fn whois_lookup(
 /// DNS 查询
 #[tauri::command]
 pub async fn dns_lookup(
-    state: State<'_, AppState>,
     domain: String,
     record_type: String,
     nameserver: Option<String>,
 ) -> Result<ApiResponse<DnsLookupResult>, String> {
-    let result = state
-        .toolbox_service
-        .dns_lookup(&domain, &record_type, nameserver.as_deref())
+    let result = ToolboxService::dns_lookup(&domain, &record_type, nameserver.as_deref())
         .await
         .map_err(|e| e.to_string())?;
 
@@ -134,13 +125,8 @@ pub async fn dns_lookup(
 
 /// IP/域名 地理位置查询
 #[tauri::command]
-pub async fn ip_lookup(
-    state: State<'_, AppState>,
-    query: String,
-) -> Result<ApiResponse<IpLookupResult>, String> {
-    let result = state
-        .toolbox_service
-        .ip_lookup(&query)
+pub async fn ip_lookup(query: String) -> Result<ApiResponse<IpLookupResult>, String> {
+    let result = ToolboxService::ip_lookup(&query)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -150,13 +136,10 @@ pub async fn ip_lookup(
 /// SSL 证书检查
 #[tauri::command]
 pub async fn ssl_check(
-    state: State<'_, AppState>,
     domain: String,
     port: Option<u16>,
 ) -> Result<ApiResponse<SslCheckResult>, String> {
-    let result = state
-        .toolbox_service
-        .ssl_check(&domain, port)
+    let result = ToolboxService::ssl_check(&domain, port)
         .await
         .map_err(|e| e.to_string())?;
 
