@@ -13,6 +13,14 @@ export interface ProviderFeatures {
   proxy: boolean
 }
 
+/** 提供商分页限制 */
+export interface ProviderLimits {
+  /** 域名列表的最大分页大小 */
+  maxPageSizeDomains: number
+  /** DNS 记录列表的最大分页大小 */
+  maxPageSizeRecords: number
+}
+
 /** 提供商信息 (从后端获取) */
 export interface ProviderInfo {
   id: string
@@ -20,4 +28,5 @@ export interface ProviderInfo {
   description: string
   requiredFields: ProviderCredentialField[]
   features: ProviderFeatures
+  limits: ProviderLimits
 }

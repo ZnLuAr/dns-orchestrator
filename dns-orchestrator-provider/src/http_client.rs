@@ -10,6 +10,7 @@
 
 use reqwest::RequestBuilder;
 use serde::de::DeserializeOwned;
+use std::time::Duration;
 
 use crate::error::ProviderError;
 
@@ -107,4 +108,100 @@ impl HttpUtils {
                 .await?;
         Self::parse_json(&text, provider_name)
     }
+
+    /// 执行 HTTP 请求并返回响应文本（带重试）
+    ///
+    /// 自动重试网络错误，使用指数退避策略。
+    ///
+    /// # Arguments
+    /// * `request_builder` - 已配置好的请求构造器
+    /// * `provider_name` - Provider 名称
+    /// * `method_name` - 请求方法名
+    /// * `url_or_action` - URL 或 Action 名称
+    /// * `max_retries` - 最大重试次数（0 表示不重试）
+    ///
+    /// # Returns
+    /// * `Ok((status_code, response_text))` - 成功时返回状态码和响应文本
+    /// * `Err(ProviderError)` - 所有重试都失败后返回最后一个错误
+    ///
+    /// # 重试策略
+    /// - 只重试网络错误（`ProviderError::NetworkError`）
+    /// - 指数退避：100ms, 200ms, 400ms, 800ms, ... (最大 10 秒)
+    /// - 业务错误（认证失败、记录不存在等）不会重试
+    pub async fn execute_request_with_retry(
+        request_builder: RequestBuilder,
+        provider_name: &str,
+        method_name: &str,
+        url_or_action: &str,
+        max_retries: u32,
+    ) -> Result<(u16, String), ProviderError> {
+        if max_retries == 0 {
+            // 不重试，直接执行
+            return Self::execute_request(
+                request_builder,
+                provider_name,
+                method_name,
+                url_or_action,
+            )
+            .await;
+        }
+
+        let mut last_error = None;
+
+        for attempt in 0..=max_retries {
+            // 克隆请求（RequestBuilder 只能使用一次）
+            let req = match request_builder.try_clone() {
+                Some(r) => r,
+                None => {
+                    // 无法克隆（通常是 body stream 导致），回退到不重试
+                    log::warn!("[{}] 无法克隆请求，禁用重试", provider_name);
+                    return Self::execute_request(
+                        request_builder,
+                        provider_name,
+                        method_name,
+                        url_or_action,
+                    )
+                    .await;
+                }
+            };
+
+            match Self::execute_request(req, provider_name, method_name, url_or_action).await {
+                Ok(resp) => return Ok(resp),
+                Err(e) if attempt < max_retries && is_retryable(&e) => {
+                    let delay = backoff_delay(attempt);
+                    log::warn!(
+                        "[{}] 请求失败（尝试 {}/{}），{:.1}秒后重试: {}",
+                        provider_name,
+                        attempt + 1,
+                        max_retries,
+                        delay.as_secs_f32(),
+                        e
+                    );
+                    tokio::time::sleep(delay).await;
+                    last_error = Some(e);
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Err(last_error.unwrap())
+    }
+}
+
+/// 判断错误是否可重试
+///
+/// 只有网络错误才适合重试，业务错误（如认证失败、记录不存在）不应重试
+fn is_retryable(error: &ProviderError) -> bool {
+    matches!(error, ProviderError::NetworkError { .. })
+}
+
+/// 计算指数退避延迟
+///
+/// 退避策略：100ms, 200ms, 400ms, 800ms, 1.6s, ...
+/// 最大延迟限制为 10 秒
+fn backoff_delay(attempt: u32) -> Duration {
+    let delay_ms = 100 * 2_u64.pow(attempt);
+    let delay_ms = delay_ms.min(10_000); // 最大 10 秒
+    Duration::from_millis(delay_ms)
 }

@@ -53,7 +53,7 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
   useEffect(() => {
     if (providers.length === 0) {
       fetchProviders()
-    } else if (!provider && !isEditing) {
+    } else if (!(provider || isEditing)) {
       setProvider(providers[0].id)
     }
   }, [providers, provider, fetchProviders, isEditing])

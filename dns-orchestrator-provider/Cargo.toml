@@ -28,6 +28,9 @@ serde_json = "1"
 # HTTP 客户端（不带默认 features，让 feature flag 控制 TLS）
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 
+# 异步运行时（用于重试延迟）
+tokio = { version = "1", features = ["time"] }
+
 # 加密和签名
 hmac = "0.12"
 sha2 = "0.10"
@@ -42,3 +45,4 @@ urlencoding = "2.1"
 
 # 日志
 log = "0.4"
+

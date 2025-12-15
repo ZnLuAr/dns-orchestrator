@@ -11,7 +11,7 @@ use crate::providers::common::{
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, FieldType, PaginatedResponse,
-    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures,
+    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures, ProviderLimits,
     ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
@@ -69,6 +69,10 @@ impl DnsProvider for HuaweicloudProvider {
                 },
             ],
             features: ProviderFeatures::default(),
+            limits: ProviderLimits {
+                max_page_size_domains: 500,
+                max_page_size_records: 500,
+            },
         }
     }
 

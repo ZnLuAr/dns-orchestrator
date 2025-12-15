@@ -5,6 +5,7 @@ import i18n from "@/i18n"
 import { extractErrorMessage, getErrorMessage } from "@/lib/error"
 import { logger } from "@/lib/logger"
 import { dnsService } from "@/services"
+import { useAccountStore } from "@/stores/accountStore"
 import type {
   BatchDeleteRequest,
   BatchDeleteResult,
@@ -12,6 +13,24 @@ import type {
   DnsRecord,
   UpdateDnsRecordRequest,
 } from "@/types"
+
+/**
+ * 获取 DNS 记录的分页大小
+ *
+ * 根据账户的 provider 限制动态计算，确保不超过 API 限制
+ */
+const getRecordPageSize = (accountId: string): number => {
+  const { accounts, providers } = useAccountStore.getState()
+  const account = accounts.find((a) => a.id === accountId)
+  if (!account) {
+    return PAGINATION.PAGE_SIZE
+  }
+
+  const provider = providers.find((p) => p.id === account.provider)
+  const maxPageSize = provider?.limits.maxPageSizeRecords ?? 100
+
+  return Math.min(PAGINATION.PAGE_SIZE, maxPageSize)
+}
 
 interface DnsState {
   records: DnsRecord[]
@@ -101,11 +120,12 @@ export const useDnsStore = create<DnsState>((set, get) => ({
       ...(isDomainChange && { records: [], totalCount: 0 }),
     })
     try {
+      const pageSize = getRecordPageSize(accountId)
       const response = await dnsService.listRecords({
         accountId,
         domainId,
         page: 1,
-        pageSize: PAGINATION.PAGE_SIZE,
+        pageSize,
         keyword: searchKeyword || null,
         recordType: searchRecordType || null,
       })
@@ -149,11 +169,12 @@ export const useDnsStore = create<DnsState>((set, get) => ({
     const nextPage = page + 1
 
     try {
+      const pageSize = getRecordPageSize(accountId)
       const response = await dnsService.listRecords({
         accountId,
         domainId,
         page: nextPage,
-        pageSize: PAGINATION.PAGE_SIZE,
+        pageSize,
         keyword: keyword || null,
         recordType: recordType || null,
       })

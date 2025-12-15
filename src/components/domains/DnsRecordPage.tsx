@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router-dom"
 import { useShallow } from "zustand/react/shallow"
 import { DnsRecordTable } from "@/components/dns/DnsRecordTable"
-import { addRecentDomain } from "@/lib/recent-domains"
 import { Button } from "@/components/ui/button"
+import { addRecentDomain } from "@/lib/recent-domains"
 import { useAccountStore, useDomainStore } from "@/stores"
 
 export function DnsRecordPage() {

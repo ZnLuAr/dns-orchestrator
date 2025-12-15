@@ -9,7 +9,7 @@ use crate::providers::common::{parse_record_type, record_type_to_string};
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DomainStatus, FieldType, PaginatedResponse,
-    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures,
+    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures, ProviderLimits,
     ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
@@ -65,6 +65,10 @@ impl DnsProvider for AliyunProvider {
                 },
             ],
             features: ProviderFeatures::default(),
+            limits: ProviderLimits {
+                max_page_size_domains: 100,
+                max_page_size_records: 100,
+            },
         }
     }
 

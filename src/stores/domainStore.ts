@@ -43,6 +43,24 @@ const initialCache = getInitialCache()
 // 滚动位置保存的防抖 timer
 let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null
 
+/**
+ * 获取域名列表的分页大小
+ *
+ * 根据账户的 provider 限制动态计算，确保不超过 API 限制
+ */
+const getDomainPageSize = (accountId: string): number => {
+  const { accounts, providers } = useAccountStore.getState()
+  const account = accounts.find((a) => a.id === accountId)
+  if (!account) {
+    return PAGINATION.PAGE_SIZE
+  }
+
+  const provider = providers.find((p) => p.id === account.provider)
+  const maxPageSize = provider?.limits.maxPageSizeDomains ?? 100
+
+  return Math.min(PAGINATION.PAGE_SIZE, maxPageSize)
+}
+
 interface DomainState {
   // 按账户分组的域名缓存
   domainsByAccount: Record<string, AccountDomainCache>
@@ -142,7 +160,8 @@ export const useDomainStore = create<DomainState>((set, get) => ({
       await Promise.allSettled(
         accounts.map(async (account) => {
           try {
-            const response = await domainService.listDomains(account.id, 1, PAGINATION.PAGE_SIZE)
+            const pageSize = getDomainPageSize(account.id)
+            const response = await domainService.listDomains(account.id, 1, pageSize)
             if (response.success && response.data) {
               set((state) => ({
                 domainsByAccount: {
@@ -179,7 +198,8 @@ export const useDomainStore = create<DomainState>((set, get) => ({
     }))
 
     try {
-      const response = await domainService.listDomains(accountId, 1, PAGINATION.PAGE_SIZE)
+      const pageSize = getDomainPageSize(accountId)
+      const response = await domainService.listDomains(accountId, 1, pageSize)
       if (response.success && response.data) {
         set((state) => ({
           domainsByAccount: {
@@ -225,7 +245,8 @@ export const useDomainStore = create<DomainState>((set, get) => ({
     const nextPage = cache.page + 1
 
     try {
-      const response = await domainService.listDomains(accountId, nextPage, PAGINATION.PAGE_SIZE)
+      const pageSize = getDomainPageSize(accountId)
+      const response = await domainService.listDomains(accountId, nextPage, pageSize)
       if (response.success && response.data) {
         set((state) => ({
           domainsByAccount: {

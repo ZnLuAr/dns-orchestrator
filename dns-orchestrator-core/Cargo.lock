@@ -457,6 +457,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.17",
+ "tokio",
  "urlencoding",
  "uuid",
 ]

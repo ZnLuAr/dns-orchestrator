@@ -226,6 +226,16 @@ pub struct ProviderFeatures {
     pub proxy: bool,
 }
 
+/// 提供商分页限制
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderLimits {
+    /// 域名列表的最大分页大小
+    pub max_page_size_domains: u32,
+    /// DNS 记录列表的最大分页大小
+    pub max_page_size_records: u32,
+}
+
 /// 提供商元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -235,6 +245,7 @@ pub struct ProviderMetadata {
     pub description: String,
     pub required_fields: Vec<ProviderCredentialField>,
     pub features: ProviderFeatures,
+    pub limits: ProviderLimits,
 }
 
 // ============ 凭证类型 ============
