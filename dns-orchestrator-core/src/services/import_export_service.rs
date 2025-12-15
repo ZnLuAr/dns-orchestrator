@@ -304,8 +304,8 @@ impl ImportExportService {
                 id: account_id.clone(),
                 name: exported.name.clone(),
                 provider: exported.provider,
-                created_at: now.clone(),
-                updated_at: now.clone(),
+                created_at: now,
+                updated_at: now,
                 status: Some(AccountStatus::Active),
                 error: None,
             };

@@ -29,14 +29,46 @@ pub struct AliyunProvider {
     pub(crate) client: Client,
     pub(crate) access_key_id: String,
     pub(crate) access_key_secret: String,
+    pub(crate) max_retries: u32,
+}
+
+/// 阿里云 Provider Builder
+pub struct AliyunProviderBuilder {
+    access_key_id: String,
+    access_key_secret: String,
+    max_retries: u32,
+}
+
+impl AliyunProviderBuilder {
+    fn new(access_key_id: String, access_key_secret: String) -> Self {
+        Self {
+            access_key_id,
+            access_key_secret,
+            max_retries: 2,
+        }
+    }
+
+    pub fn max_retries(mut self, retries: u32) -> Self {
+        self.max_retries = retries;
+        self
+    }
+
+    pub fn build(self) -> AliyunProvider {
+        AliyunProvider {
+            client: create_http_client(),
+            access_key_id: self.access_key_id,
+            access_key_secret: self.access_key_secret,
+            max_retries: self.max_retries,
+        }
+    }
 }
 
 impl AliyunProvider {
     pub fn new(access_key_id: String, access_key_secret: String) -> Self {
-        Self {
-            client: create_http_client(),
-            access_key_id,
-            access_key_secret,
-        }
+        Self::builder(access_key_id, access_key_secret).build()
+    }
+
+    pub fn builder(access_key_id: String, access_key_secret: String) -> AliyunProviderBuilder {
+        AliyunProviderBuilder::new(access_key_id, access_key_secret)
     }
 }

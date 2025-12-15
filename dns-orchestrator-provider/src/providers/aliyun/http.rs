@@ -48,21 +48,21 @@ impl AliyunProvider {
             .header("x-acs-content-sha256", EMPTY_BODY_SHA256)
             .header("Authorization", authorization);
 
-        let (_status, response_text) = HttpUtils::execute_request(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "POST",
             &format!("{} (Action: {})", url, action),
+            self.max_retries,
         )
         .await?;
 
         // 5. 先检查是否有错误响应
-        if let Ok(error_response) = serde_json::from_str::<AliyunResponse<()>>(&response_text) {
-            if let (Some(code), Some(message)) = (error_response.code, error_response.message) {
+        if let Ok(error_response) = serde_json::from_str::<AliyunResponse<()>>(&response_text)
+            && let (Some(code), Some(message)) = (error_response.code, error_response.message) {
                 log::error!("API 错误: {code} - {message}");
                 return Err(self.map_error(RawApiError::with_code(&code, &message), ctx));
             }
-        }
 
         // 6. 解析成功响应
         HttpUtils::parse_json(&response_text, self.provider_name())

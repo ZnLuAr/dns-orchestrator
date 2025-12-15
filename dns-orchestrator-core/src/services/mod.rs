@@ -64,6 +64,8 @@ impl ServiceContext {
     }
 
     /// 标记账户为无效状态
+    ///
+    /// 当检测到凭证失效时调用此方法更新账户状态。
     pub async fn mark_account_invalid(&self, account_id: &str, error_msg: &str) {
         if let Err(e) = self
             .account_repository

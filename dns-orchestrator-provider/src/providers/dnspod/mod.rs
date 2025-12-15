@@ -26,14 +26,46 @@ pub struct DnspodProvider {
     pub(crate) client: Client,
     pub(crate) secret_id: String,
     pub(crate) secret_key: String,
+    pub(crate) max_retries: u32,
+}
+
+/// DNSPod Provider Builder
+pub struct DnspodProviderBuilder {
+    secret_id: String,
+    secret_key: String,
+    max_retries: u32,
+}
+
+impl DnspodProviderBuilder {
+    fn new(secret_id: String, secret_key: String) -> Self {
+        Self {
+            secret_id,
+            secret_key,
+            max_retries: 2,
+        }
+    }
+
+    pub fn max_retries(mut self, retries: u32) -> Self {
+        self.max_retries = retries;
+        self
+    }
+
+    pub fn build(self) -> DnspodProvider {
+        DnspodProvider {
+            client: create_http_client(),
+            secret_id: self.secret_id,
+            secret_key: self.secret_key,
+            max_retries: self.max_retries,
+        }
+    }
 }
 
 impl DnspodProvider {
     pub fn new(secret_id: String, secret_key: String) -> Self {
-        Self {
-            client: create_http_client(),
-            secret_id,
-            secret_key,
-        }
+        Self::builder(secret_id, secret_key).build()
+    }
+
+    pub fn builder(secret_id: String, secret_key: String) -> DnspodProviderBuilder {
+        DnspodProviderBuilder::new(secret_id, secret_key)
     }
 }

@@ -33,7 +33,7 @@ impl AliyunProvider {
 
     /// 将阿里云的 Unix 毫秒时间戳转换为 DateTime<Utc>
     pub(crate) fn timestamp_to_datetime(timestamp: Option<i64>) -> Option<DateTime<chrono::Utc>> {
-        timestamp.and_then(|ts| DateTime::from_timestamp_millis(ts))
+        timestamp.and_then(DateTime::from_timestamp_millis)
     }
 }
 

@@ -20,14 +20,20 @@ impl CloudflareProvider {
     ) -> Result<T> {
         let url = format!("{CF_API_BASE}{path}");
 
-        // 使用 HttpUtils 发送请求
+        // 使用 HttpUtils 发送请求（带重试）
         let request = self
             .client
             .get(&url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (_status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "GET", &url).await?;
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "GET",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 解析 Cloudflare 响应
         let cf_response: CloudflareResponse<T> =
@@ -68,14 +74,20 @@ impl CloudflareProvider {
             params.page_size.min(MAX_PAGE_SIZE_ZONES)
         );
 
-        // 使用 HttpUtils 发送请求
+        // 使用 HttpUtils 发送请求（带重试）
         let request = self
             .client
             .get(&url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (_status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "GET", &url).await?;
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "GET",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 解析 Cloudflare 响应
         let cf_response: CloudflareResponse<Vec<T>> =
@@ -109,14 +121,20 @@ impl CloudflareProvider {
     ) -> Result<(Vec<CloudflareDnsRecord>, u32)> {
         let full_url = format!("{CF_API_BASE}{url}");
 
-        // 使用 HttpUtils 发送请求
+        // 使用 HttpUtils 发送请求（带重试）
         let request = self
             .client
             .get(&full_url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (_status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "GET", &full_url).await?;
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "GET",
+            &full_url,
+            self.max_retries,
+        )
+        .await?;
 
         // 解析 Cloudflare 响应
         let cf_response: CloudflareResponse<Vec<CloudflareDnsRecord>> =
@@ -153,15 +171,21 @@ impl CloudflareProvider {
             serde_json::to_string_pretty(body).unwrap_or_else(|_| "无法序列化请求体".to_string());
         log::debug!("Request Body: {body_json}");
 
-        // 使用 HttpUtils 发送请求
+        // 使用 HttpUtils 发送请求（带重试）
         let request = self
             .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_token))
             .json(body);
 
-        let (_status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "POST", &url).await?;
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "POST",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 解析 Cloudflare 响应
         let cf_response: CloudflareResponse<T> =
@@ -198,15 +222,21 @@ impl CloudflareProvider {
             serde_json::to_string_pretty(body).unwrap_or_else(|_| "无法序列化请求体".to_string());
         log::debug!("Request Body: {body_json}");
 
-        // 使用 HttpUtils 发送请求
+        // 使用 HttpUtils 发送请求（带重试）
         let request = self
             .client
             .patch(&url)
             .header("Authorization", format!("Bearer {}", self.api_token))
             .json(body);
 
-        let (_status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "PATCH", &url).await?;
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "PATCH",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 解析 Cloudflare 响应
         let cf_response: CloudflareResponse<T> =
@@ -235,14 +265,20 @@ impl CloudflareProvider {
     pub(crate) async fn delete(&self, path: &str, ctx: ErrorContext) -> Result<()> {
         let url = format!("{CF_API_BASE}{path}");
 
-        // 使用 HttpUtils 发送请求
+        // 使用 HttpUtils 发送请求（带重试）
         let request = self
             .client
             .delete(&url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (_status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "DELETE", &url).await?;
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "DELETE",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 解析 Cloudflare 响应
         let cf_response: CloudflareResponse<serde_json::Value> =

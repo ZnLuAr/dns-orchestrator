@@ -53,7 +53,7 @@ impl AccountBootstrapService {
             Err(e) => {
                 log::error!("Failed to load credentials: {e}");
                 // 标记所有账户为错误状态
-                for account in accounts.iter() {
+                for account in &accounts {
                     if let Err(update_err) = self
                         .metadata_service
                         .update_status(&account.id, AccountStatus::Error, Some(e.to_string()))
@@ -73,7 +73,7 @@ impl AccountBootstrapService {
         };
 
         // 3. 逐个恢复账户
-        for account in accounts.iter() {
+        for account in &accounts {
             let Some(credentials) = all_credentials.get(&account.id) else {
                 log::warn!("No credentials found for account: {}", account.id);
                 if let Err(e) = self

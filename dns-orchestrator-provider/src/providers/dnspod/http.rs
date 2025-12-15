@@ -43,11 +43,12 @@ impl DnspodProvider {
             .header("Authorization", authorization)
             .body(payload);
 
-        let (_status, response_text) = HttpUtils::execute_request(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "POST",
             &format!("Action: {}", action),
+            self.max_retries,
         )
         .await?;
 

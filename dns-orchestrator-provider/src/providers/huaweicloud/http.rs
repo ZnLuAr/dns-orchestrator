@@ -42,8 +42,14 @@ impl HuaweicloudProvider {
             .header("X-Sdk-Date", &timestamp)
             .header("Authorization", authorization);
 
-        let (status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "GET", &url).await?;
+        let (status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "GET",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 处理错误响应
         self.handle_response_error(status, &response_text, ctx)?;
@@ -90,8 +96,14 @@ impl HuaweicloudProvider {
             .header("Authorization", authorization)
             .body(payload);
 
-        let (status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "POST", &url).await?;
+        let (status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "POST",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 处理错误响应
         self.handle_response_error(status, &response_text, ctx)?;
@@ -138,8 +150,14 @@ impl HuaweicloudProvider {
             .header("Authorization", authorization)
             .body(payload);
 
-        let (status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "PUT", &url).await?;
+        let (status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "PUT",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 处理错误响应
         self.handle_response_error(status, &response_text, ctx)?;
@@ -170,8 +188,14 @@ impl HuaweicloudProvider {
             .header("X-Sdk-Date", &timestamp)
             .header("Authorization", authorization);
 
-        let (status, response_text) =
-            HttpUtils::execute_request(request, self.provider_name(), "DELETE", &url).await?;
+        let (status, response_text) = HttpUtils::execute_request_with_retry(
+            request,
+            self.provider_name(),
+            "DELETE",
+            &url,
+            self.max_retries,
+        )
+        .await?;
 
         // 处理错误响应
         self.handle_response_error(status, &response_text, ctx)?;
