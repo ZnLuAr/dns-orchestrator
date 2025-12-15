@@ -10,8 +10,9 @@ use crate::providers::common::{
 };
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
-    PaginationParams, ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, FieldType, PaginatedResponse,
+    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures,
+    ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::HuaweicloudProvider;
@@ -44,6 +45,31 @@ impl HuaweicloudProvider {
 impl DnsProvider for HuaweicloudProvider {
     fn id(&self) -> &'static str {
         "huaweicloud"
+    }
+
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata {
+            id: ProviderType::Huaweicloud,
+            name: "华为云 DNS".to_string(),
+            description: "华为云云解析服务".to_string(),
+            required_fields: vec![
+                ProviderCredentialField {
+                    key: "accessKeyId".to_string(),
+                    label: "Access Key ID".to_string(),
+                    field_type: FieldType::Text,
+                    placeholder: Some("输入 Access Key ID".to_string()),
+                    help_text: None,
+                },
+                ProviderCredentialField {
+                    key: "secretAccessKey".to_string(),
+                    label: "Secret Access Key".to_string(),
+                    field_type: FieldType::Password,
+                    placeholder: Some("输入 Secret Access Key".to_string()),
+                    help_text: None,
+                },
+            ],
+            features: ProviderFeatures::default(),
+        }
     }
 
     async fn validate_credentials(&self) -> Result<bool> {

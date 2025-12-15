@@ -7,8 +7,9 @@ use crate::error::{ProviderError, Result};
 use crate::providers::common::{parse_record_type, record_type_to_string};
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DomainStatus, FieldType, PaginatedResponse,
+    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures,
+    ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::{
@@ -33,6 +34,31 @@ impl DnspodProvider {
 impl DnsProvider for DnspodProvider {
     fn id(&self) -> &'static str {
         "dnspod"
+    }
+
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata {
+            id: ProviderType::Dnspod,
+            name: "腾讯云 DNSPod".to_string(),
+            description: "腾讯云 DNS 解析服务".to_string(),
+            required_fields: vec![
+                ProviderCredentialField {
+                    key: "secretId".to_string(),
+                    label: "SecretId".to_string(),
+                    field_type: FieldType::Text,
+                    placeholder: Some("输入 SecretId".to_string()),
+                    help_text: None,
+                },
+                ProviderCredentialField {
+                    key: "secretKey".to_string(),
+                    label: "SecretKey".to_string(),
+                    field_type: FieldType::Password,
+                    placeholder: Some("输入 SecretKey".to_string()),
+                    help_text: None,
+                },
+            ],
+            features: ProviderFeatures::default(),
+        }
     }
 
     async fn validate_credentials(&self) -> Result<bool> {

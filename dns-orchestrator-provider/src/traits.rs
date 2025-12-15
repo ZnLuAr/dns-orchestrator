@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::error::{ProviderError, Result};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, PaginatedResponse, PaginationParams, ProviderDomain,
-    RecordQueryParams, UpdateDnsRecordRequest,
+    ProviderMetadata, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 /// 原始 API 错误（内部使用）
@@ -83,6 +83,14 @@ pub(crate) trait ProviderErrorMapper {
 pub trait DnsProvider: Send + Sync {
     /// 提供商标识符
     fn id(&self) -> &'static str;
+
+    /// 获取 Provider 元数据（类型级别）
+    ///
+    /// 返回该 Provider 的元数据，包括名称、描述、凭证字段等。
+    /// 此方法不需要实例，可以在创建 Provider 之前调用。
+    fn metadata() -> ProviderMetadata
+    where
+        Self: Sized;
 
     /// 验证凭证是否有效
     async fn validate_credentials(&self) -> Result<bool>;

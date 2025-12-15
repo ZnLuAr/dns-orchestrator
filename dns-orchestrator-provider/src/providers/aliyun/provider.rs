@@ -8,8 +8,9 @@ use crate::error::{ProviderError, Result};
 use crate::providers::common::{parse_record_type, record_type_to_string};
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DomainStatus, FieldType, PaginatedResponse,
+    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures,
+    ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::{
@@ -40,6 +41,31 @@ impl AliyunProvider {
 impl DnsProvider for AliyunProvider {
     fn id(&self) -> &'static str {
         "aliyun"
+    }
+
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata {
+            id: ProviderType::Aliyun,
+            name: "阿里云 DNS".to_string(),
+            description: "阿里云域名解析服务".to_string(),
+            required_fields: vec![
+                ProviderCredentialField {
+                    key: "accessKeyId".to_string(),
+                    label: "AccessKey ID".to_string(),
+                    field_type: FieldType::Text,
+                    placeholder: Some("输入 AccessKey ID".to_string()),
+                    help_text: None,
+                },
+                ProviderCredentialField {
+                    key: "accessKeySecret".to_string(),
+                    label: "AccessKey Secret".to_string(),
+                    field_type: FieldType::Password,
+                    placeholder: Some("输入 AccessKey Secret".to_string()),
+                    help_text: None,
+                },
+            ],
+            features: ProviderFeatures::default(),
+        }
     }
 
     async fn validate_credentials(&self) -> Result<bool> {

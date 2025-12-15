@@ -9,8 +9,9 @@ use crate::providers::common::{
 };
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper};
 use crate::types::{
-    CreateDnsRecordRequest, DnsRecord, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderDomain, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
+    CreateDnsRecordRequest, DnsRecord, DomainStatus, FieldType, PaginatedResponse,
+    PaginationParams, ProviderCredentialField, ProviderDomain, ProviderFeatures,
+    ProviderMetadata, ProviderType, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 use super::{CloudflareDnsRecord, CloudflareProvider, CloudflareZone, MAX_PAGE_SIZE_RECORDS};
@@ -71,6 +72,24 @@ impl CloudflareProvider {
 impl DnsProvider for CloudflareProvider {
     fn id(&self) -> &'static str {
         "cloudflare"
+    }
+
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata {
+            id: ProviderType::Cloudflare,
+            name: "Cloudflare".to_string(),
+            description: "全球领先的 CDN 和 DNS 服务商".to_string(),
+            required_fields: vec![ProviderCredentialField {
+                key: "apiToken".to_string(),
+                label: "API Token".to_string(),
+                field_type: FieldType::Password,
+                placeholder: Some("输入 Cloudflare API Token".to_string()),
+                help_text: Some(
+                    "在 Cloudflare Dashboard -> My Profile -> API Tokens 创建".to_string(),
+                ),
+            }],
+            features: ProviderFeatures { proxy: true },
+        }
     }
 
     async fn validate_credentials(&self) -> Result<bool> {
