@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::error::{ProviderError, Result};
 use crate::types::{
+    BatchCreateResult, BatchDeleteResult, BatchUpdateItem, BatchUpdateResult,
     CreateDnsRecordRequest, DnsRecord, PaginatedResponse, PaginationParams, ProviderDomain,
     ProviderMetadata, RecordQueryParams, UpdateDnsRecordRequest,
 };
@@ -123,4 +124,64 @@ pub trait DnsProvider: Send + Sync {
 
     /// 删除 DNS 记录
     async fn delete_record(&self, record_id: &str, domain_id: &str) -> Result<()>;
+
+    /// 批量创建 DNS 记录
+    ///
+    /// # 实现状态
+    /// 当前为占位实现，调用会 panic。
+    ///
+    /// # TODO - 实现计划
+    /// - [ ] Cloudflare: 使用 `POST /zones/{zone_id}/dns_records/batch` API
+    ///       文档: https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/batch/
+    ///       预期性能: 10,000 条记录快 850 倍
+    /// - [ ] DNSPod: 使用 `CreateRecordBatch` API（异步任务）
+    ///       文档: https://cloud.tencent.com/document/product/1427/56194
+    /// - [ ] Aliyun: 调研批量 API 支持
+    ///       文档: https://help.aliyun.com/zh/dns/pubz-batch-operation/
+    /// - [ ] Huaweicloud: 调研批量 API 支持
+    ///
+    /// # 未来优化
+    /// 默认实现可使用客户端并行循环 `join_all(create_record())`
+    async fn batch_create_records(
+        &self,
+        _requests: &[CreateDnsRecordRequest],
+    ) -> Result<BatchCreateResult> {
+        unimplemented!("批量创建 API 待实现 - 请查看 trait 文档中的 TODO 列表")
+    }
+
+    /// 批量更新 DNS 记录
+    ///
+    /// # 实现状态
+    /// 当前为占位实现，调用会 panic。
+    ///
+    /// # TODO - 实现计划
+    /// - [ ] Cloudflare: 使用批量 API
+    /// - [ ] DNSPod: 使用 `ModifyRecordBatch` API
+    /// - [ ] Aliyun: 调研批量 API 支持
+    /// - [ ] Huaweicloud: 使用 `BatchUpdateRecordSetWithLine` API
+    ///       文档: https://support.huaweicloud.com/api-dns/BatchUpdateRecordSetWithLine.html
+    async fn batch_update_records(
+        &self,
+        _updates: &[BatchUpdateItem],
+    ) -> Result<BatchUpdateResult> {
+        unimplemented!("批量更新 API 待实现 - 请查看 trait 文档中的 TODO 列表")
+    }
+
+    /// 批量删除 DNS 记录
+    ///
+    /// # 实现状态
+    /// 当前为占位实现，调用会 panic。
+    ///
+    /// # TODO - 实现计划
+    /// - [ ] Cloudflare: 使用批量 API
+    /// - [ ] DNSPod: 使用批量删除 API
+    /// - [ ] Aliyun: 调研批量 API 支持
+    /// - [ ] Huaweicloud: 调研批量 API 支持
+    async fn batch_delete_records(
+        &self,
+        _domain_id: &str,
+        _record_ids: &[String],
+    ) -> Result<BatchDeleteResult> {
+        unimplemented!("批量删除 API 待实现 - 请查看 trait 文档中的 TODO 列表")
+    }
 }

@@ -194,6 +194,70 @@ pub struct UpdateDnsRecordRequest {
     pub proxied: Option<bool>,
 }
 
+// ============ 批量操作类型 ============
+
+/// 批量创建结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCreateResult {
+    pub success_count: usize,
+    pub failed_count: usize,
+    pub created_records: Vec<DnsRecord>,
+    pub failures: Vec<BatchCreateFailure>,
+}
+
+/// 批量创建失败项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCreateFailure {
+    pub request_index: usize,
+    pub record_name: String,
+    pub reason: String,
+}
+
+/// 批量更新结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateResult {
+    pub success_count: usize,
+    pub failed_count: usize,
+    pub updated_records: Vec<DnsRecord>,
+    pub failures: Vec<BatchUpdateFailure>,
+}
+
+/// 批量更新失败项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateFailure {
+    pub record_id: String,
+    pub reason: String,
+}
+
+/// 批量更新请求项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateItem {
+    pub record_id: String,
+    pub request: UpdateDnsRecordRequest,
+}
+
+/// 批量删除结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchDeleteResult {
+    pub success_count: usize,
+    pub failed_count: usize,
+    pub failures: Vec<BatchDeleteFailure>,
+}
+
+/// 批量删除失败项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchDeleteFailure {
+    pub record_id: String,
+    pub reason: String,
+}
+
 // ============ Provider 元数据类型 ============
 
 /// 凭证字段类型

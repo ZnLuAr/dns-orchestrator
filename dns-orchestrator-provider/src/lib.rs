@@ -54,10 +54,12 @@ pub use traits::DnsProvider;
 
 // Re-export types
 pub use types::{
-    CreateDnsRecordRequest, CredentialValidationError, DnsRecord, DnsRecordType, DomainStatus,
-    FieldType, PaginatedResponse, PaginationParams, ProviderCredentialField, ProviderCredentials,
-    ProviderDomain, ProviderFeatures, ProviderMetadata, ProviderType, RecordQueryParams,
-    UpdateDnsRecordRequest,
+    BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
+    BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest,
+    CredentialValidationError, DnsRecord, DnsRecordType, DomainStatus, FieldType,
+    PaginatedResponse, PaginationParams, ProviderCredentialField, ProviderCredentials,
+    ProviderDomain, ProviderFeatures, ProviderLimits, ProviderMetadata, ProviderType,
+    RecordQueryParams, UpdateDnsRecordRequest,
 };
 
 // Re-export utils module
