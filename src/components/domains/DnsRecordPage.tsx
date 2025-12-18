@@ -5,6 +5,8 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useShallow } from "zustand/react/shallow"
 import { DnsRecordTable } from "@/components/dns/DnsRecordTable"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
+import { PageLayout } from "@/components/ui/page-layout"
 import { addRecentDomain } from "@/lib/recent-domains"
 import { useAccountStore, useDomainStore } from "@/stores"
 
@@ -64,21 +66,17 @@ export function DnsRecordPage() {
   }, [selectedAccount, providers])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/domains")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate font-semibold text-xl">
-            {selectedDomain?.name || t("common.loading")}
-          </h2>
-          <p className="truncate text-muted-foreground text-sm">
-            {t("dns.title")} · {selectedAccount?.name}
-          </p>
-        </div>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title={selectedDomain?.name || t("common.loading")}
+        subtitle={`${t("dns.title")} · ${selectedAccount?.name}`}
+        showMobileMenu={false}
+        backButton={
+          <Button variant="ghost" size="icon" onClick={() => navigate("/domains")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
 
       {/* DNS 记录表格 */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -88,6 +86,6 @@ export function DnsRecordPage() {
           supportsProxy={providerFeatures?.proxy ?? false}
         />
       </div>
-    </div>
+    </PageLayout>
   )
 }

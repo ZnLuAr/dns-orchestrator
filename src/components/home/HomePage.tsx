@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { ProviderIcon } from "@/components/account/ProviderIcon"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { PageContainer } from "@/components/ui/page-container"
+import { SectionCard } from "@/components/ui/section-card"
 import { getRecentDomains, type RecentDomain } from "@/lib/recent-domains"
 import { useAccountStore, useDomainStore } from "@/stores"
 
@@ -63,135 +63,117 @@ export function HomePage() {
   ]
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="scroll-pb-safe p-4 sm:p-6">
-        {/* 欢迎 */}
-        <div className="mb-6">
-          <h1 className="font-semibold text-2xl">{t("home.welcome")}</h1>
-          <p className="mt-1 text-muted-foreground">{t("home.welcomeDesc")}</p>
-          <div className="mt-2 flex items-center gap-1 text-muted-foreground text-sm">
-            {isRestoring ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>{t("home.restoringAccounts")}</span>
-              </>
-            ) : (
-              <>
-                <Users className="h-3.5 w-3.5" />
-                <span>
-                  {accounts.length} {t("home.totalAccounts")}
-                </span>
-                <span className="mx-1">·</span>
-                <Globe className="h-3.5 w-3.5" />
-                <span>
-                  {totalDomains} {t("home.totalDomains")}
-                </span>
-              </>
-            )}
-          </div>
+    <PageContainer>
+      {/* 欢迎 */}
+      <div className="mb-6">
+        <h1 className="font-semibold text-2xl">{t("home.welcome")}</h1>
+        <p className="mt-1 text-muted-foreground">{t("home.welcomeDesc")}</p>
+        <div className="mt-2 flex items-center gap-1 text-muted-foreground text-sm">
+          {isRestoring ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>{t("home.restoringAccounts")}</span>
+            </>
+          ) : (
+            <>
+              <Users className="h-3.5 w-3.5" />
+              <span>
+                {accounts.length} {t("home.totalAccounts")}
+              </span>
+              <span className="mx-1">·</span>
+              <Globe className="h-3.5 w-3.5" />
+              <span>
+                {totalDomains} {t("home.totalDomains")}
+              </span>
+            </>
+          )}
         </div>
-
-        {/* 最近访问 */}
-        {recentDomains.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5" />
-                {t("home.recentDomains")}
-              </CardTitle>
-              <CardDescription>{t("home.recentDomainsDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="px-2 sm:px-6">
-              {/* 移动端：紧凑列表 */}
-              <div className="flex flex-col divide-y sm:hidden">
-                {recentDomains.map((domain) => (
-                  <button
-                    key={domain.domainId}
-                    type="button"
-                    onClick={() => handleQuickAccess(domain.accountId, domain.domainId)}
-                    className="flex items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-accent"
-                  >
-                    <ProviderIcon provider={domain.provider} className="h-5 w-5 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-sm">{domain.domainName}</div>
-                      <div className="truncate text-muted-foreground text-xs">
-                        {domain.accountName}
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </button>
-                ))}
-              </div>
-              {/* 桌面端：网格卡片 */}
-              <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
-                {recentDomains.map((domain) => (
-                  <button
-                    key={domain.domainId}
-                    type="button"
-                    onClick={() => handleQuickAccess(domain.accountId, domain.domainId)}
-                    className="flex flex-col items-center gap-2 rounded-lg border p-4 text-center transition-colors hover:bg-accent"
-                  >
-                    <ProviderIcon provider={domain.provider} className="h-6 w-6" />
-                    <div className="w-full min-w-0">
-                      <div className="truncate font-medium">{domain.domainName}</div>
-                      <div className="truncate text-muted-foreground text-xs">
-                        {domain.accountName}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 快捷操作 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t("home.quickActions")}</CardTitle>
-            <CardDescription>{t("home.quickActionsDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6">
-            {/* 移动端：紧凑列表 */}
-            <div className="flex flex-col divide-y sm:hidden">
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={action.onClick}
-                  className="flex items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-accent"
-                >
-                  <action.icon className="h-5 w-5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-sm">{action.label}</div>
-                    <div className="truncate text-muted-foreground text-xs">
-                      {action.description}
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
-            {/* 桌面端：网格卡片 */}
-            <div className="hidden gap-3 sm:grid sm:grid-cols-2">
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={action.onClick}
-                  className="flex h-auto items-center justify-start gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent"
-                >
-                  <action.icon className="h-5 w-5 shrink-0" />
-                  <div>
-                    <div className="font-medium">{action.label}</div>
-                    <div className="text-muted-foreground text-xs">{action.description}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
-    </ScrollArea>
+
+      {/* 最近访问 */}
+      {recentDomains.length > 0 && (
+        <SectionCard
+          title={t("home.recentDomains")}
+          icon={<Clock className="h-5 w-5" />}
+          description={t("home.recentDomainsDesc")}
+          className="mb-6"
+        >
+          {/* 移动端：紧凑列表 */}
+          <div className="flex flex-col divide-y sm:hidden">
+            {recentDomains.map((domain) => (
+              <button
+                key={domain.domainId}
+                type="button"
+                onClick={() => handleQuickAccess(domain.accountId, domain.domainId)}
+                className="flex items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-accent"
+              >
+                <ProviderIcon provider={domain.provider} className="h-5 w-5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-sm">{domain.domainName}</div>
+                  <div className="truncate text-muted-foreground text-xs">{domain.accountName}</div>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+          {/* 桌面端：网格卡片 */}
+          <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
+            {recentDomains.map((domain) => (
+              <button
+                key={domain.domainId}
+                type="button"
+                onClick={() => handleQuickAccess(domain.accountId, domain.domainId)}
+                className="flex flex-col items-center gap-2 rounded-lg border p-4 text-center transition-colors hover:bg-accent"
+              >
+                <ProviderIcon provider={domain.provider} className="h-6 w-6" />
+                <div className="w-full min-w-0">
+                  <div className="truncate font-medium">{domain.domainName}</div>
+                  <div className="truncate text-muted-foreground text-xs">{domain.accountName}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* 快捷操作 */}
+      <SectionCard title={t("home.quickActions")} description={t("home.quickActionsDesc")}>
+        {/* 移动端：紧凑列表 */}
+        <div className="flex flex-col divide-y sm:hidden">
+          {quickActions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              className="flex items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-accent"
+            >
+              <action.icon className="h-5 w-5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium text-sm">{action.label}</div>
+                <div className="truncate text-muted-foreground text-xs">{action.description}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
+        {/* 桌面端：网格卡片 */}
+        <div className="hidden gap-3 sm:grid sm:grid-cols-2">
+          {quickActions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              className="flex h-auto items-center justify-start gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent"
+            >
+              <action.icon className="h-5 w-5 shrink-0" />
+              <div>
+                <div className="font-medium">{action.label}</div>
+                <div className="text-muted-foreground text-xs">{action.description}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+    </PageContainer>
   )
 }

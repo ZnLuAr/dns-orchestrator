@@ -122,6 +122,13 @@
     overflow: hidden;
     overscroll-behavior: none;
     height: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* 表单元素保持可选择 */
+  input, textarea, [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
   }
   body {
     padding-top: env(safe-area-inset-top, 0) !important;

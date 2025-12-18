@@ -4,11 +4,13 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { useShallow } from "zustand/react/shallow"
 import { getProviderName, ProviderIcon } from "@/components/account/ProviderIcon"
-import { MobileMenuTrigger } from "@/components/layout/MobileMenuTrigger"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
+import { PageLayout } from "@/components/ui/page-layout"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -249,24 +251,22 @@ export function DomainSelectorPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b bg-background px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
-        <div className="md:hidden">
-          <MobileMenuTrigger />
-        </div>
-        <Globe className="h-5 w-5 text-primary" />
-        <h2 className="flex-1 font-semibold text-xl">{t("nav.domains")}</h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleRefreshAll}
-          disabled={isBackgroundRefreshing}
-          title={t("domains.refresh")}
-        >
-          <RefreshCw className={cn("h-4 w-4", isBackgroundRefreshing && "animate-spin")} />
-        </Button>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title={t("nav.domains")}
+        icon={<Globe className="h-5 w-5" />}
+        actions={
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefreshAll}
+            disabled={isBackgroundRefreshing}
+            title={t("domains.refresh")}
+          >
+            <RefreshCw className={cn("h-4 w-4", isBackgroundRefreshing && "animate-spin")} />
+          </Button>
+        }
+      />
 
       {/* 搜索栏 */}
       <div className="border-b px-4 py-3 sm:px-6">
@@ -290,16 +290,17 @@ export function DomainSelectorPage() {
               <Skeleton className="h-16 w-full rounded-lg" />
             </div>
           ) : accounts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Globe className="mb-4 h-16 w-16 text-muted-foreground/30" />
-              <h3 className="mb-2 font-medium text-lg">{t("accounts.empty")}</h3>
-              <p className="max-w-sm text-muted-foreground text-sm">{t("accounts.emptyDesc")}</p>
-            </div>
+            <EmptyState
+              icon={<Globe className="h-16 w-16" />}
+              title={t("accounts.empty")}
+              description={t("accounts.emptyDesc")}
+              size="large"
+            />
           ) : (
             accounts.map((account) => renderAccountGroup(account))
           )}
         </div>
       </ScrollArea>
-    </div>
+    </PageLayout>
   )
 }

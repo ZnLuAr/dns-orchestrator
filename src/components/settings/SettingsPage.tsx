@@ -1,11 +1,25 @@
-import { Check, Download, Github, Languages, Monitor, Moon, RefreshCw, Sun, X } from "lucide-react"
+import {
+  Check,
+  Download,
+  Github,
+  Languages,
+  Monitor,
+  Moon,
+  RefreshCw,
+  Settings,
+  Sun,
+  X,
+} from "lucide-react"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { MobileMenuTrigger } from "@/components/layout/MobileMenuTrigger"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { PageContainer } from "@/components/ui/page-container"
+import { PageHeader } from "@/components/ui/page-header"
+import { PageLayout } from "@/components/ui/page-layout"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { SettingItem, SettingRow, SettingSection } from "@/components/ui/setting-section"
 import { Switch } from "@/components/ui/switch"
 import { EXTERNAL_LINKS } from "@/constants"
 import { type LanguageCode, supportedLanguages } from "@/i18n"
@@ -116,264 +130,236 @@ export function SettingsPage() {
   ]
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b bg-background px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
-        <div className="md:hidden">
-          <MobileMenuTrigger />
-        </div>
-        <h2 className="font-semibold text-xl">{t("settings.title")}</h2>
-      </div>
+    <PageLayout>
+      <PageHeader title={t("settings.title")} icon={<Settings className="h-5 w-5" />} />
 
-      {/* Content */}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="scroll-pb-safe mx-auto max-w-3xl space-y-6 p-4 sm:space-y-10 sm:p-8">
-          {/* 主题设置 */}
-          <div className="space-y-3 sm:space-y-5">
-            <div>
-              <h3 className="mb-1 font-semibold text-lg">{t("settings.appearance")}</h3>
-              <p className="text-muted-foreground text-sm">{t("settings.theme")}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              {themes.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTheme(id)}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all sm:gap-3 sm:p-5",
-                    theme === id
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
-                  )}
-                >
-                  <Icon className="h-5 w-5 sm:h-7 sm:w-7" />
-                  <span className="whitespace-nowrap font-medium text-xs sm:text-sm">{label}</span>
-                </button>
-              ))}
-            </div>
+      <PageContainer maxWidth="max-w-3xl" className="space-y-6 sm:space-y-8">
+        {/* 主题设置 */}
+        <SettingSection title={t("settings.appearance")} description={t("settings.theme")}>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            {themes.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTheme(id)}
+                className={cn(
+                  "flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all sm:gap-3 sm:p-5",
+                  theme === id
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
+                )}
+              >
+                <Icon className="h-5 w-5 sm:h-7 sm:w-7" />
+                <span className="whitespace-nowrap font-medium text-xs sm:text-sm">{label}</span>
+              </button>
+            ))}
           </div>
+        </SettingSection>
 
-          {/* 语言设置 */}
-          <div className="space-y-3 sm:space-y-5">
-            <div>
-              <h3 className="mb-1 font-semibold text-lg">{t("settings.language")}</h3>
-              <p className="text-muted-foreground text-sm">{t("settings.languageDesc")}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
-              {supportedLanguages.map((lang) => (
-                <button
-                  key={lang.code}
-                  type="button"
-                  onClick={() => setLanguage(lang.code as LanguageCode)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-xl border-2 p-3 transition-all sm:gap-3 sm:p-4",
-                    language === lang.code
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
-                  )}
-                >
-                  <Languages className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="font-medium text-sm">{lang.name}</span>
-                </button>
-              ))}
-            </div>
+        {/* 语言设置 */}
+        <SettingSection title={t("settings.language")} description={t("settings.languageDesc")}>
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            {supportedLanguages.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => setLanguage(lang.code as LanguageCode)}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 p-3 transition-all sm:gap-3 sm:p-4",
+                  language === lang.code
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
+                )}
+              >
+                <Languages className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="font-medium text-sm">{lang.name}</span>
+              </button>
+            ))}
           </div>
+        </SettingSection>
 
-          {/* 通知设置 */}
-          <div className="space-y-3 sm:space-y-5">
-            <div>
-              <h3 className="mb-1 font-semibold text-lg">{t("settings.notifications")}</h3>
-              <p className="text-muted-foreground text-sm">{t("settings.notificationsDesc")}</p>
-            </div>
-            <div className="flex items-center justify-between rounded-xl border bg-card p-4 sm:p-5">
-              <div className="space-y-1.5">
+        {/* 通知设置 */}
+        <SettingSection
+          title={t("settings.notifications")}
+          description={t("settings.notificationsDesc")}
+        >
+          <SettingItem>
+            <SettingRow
+              label={
                 <Label htmlFor="notifications" className="font-medium text-sm">
                   {t("settings.operationNotifications")}
                 </Label>
+              }
+              description={t("settings.operationNotificationsDesc")}
+              control={<Switch id="notifications" defaultChecked />}
+            />
+          </SettingItem>
+        </SettingSection>
+
+        {/* 分页模式设置 */}
+        <SettingSection title={t("settings.pagination")} description={t("settings.paginationDesc")}>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setPaginationMode("infinite")}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl border-2 p-4 transition-all sm:p-5",
+                paginationMode === "infinite"
+                  ? "border-primary bg-primary/5 shadow-sm"
+                  : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
+              )}
+            >
+              <div className="text-left">
+                <p className="font-medium text-sm">{t("settings.infiniteScroll")}</p>
+                <p className="text-muted-foreground text-xs">{t("settings.infiniteScrollDesc")}</p>
+              </div>
+              {paginationMode === "infinite" && <Check className="h-5 w-5 text-primary" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPaginationMode("paginated")}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl border-2 p-4 transition-all sm:p-5",
+                paginationMode === "paginated"
+                  ? "border-primary bg-primary/5 shadow-sm"
+                  : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
+              )}
+            >
+              <div className="text-left">
+                <p className="font-medium text-sm">{t("settings.traditionalPagination")}</p>
                 <p className="text-muted-foreground text-xs">
-                  {t("settings.operationNotificationsDesc")}
+                  {t("settings.traditionalPaginationDesc")}
                 </p>
               </div>
-              <Switch id="notifications" defaultChecked />
-            </div>
+              {paginationMode === "paginated" && <Check className="h-5 w-5 text-primary" />}
+            </button>
           </div>
+        </SettingSection>
 
-          {/* 分页模式设置 */}
-          <div className="space-y-3 sm:space-y-5">
-            <div>
-              <h3 className="mb-1 font-semibold text-lg">{t("settings.pagination")}</h3>
-              <p className="text-muted-foreground text-sm">{t("settings.paginationDesc")}</p>
-            </div>
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => setPaginationMode("infinite")}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-xl border-2 p-4 transition-all sm:p-5",
-                  paginationMode === "infinite"
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
-                )}
-              >
-                <div className="text-left">
-                  <p className="font-medium text-sm">{t("settings.infiniteScroll")}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {t("settings.infiniteScrollDesc")}
-                  </p>
-                </div>
-                {paginationMode === "infinite" && <Check className="h-5 w-5 text-primary" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaginationMode("paginated")}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-xl border-2 p-4 transition-all sm:p-5",
-                  paginationMode === "paginated"
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border bg-card hover:border-accent-foreground/20 hover:bg-accent"
-                )}
-              >
-                <div className="text-left">
-                  <p className="font-medium text-sm">{t("settings.traditionalPagination")}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {t("settings.traditionalPaginationDesc")}
-                  </p>
-                </div>
-                {paginationMode === "paginated" && <Check className="h-5 w-5 text-primary" />}
-              </button>
-            </div>
-          </div>
-
-          {/* 调试模式设置 - 仅开发环境显示 */}
-          {ENV.isDev && (
-            <div className="space-y-3 sm:space-y-5">
-              <div>
-                <h3 className="mb-1 font-semibold text-lg">{t("settings.debug")}</h3>
-                <p className="text-muted-foreground text-sm">{t("settings.debugDesc")}</p>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border bg-card p-4 sm:p-5">
-                <div className="space-y-1.5">
+        {/* 调试模式设置 - 仅开发环境显示 */}
+        {ENV.isDev && (
+          <SettingSection title={t("settings.debug")} description={t("settings.debugDesc")}>
+            <SettingItem>
+              <SettingRow
+                label={
                   <Label htmlFor="debug-mode" className="font-medium text-sm">
                     {t("settings.debugMode")}
                   </Label>
-                  <p className="text-muted-foreground text-xs">{t("settings.debugModeDesc")}</p>
-                </div>
-                <Switch id="debug-mode" checked={debugMode} onCheckedChange={setDebugMode} />
-              </div>
-            </div>
-          )}
+                }
+                description={t("settings.debugModeDesc")}
+                control={
+                  <Switch id="debug-mode" checked={debugMode} onCheckedChange={setDebugMode} />
+                }
+              />
+            </SettingItem>
+          </SettingSection>
+        )}
 
-          {/* 关于 */}
-          <div className="space-y-3 sm:space-y-5">
-            <div>
-              <h3 className="mb-1 font-semibold text-lg">{t("settings.about")}</h3>
-              <p className="text-muted-foreground text-sm">{t("settings.aboutDesc")}</p>
-            </div>
-            <div className="space-y-4 rounded-xl border bg-card p-4 sm:space-y-5 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="font-medium">{t("common.appName")}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {t("settings.version")} {ENV.appVersion}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => openExternal(EXTERNAL_LINKS.GITHUB_REPO)}
-                >
-                  <Github className="h-4 w-4" />
-                </Button>
+        {/* 关于 */}
+        <SettingSection title={t("settings.about")} description={t("settings.aboutDesc")}>
+          <SettingItem className="space-y-4 sm:space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="font-medium">{t("common.appName")}</p>
+                <p className="text-muted-foreground text-sm">
+                  {t("settings.version")} {ENV.appVersion}
+                </p>
               </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => openExternal(EXTERNAL_LINKS.GITHUB_REPO)}
+              >
+                <Github className="h-4 w-4" />
+              </Button>
+            </div>
 
-              {/* 检查更新 */}
-              <div className="flex flex-col gap-3 border-t pt-2">
-                <div className="flex items-center gap-3 pt-3">
-                  {available ? (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={handleDownloadAndInstall}
-                        disabled={downloading}
-                        className="gap-2"
-                      >
-                        {downloading ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                            {t("settings.downloading")} {progress}%
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4" />
-                            {t("settings.updateNow")} ({available.version})
-                          </>
-                        )}
-                      </Button>
-                      {!downloading && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSkipVersion}
-                          className="gap-2"
-                        >
-                          <X className="h-4 w-4" />
-                          {t("settings.skipVersion")}
-                        </Button>
-                      )}
-                    </>
-                  ) : (
+            {/* 检查更新 */}
+            <div className="flex flex-col gap-3 border-t pt-2">
+              <div className="flex items-center gap-3 pt-3">
+                {available ? (
+                  <>
                     <Button
-                      variant={upToDate ? "default" : "outline"}
                       size="sm"
-                      onClick={handleCheckUpdates}
-                      disabled={checking || upToDate}
+                      onClick={handleDownloadAndInstall}
+                      disabled={downloading}
                       className="gap-2"
                     >
-                      {checking ? (
+                      {downloading ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          {t("settings.checking")}
-                        </>
-                      ) : upToDate ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          {t("settings.noUpdate")}
+                          {t("settings.downloading")} {progress}%
                         </>
                       ) : (
                         <>
-                          <Check className="h-4 w-4" />
-                          {t("settings.checkUpdate")}
+                          <Download className="h-4 w-4" />
+                          {t("settings.updateNow")} ({available.version})
                         </>
                       )}
                     </Button>
-                  )}
-                </div>
-                {/* 错误提示 */}
-                {error && (
-                  <p className="text-destructive text-xs">
-                    {isPlatformUnsupported
-                      ? t("settings.platformNotSupported")
-                      : t("settings.updateCheckError")}
-                  </p>
-                )}
-                {/* 发行说明 */}
-                {available && getUpdateNotes(available) && (
-                  <div className="space-y-2 border-t pt-3">
-                    <p className="font-medium text-sm">{t("settings.releaseNotes")}</p>
-                    <ScrollArea className="h-[150px] rounded-md border bg-muted/50 p-3">
-                      <pre className="whitespace-pre-wrap break-all text-xs">
-                        {getUpdateNotes(available)}
-                      </pre>
-                    </ScrollArea>
-                  </div>
+                    {!downloading && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSkipVersion}
+                        className="gap-2"
+                      >
+                        <X className="h-4 w-4" />
+                        {t("settings.skipVersion")}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <Button
+                    variant={upToDate ? "default" : "outline"}
+                    size="sm"
+                    onClick={handleCheckUpdates}
+                    disabled={checking || upToDate}
+                    className="gap-2"
+                  >
+                    {checking ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        {t("settings.checking")}
+                      </>
+                    ) : upToDate ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        {t("settings.noUpdate")}
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        {t("settings.checkUpdate")}
+                      </>
+                    )}
+                  </Button>
                 )}
               </div>
+              {/* 错误提示 */}
+              {error && (
+                <p className="text-destructive text-xs">
+                  {isPlatformUnsupported
+                    ? t("settings.platformNotSupported")
+                    : t("settings.updateCheckError")}
+                </p>
+              )}
+              {/* 发行说明 */}
+              {available && getUpdateNotes(available) && (
+                <div className="space-y-2 border-t pt-3">
+                  <p className="font-medium text-sm">{t("settings.releaseNotes")}</p>
+                  <ScrollArea className="h-[150px] rounded-md border bg-muted/50 p-3">
+                    <pre className="whitespace-pre-wrap break-all text-xs">
+                      {getUpdateNotes(available)}
+                    </pre>
+                  </ScrollArea>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      </ScrollArea>
-    </div>
+          </SettingItem>
+        </SettingSection>
+      </PageContainer>
+    </PageLayout>
   )
 }

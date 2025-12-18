@@ -1,7 +1,8 @@
 import { FileText, Globe, Lock, MapPin, Wrench } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { MobileMenuTrigger } from "@/components/layout/MobileMenuTrigger"
+import { PageHeader } from "@/components/ui/page-header"
+import { PageLayout } from "@/components/ui/page-layout"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -40,17 +41,8 @@ export function ToolboxPage() {
   }, [activeTab])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
-        <div className="md:hidden">
-          <MobileMenuTrigger />
-        </div>
-        <div className="flex items-center gap-2">
-          <Wrench className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold text-xl">{t("toolbox.title")}</h2>
-        </div>
-      </div>
+    <PageLayout>
+      <PageHeader title={t("toolbox.title")} icon={<Wrench className="h-5 w-5" />} />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
@@ -101,6 +93,6 @@ export function ToolboxPage() {
           </div>
         </ScrollArea>
       </Tabs>
-    </div>
+    </PageLayout>
   )
 }

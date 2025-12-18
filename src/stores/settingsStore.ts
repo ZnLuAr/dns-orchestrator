@@ -84,11 +84,27 @@ export function initTheme() {
   useSettingsStore.setState({ theme })
 
   const root = document.documentElement
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
 
-  if (theme === "system") {
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-    root.classList.add(systemDark ? "dark" : "light")
-  } else {
-    root.classList.add(theme)
+  // 应用当前主题
+  const applyTheme = () => {
+    const currentTheme = useSettingsStore.getState().theme
+    root.classList.remove("light", "dark")
+
+    if (currentTheme === "system") {
+      root.classList.add(mediaQuery.matches ? "dark" : "light")
+    } else {
+      root.classList.add(currentTheme)
+    }
   }
+
+  applyTheme()
+
+  // 监听系统主题变化
+  mediaQuery.addEventListener("change", () => {
+    const currentTheme = useSettingsStore.getState().theme
+    if (currentTheme === "system") {
+      applyTheme()
+    }
+  })
 }

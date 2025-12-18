@@ -18,7 +18,6 @@ import { ExportDialog } from "@/components/account/ExportDialog"
 import { ImportDialog } from "@/components/account/ImportDialog"
 import { getProviderName, ProviderIcon } from "@/components/account/ProviderIcon"
 import { AccountBatchActionBar } from "@/components/accounts/AccountBatchActionBar"
-import { MobileMenuTrigger } from "@/components/layout/MobileMenuTrigger"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +36,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { EmptyState } from "@/components/ui/empty-state"
+import { PageHeader } from "@/components/ui/page-header"
+import { PageLayout } from "@/components/ui/page-layout"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -88,17 +90,8 @@ export function AccountsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
-        <div className="md:hidden">
-          <MobileMenuTrigger />
-        </div>
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold text-xl">{t("accounts.title")}</h2>
-        </div>
-      </div>
+    <PageLayout>
+      <PageHeader title={t("accounts.title")} icon={<Users className="h-5 w-5" />} />
 
       {/* 操作栏 */}
       <div className="flex items-center justify-between border-b px-4 py-3 sm:px-6">
@@ -160,23 +153,24 @@ export function AccountsPage() {
               <Skeleton className="h-20 w-full rounded-lg" />
             </div>
           ) : accounts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Globe className="mb-4 h-16 w-16 text-muted-foreground/30" />
-              <h3 className="mb-2 font-medium text-lg">{t("accounts.empty")}</h3>
-              <p className="mb-6 max-w-sm text-muted-foreground text-sm">
-                {t("accounts.emptyDesc")}
-              </p>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={openImportDialog}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  {t("import.title")}
-                </Button>
-                <Button onClick={() => setShowAccountForm(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t("account.create")}
-                </Button>
-              </div>
-            </div>
+            <EmptyState
+              icon={<Globe className="h-16 w-16" />}
+              title={t("accounts.empty")}
+              description={t("accounts.emptyDesc")}
+              size="large"
+              actions={
+                <>
+                  <Button variant="outline" onClick={openImportDialog}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {t("import.title")}
+                  </Button>
+                  <Button onClick={() => setShowAccountForm(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("account.create")}
+                  </Button>
+                </>
+              }
+            />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {accounts.map((account) => {
@@ -300,6 +294,6 @@ export function AccountsPage() {
 
       {/* 批量操作栏 */}
       <AccountBatchActionBar />
-    </div>
+    </PageLayout>
   )
 }
