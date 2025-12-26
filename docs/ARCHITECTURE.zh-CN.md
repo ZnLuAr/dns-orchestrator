@@ -459,14 +459,11 @@ pub struct AccountLifecycleService {
 
 impl AccountLifecycleService {
     pub async fn create_account(&self, request: CreateAccountRequest) -> CoreResult<Account> {
-        // 1. 验证并注册凭证
-        self.credential_service.validate_and_register(&request.id, request.credentials).await?;
-
-        // 2. 创建账户元数据
-        let account = Account::new(request.id, request.name, request.provider);
-        self.metadata_service.create(account.clone()).await?;
-
-        Ok(account)
+        // 1. 使用提供商的 API 验证凭证。
+        // 2. 使用 CredentialStore 安全地保存凭证。
+        // 3. 在 ProviderRegistry 中注册新的提供商实例。
+        // 4. 使用 AccountRepository 保存账户元数据。
+        // ...
     }
 }
 ```
