@@ -28,8 +28,8 @@ impl HuaweicloudProvider {
         if let Ok(error) = serde_json::from_str::<ErrorResponse>(response_text) {
             return Err(self.map_error(
                 RawApiError::with_code(
-                    error.code.unwrap_or_default(),
-                    error.message.unwrap_or_default(),
+                    error.code.unwrap_or_else(|| "UNKNOWN".to_string()),
+                    error.message.unwrap_or_else(|| "No error message provided by API".to_string()),
                 ),
                 ctx,
             ));
