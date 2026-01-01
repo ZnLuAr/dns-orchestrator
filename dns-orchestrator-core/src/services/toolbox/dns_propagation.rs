@@ -184,7 +184,7 @@ pub async fn dns_propagation_check(
                         status: "timeout".to_string(),
                         records: vec![],
                         error: Some(format!("Query timeout ({QUERY_TIMEOUT_SECS}s)")),
-                        response_time_ms: QUERY_TIMEOUT_SECS * 1000,
+                        response_time_ms: elapsed,
                     },
                 }
             }

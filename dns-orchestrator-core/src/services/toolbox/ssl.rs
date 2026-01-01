@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{debug, trace, warn};
+use log::{debug, error, trace, warn};
 use rustls::crypto::CryptoProvider;
 use rustls::{ClientConfig, RootCertStore};
 use rustls_pki_types::{CertificateDer, ServerName};
@@ -28,8 +28,13 @@ fn ensure_crypto_provider() {
     use std::sync::Once;
     static INIT: Once = Once::new();
     INIT.call_once(|| {
-        CryptoProvider::install_default(rustls::crypto::ring::default_provider())
-            .expect("Failed to install default rustls crypto provider");
+        if let Err(e) = CryptoProvider::install_default(rustls::crypto::ring::default_provider()) {
+            error!(
+                "FATAL: Failed to install rustls crypto provider: {e:?}. \
+                 This is a critical initialization error. The application cannot continue."
+            );
+            panic!("Failed to install default rustls crypto provider: {e:?}");
+        }
     });
 }
 
