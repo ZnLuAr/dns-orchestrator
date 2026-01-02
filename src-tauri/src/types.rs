@@ -20,13 +20,12 @@ pub use dns_orchestrator_provider::{
     UpdateDnsRecordRequest,
 };
 
+// ============ Re-export Core 库类型 ============
+
+pub use dns_orchestrator_core::types::DomainMetadata;
+
 // 工具箱类型
-pub use dns_orchestrator_core::types::{
-    BatchDeleteRequest, CertChainItem, DnsLookupRecord, DnsLookupResult, DnsPropagationResult,
-    DnsPropagationServer, DnsPropagationServerResult, DnskeyRecord, DnssecResult, DsRecord,
-    HttpHeader, HttpHeaderCheckRequest, HttpHeaderCheckResult, HttpMethod, IpGeoInfo,
-    IpLookupResult, RrsigRecord, SecurityHeaderAnalysis, SslCertInfo, SslCheckResult, WhoisResult,
-};
+pub use dns_orchestrator_core::types::BatchDeleteRequest;
 
 // ============ 应用层 Provider 相关类型 ============
 
@@ -83,6 +82,8 @@ pub struct Domain {
     pub status: DomainStatus,
     #[serde(rename = "recordCount", skip_serializing_if = "Option::is_none")]
     pub record_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<DomainMetadata>,
 }
 
 // ============ API 响应类型 ============
