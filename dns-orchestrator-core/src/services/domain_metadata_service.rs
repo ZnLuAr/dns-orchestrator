@@ -127,6 +127,28 @@ impl DomainMetadataService {
         self.repository.delete_by_account(account_id).await
     }
 
+    /// 验证单个标签
+    ///
+    /// # 验证规则
+    /// - 去除首尾空格后不能为空
+    /// - 长度不能超过 50 个字符
+    fn validate_tag(tag: &str) -> CoreResult<()> {
+        use crate::error::CoreError;
+
+        let trimmed = tag.trim();
+        if trimmed.is_empty() {
+            return Err(CoreError::ValidationError(
+                "Tag cannot be empty".to_string(),
+            ));
+        }
+        if trimmed.len() > 50 {
+            return Err(CoreError::ValidationError(
+                "Tag length cannot exceed 50 characters".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// 添加标签（返回更新后的标签列表）
     pub async fn add_tag(
         &self,
@@ -138,16 +160,7 @@ impl DomainMetadataService {
 
         // 标签验证
         let tag = tag.trim().to_string();
-        if tag.is_empty() {
-            return Err(CoreError::ValidationError(
-                "Tag cannot be empty".to_string(),
-            ));
-        }
-        if tag.len() > 50 {
-            return Err(CoreError::ValidationError(
-                "Tag length cannot exceed 50 characters".to_string(),
-            ));
-        }
+        Self::validate_tag(&tag)?;
 
         let mut metadata = self.get_metadata(account_id, domain_id).await?;
 
@@ -201,17 +214,7 @@ impl DomainMetadataService {
 
         // 验证每个标签
         for tag in &tags {
-            let trimmed = tag.trim();
-            if trimmed.is_empty() {
-                return Err(CoreError::ValidationError(
-                    "Tag cannot be empty".to_string(),
-                ));
-            }
-            if trimmed.len() > 50 {
-                return Err(CoreError::ValidationError(
-                    "Tag length cannot exceed 50 characters".to_string(),
-                ));
-            }
+            Self::validate_tag(tag)?;
         }
 
         if tags.len() > 10 {
@@ -368,17 +371,7 @@ impl DomainMetadataService {
 
         // 验证每个标签
         for tag in &tags_to_add {
-            let trimmed = tag.trim();
-            if trimmed.is_empty() {
-                return Err(CoreError::ValidationError(
-                    "Tag cannot be empty".to_string(),
-                ));
-            }
-            if trimmed.len() > 50 {
-                return Err(CoreError::ValidationError(
-                    "Tag length cannot exceed 50 characters".to_string(),
-                ));
-            }
+            Self::validate_tag(tag)?;
         }
 
         let mut metadata = self.get_metadata(account_id, domain_id).await?;
@@ -442,17 +435,7 @@ impl DomainMetadataService {
 
         // 验证每个标签
         for tag in &tags {
-            let trimmed = tag.trim();
-            if trimmed.is_empty() {
-                return Err(CoreError::ValidationError(
-                    "Tag cannot be empty".to_string(),
-                ));
-            }
-            if trimmed.len() > 50 {
-                return Err(CoreError::ValidationError(
-                    "Tag length cannot exceed 50 characters".to_string(),
-                ));
-            }
+            Self::validate_tag(tag)?;
         }
 
         if tags.len() > 10 {
