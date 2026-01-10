@@ -100,7 +100,7 @@ function initFormData(record: DnsRecord | null | undefined): FormData {
       }
     default:
       // Exhaustive check: TypeScript will error if new record type is added but not handled
-      throw new Error(`Unhandled record type in initFormData: ${(data as any).type}`)
+      throw new Error(`Unhandled record type in initFormData: ${(data as { type: string }).type}`)
   }
 }
 
@@ -157,7 +157,7 @@ export function DnsRecordForm({
         return formData.value
       default:
         // Exhaustive check: TypeScript will error if new record type is added but not handled
-        throw new Error(`Unhandled record type in getCurrentValue: ${(formData as any).type}`)
+        throw new Error(`Unhandled record type in getCurrentValue: ${(formData as { type: string }).type}`)
     }
   }
 
@@ -235,7 +235,7 @@ export function DnsRecordForm({
         }
       default:
         // Exhaustive check: TypeScript will error if new record type is added but not handled
-        throw new Error(`Unhandled record type in buildRecordData: ${(formData as any).type}`)
+        throw new Error(`Unhandled record type in buildRecordData: ${(formData as { type: string }).type}`)
     }
   }
 

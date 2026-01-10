@@ -62,12 +62,12 @@ export function DomainSelectorPage() {
   const validAccounts = useMemo(() => accounts.filter((a) => a.status !== "error"), [accounts])
 
   // Scroll position restoration
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在挂载时恢复一次滚动位置
   useEffect(() => {
     if (scrollAreaRef.current && scrollPosition > 0) {
       const viewport = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]")
       if (viewport) viewport.scrollTop = scrollPosition
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Scroll position saving
@@ -96,6 +96,7 @@ export function DomainSelectorPage() {
     return Array.from(tagsSet).sort()
   }, [selectedDomainKeys, getDomainsForAccount])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: domainsByAccount 是 getAllUsedTags 内部依赖的状态
   const allTags = useMemo(() => getAllUsedTags(), [domainsByAccount, getAllUsedTags])
 
   return (

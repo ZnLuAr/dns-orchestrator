@@ -122,7 +122,8 @@ export function DnsRecordWizard({
 
   // 创建邮件预设记录
   const createMailPresetRecords = async () => {
-    const preset = getMailPresetById(state.mailPresetId!)
+    if (!state.mailPresetId) return
+    const preset = getMailPresetById(state.mailPresetId)
     if (!preset) return
 
     for (const record of preset.records) {

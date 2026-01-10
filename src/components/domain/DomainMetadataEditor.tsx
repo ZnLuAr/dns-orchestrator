@@ -103,6 +103,7 @@ export function DomainMetadataEditor({
   }
 
   // 获取所有已使用的标签（memoized）
+  // biome-ignore lint/correctness/useExhaustiveDependencies: domainsByAccount 是 getAllUsedTags 内部依赖的状态
   const allTags = useMemo(() => getAllUsedTags(), [domainsByAccount, getAllUsedTags])
 
   // 移除标签

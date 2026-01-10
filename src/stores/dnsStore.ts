@@ -273,13 +273,14 @@ export const useDnsStore = create<DnsState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await dnsService.createRecord(accountId, request)
-      if (response.success && response.data) {
+      const data = response.data
+      if (response.success && data) {
         set((state) => ({
-          records: [...state.records, response.data!],
+          records: [...state.records, data],
           totalCount: state.totalCount + 1,
         }))
-        toast.success(i18n.t("dns.createSuccess", { name: response.data.name }))
-        return response.data
+        toast.success(i18n.t("dns.createSuccess", { name: data.name }))
+        return data
       }
       const msg = getErrorMessage(response.error)
       set({ error: msg })
@@ -299,9 +300,10 @@ export const useDnsStore = create<DnsState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await dnsService.updateRecord(accountId, recordId, request)
-      if (response.success && response.data) {
+      const data = response.data
+      if (response.success && data) {
         set((state) => ({
-          records: state.records.map((r) => (r.id === recordId ? response.data! : r)),
+          records: state.records.map((r) => (r.id === recordId ? data : r)),
         }))
         toast.success(i18n.t("dns.updateSuccess"))
         return true

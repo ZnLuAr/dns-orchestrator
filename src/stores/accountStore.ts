@@ -118,10 +118,11 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({ isLoading: true, error: null, fieldErrors: {} })
     try {
       const response = await accountService.createAccount(request)
-      if (response.success && response.data) {
-        set((state) => ({ accounts: [...state.accounts, response.data!] }))
-        toast.success(i18n.t("account.createSuccess", { name: response.data.name }))
-        return response.data
+      const data = response.data
+      if (response.success && data) {
+        set((state) => ({ accounts: [...state.accounts, data] }))
+        toast.success(i18n.t("account.createSuccess", { name: data.name }))
+        return data
       }
       // 处理凭证验证错误（字段级）
       if (response.error?.code === "CredentialValidation" && response.error.details) {
@@ -175,13 +176,14 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({ isUpdating: true, error: null, fieldErrors: {} })
     try {
       const response = await accountService.updateAccount(request)
-      if (response.success && response.data) {
+      const data = response.data
+      if (response.success && data) {
         // 更新本地账户列表
         set((state) => ({
-          accounts: state.accounts.map((a) => (a.id === request.id ? response.data! : a)),
+          accounts: state.accounts.map((a) => (a.id === request.id ? data : a)),
         }))
-        toast.success(i18n.t("account.updateSuccess", { name: response.data.name }))
-        return response.data
+        toast.success(i18n.t("account.updateSuccess", { name: data.name }))
+        return data
       }
       // 处理凭证验证错误（字段级）
       if (response.error?.code === "CredentialValidation" && response.error.details) {
