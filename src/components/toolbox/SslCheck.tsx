@@ -109,7 +109,7 @@ export function SslCheck() {
     const portNum = port.trim() ? Number.parseInt(port.trim(), 10) : undefined
     if (
       port.trim() &&
-      (Number.isNaN(portNum) || portNum! < NETWORK.MIN_PORT || portNum! > NETWORK.MAX_PORT)
+      (Number.isNaN(portNum) || (portNum ?? 0) < NETWORK.MIN_PORT || (portNum ?? 0) > NETWORK.MAX_PORT)
     ) {
       toast.error(t("toolbox.ssl.invalidPort"))
       return

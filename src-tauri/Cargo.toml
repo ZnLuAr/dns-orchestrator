@@ -1,6 +1,6 @@
 [package]
 name = "dns-orchestrator-tauri"
-version = "1.7.0"
+version = "1.8.0"
 description = "DNS Orchestrator built with Tauri"
 license = "MIT"
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
@@ -48,7 +48,7 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-log = "2"
 tauri-plugin-process = "2"
-tauri-plugin-dialog = "2"
+tauri-plugin-dialog = "2.5"
 tauri-plugin-fs = "2"
 urlencoding = "2.1.3"
 
