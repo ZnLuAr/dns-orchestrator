@@ -4,6 +4,7 @@
  */
 
 import type { LanguageCode } from "@/i18n"
+import type { Domain } from "@/types"
 
 // ============ 数据类型定义 ============
 
@@ -31,7 +32,7 @@ export interface DomainsCacheData {
 
 /** 单个账户的域名缓存 */
 interface AccountDomainCache {
-  domains: unknown[] // 避免循环引用，实际类型为 Domain[]
+  domains: Domain[]
   lastUpdated: number
   page: number
   hasMore: boolean

@@ -208,6 +208,44 @@ export function DnsRecordTable({ accountId, domainId, supportsProxy }: DnsRecord
   // 只有域名切换时才显示全屏 loading
   const isInitialLoading = isLoading && currentDomainId !== domainId
 
+  // 桌面端分页页码渲染
+  const renderDesktopPaginationLinks = () => {
+    const totalPages = Math.ceil(totalCount / pageSize)
+    const pages: (number | "ellipsis")[] = []
+
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      if (page <= 3) {
+        pages.push(1, 2, 3, 4, "ellipsis", totalPages)
+      } else if (page >= totalPages - 2) {
+        pages.push(1, "ellipsis", totalPages - 3, totalPages - 2, totalPages - 1, totalPages)
+      } else {
+        pages.push(1, "ellipsis", page - 1, page, page + 1, "ellipsis", totalPages)
+      }
+    }
+
+    return pages.map((p, i) =>
+      p === "ellipsis" ? (
+        <PaginationItem key={`ellipsis-${i}`}>
+          <PaginationEllipsis className="h-8 w-8" />
+        </PaginationItem>
+      ) : (
+        <PaginationItem key={p}>
+          <PaginationLink
+            onClick={() => jumpToPage(accountId, domainId, p)}
+            isActive={page === p}
+            className="h-8 w-8 cursor-pointer text-xs"
+          >
+            {p}
+          </PaginationLink>
+        </PaginationItem>
+      )
+    )
+  }
+
   if (isInitialLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -339,55 +377,7 @@ export function DnsRecordTable({ accountId, domainId, supportsProxy }: DnsRecord
                 </PaginationItem>
               ) : (
                 /* 桌面端完整页码 */
-                (() => {
-                  const totalPages = Math.ceil(totalCount / pageSize)
-                  const pages: (number | "ellipsis")[] = []
-
-                  // 生成页码数组（显示当前页附近的页码）
-                  if (totalPages <= 7) {
-                    // 总页数少，全部显示
-                    for (let i = 1; i <= totalPages; i++) {
-                      pages.push(i)
-                    }
-                  } else {
-                    // 总页数多，显示部分页码
-                    if (page <= 3) {
-                      // 靠近开头
-                      pages.push(1, 2, 3, 4, "ellipsis", totalPages)
-                    } else if (page >= totalPages - 2) {
-                      // 靠近结尾
-                      pages.push(
-                        1,
-                        "ellipsis",
-                        totalPages - 3,
-                        totalPages - 2,
-                        totalPages - 1,
-                        totalPages
-                      )
-                    } else {
-                      // 中间
-                      pages.push(1, "ellipsis", page - 1, page, page + 1, "ellipsis", totalPages)
-                    }
-                  }
-
-                  return pages.map((p, i) =>
-                    p === "ellipsis" ? (
-                      <PaginationItem key={`ellipsis-${i}`}>
-                        <PaginationEllipsis className="h-8 w-8" />
-                      </PaginationItem>
-                    ) : (
-                      <PaginationItem key={p}>
-                        <PaginationLink
-                          onClick={() => jumpToPage(accountId, domainId, p)}
-                          isActive={page === p}
-                          className="h-8 w-8 cursor-pointer text-xs"
-                        >
-                          {p}
-                        </PaginationLink>
-                      </PaginationItem>
-                    )
-                  )
-                })()
+                renderDesktopPaginationLinks()
               )}
 
               <PaginationItem>
