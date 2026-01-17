@@ -1,0 +1,965 @@
+//! 弹窗组件
+
+use ratatui::{
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
+};
+
+use crate::model::state::{
+    get_all_dns_servers, get_all_providers, get_all_record_types, get_credential_fields, Modal,
+};
+use crate::model::App;
+
+/// 渲染弹窗（如果有活动弹窗）
+pub fn render(app: &App, frame: &mut Frame) {
+    let Some(ref modal) = app.modal.active else {
+        return;
+    };
+
+    match modal {
+        Modal::AddAccount { .. } => render_add_account(app, frame, modal),
+        Modal::ConfirmDelete { .. } => render_confirm_delete(frame, modal),
+        Modal::DnsLookup { .. } => render_dns_lookup(frame, modal),
+        Modal::WhoisLookup { .. } => render_whois_lookup(frame, modal),
+        Modal::SslCheck { .. } => render_ssl_check(frame, modal),
+        Modal::IpLookup { .. } => render_ip_lookup(frame, modal),
+        Modal::HttpHeaderCheck { .. } => render_http_header_check(frame, modal),
+        Modal::DnsPropagation { .. } => render_dns_propagation(frame, modal),
+        Modal::DnssecCheck { .. } => render_dnssec_check(frame, modal),
+        Modal::Error { title, message } => render_error(frame, title, message),
+        Modal::Help => render_help(frame),
+        _ => {}
+    }
+}
+
+/// 计算居中弹窗区域
+fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    Rect::new(x, y, width.min(area.width), height.min(area.height))
+}
+
+/// 渲染添加账号弹窗
+fn render_add_account(app: &App, frame: &mut Frame, modal: &Modal) {
+    let Modal::AddAccount {
+        provider_index,
+        name,
+        credential_values,
+        focus,
+        show_secrets,
+        error,
+    } = modal
+    else {
+        return;
+    };
+
+    let providers = get_all_providers();
+    let current_provider = &providers[*provider_index];
+    let credential_fields = get_credential_fields(current_provider);
+
+    // 计算弹窗高度：标题(3) + 服务商(3) + 名称(3) + 凭证字段(每个3) + 错误(2) + 按钮(3) + 边框(2)
+    let height = 3 + 3 + 3 + (credential_fields.len() as u16 * 3) + 2 + 3 + 2;
+    let area = centered_rect(50, height, frame.area());
+
+    // 清除背景
+    frame.render_widget(Clear, area);
+
+    // 弹窗边框
+    let block = Block::default()
+        .title(" New Account ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan))
+        .style(Style::default().bg(Color::Black));
+
+    frame.render_widget(block, area);
+
+    // 内容区域
+    let inner = Rect::new(area.x + 2, area.y + 1, area.width - 4, area.height - 2);
+
+    let mut lines = Vec::new();
+    let mut current_y = inner.y;
+
+    // === 服务商选择 ===
+    let provider_focused = *focus == 0;
+    let provider_style = if provider_focused {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    lines.push(Line::from(vec![
+        Span::styled("DNS Provider", Style::default().fg(Color::Gray)),
+        if provider_focused {
+            Span::styled(" (←→ to Switch)", Style::default().fg(Color::DarkGray))
+        } else {
+            Span::raw("")
+        },
+    ]));
+
+    let provider_display = format!(
+        "  {} {} {}",
+        if provider_focused { "◀" } else { " " },
+        current_provider.display_name(),
+        if provider_focused { "▶" } else { " " }
+    );
+    lines.push(Line::styled(provider_display, provider_style));
+    lines.push(Line::from(""));
+
+    // === 账号名称 ===
+    let name_focused = *focus == 1;
+    let name_style = if name_focused {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    lines.push(Line::from(Span::styled(
+        "Account Name (Optional)",
+        Style::default().fg(Color::Gray),
+    )));
+
+    let name_display = if name.is_empty() && !name_focused {
+        format!("  Example: {} Main Account", current_provider.display_name())
+    } else if name_focused {
+        format!("  {}▎", name)
+    } else {
+        format!("  {}", name)
+    };
+
+    let name_line_style = if name.is_empty() && !name_focused {
+        Style::default().fg(Color::DarkGray)
+    } else {
+        name_style
+    };
+    lines.push(Line::styled(name_display, name_line_style));
+    lines.push(Line::from(""));
+
+    // === 凭证字段 ===
+    for (i, field) in credential_fields.iter().enumerate() {
+        let field_focused = *focus == 2 + i;
+        let field_style = if field_focused {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let label = if field.is_secret {
+            format!("{} ⊖", field.label)
+        } else {
+            field.label.to_string()
+        };
+        lines.push(Line::from(Span::styled(label, Style::default().fg(Color::Gray))));
+
+        let value = credential_values.get(i).map(|s| s.as_str()).unwrap_or("");
+        let display_value = if field.is_secret && !show_secrets && !value.is_empty() {
+            "•".repeat(value.len().min(20))
+        } else {
+            value.to_string()
+        };
+
+        let value_display = if value.is_empty() && !field_focused {
+            format!("  {}", field.placeholder)
+        } else if field_focused {
+            format!("  {}▎", display_value)
+        } else {
+            format!("  {}", display_value)
+        };
+
+        let value_style = if value.is_empty() && !field_focused {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            field_style
+        };
+        lines.push(Line::styled(value_display, value_style));
+        lines.push(Line::from(""));
+    }
+
+    // === 错误信息 ===
+    if let Some(err) = error {
+        lines.push(Line::styled(
+            format!("  ⚠ {}", err),
+            Style::default().fg(Color::Red),
+        ));
+    }
+
+    // === 操作提示 ===
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("  Tab", Style::default().fg(Color::Yellow)),
+        Span::styled(" Next | ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Enter", Style::default().fg(Color::Yellow)),
+        Span::styled(" Confirm | ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Esc", Style::default().fg(Color::Yellow)),
+        Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+    ]));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染确认删除弹窗
+fn render_confirm_delete(frame: &mut Frame, modal: &Modal) {
+    let Modal::ConfirmDelete {
+        item_type,
+        item_name,
+        focus,
+        ..
+    } = modal
+    else {
+        return;
+    };
+
+    let area = centered_rect(40, 9, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Confirm Deletion ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red))
+        .style(Style::default().bg(Color::Black));
+
+    frame.render_widget(block, area);
+
+    let inner = Rect::new(area.x + 2, area.y + 1, area.width - 4, area.height - 2);
+
+    let cancel_style = if *focus == 0 {
+        Style::default().fg(Color::Black).bg(Color::White)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    let confirm_style = if *focus == 1 {
+        Style::default().fg(Color::Black).bg(Color::Red)
+    } else {
+        Style::default().fg(Color::Red)
+    };
+
+    let lines = vec![
+        Line::from(""),
+        Line::styled(
+            format!("  Are you sure to delete {} ?", item_type),
+            Style::default().fg(Color::White),
+        ),
+        Line::styled(
+            format!("  \"{}\"", item_name),
+            Style::default().fg(Color::Yellow),
+        ),
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("    "),
+            Span::styled(" Cancel ", cancel_style),
+            Span::raw("    "),
+            Span::styled(" Delete ", confirm_style),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染错误弹窗
+fn render_error(frame: &mut Frame, title: &str, message: &str) {
+    let area = centered_rect(50, 8, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(format!(" {} ", title))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red))
+        .style(Style::default().bg(Color::Black));
+
+    frame.render_widget(block, area);
+
+    let inner = Rect::new(area.x + 2, area.y + 2, area.width - 4, area.height - 4);
+
+    let lines = vec![
+        Line::styled(message, Style::default().fg(Color::White)),
+        Line::from(""),
+        Line::styled(
+            "Press Esc or Enter to close",
+            Style::default().fg(Color::DarkGray),
+        ),
+    ];
+
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染帮助弹窗
+fn render_help(frame: &mut Frame) {
+    let area = centered_rect(55, 18, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Help ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan))
+        .style(Style::default().bg(Color::Black));
+
+    frame.render_widget(block, area);
+
+    let inner = Rect::new(area.x + 2, area.y + 1, area.width - 4, area.height - 2);
+
+    let lines = vec![
+        Line::styled("Global shortcuts", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ←→     ", Style::default().fg(Color::Yellow)),
+            Span::styled("Switch panel", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  ↑↓/jk  ", Style::default().fg(Color::Yellow)),
+            Span::styled("Move Up/Down", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Enter  ", Style::default().fg(Color::Yellow)),
+            Span::styled("Confirm", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc    ", Style::default().fg(Color::Yellow)),
+            Span::styled("Back/Cancel", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  q      ", Style::default().fg(Color::Yellow)),
+            Span::styled("Quit", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::styled("Operation shortcut", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Alt+a  ", Style::default().fg(Color::Yellow)),
+            Span::styled("Add", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Alt+e  ", Style::default().fg(Color::Yellow)),
+            Span::styled("Edit", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Alt+d  ", Style::default().fg(Color::Yellow)),
+            Span::styled("Delete", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::styled("Press Esc to close the help", Style::default().fg(Color::DarkGray)),
+    ];
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 DNS 查询工具弹窗
+fn render_dns_lookup(frame: &mut Frame, modal: &Modal) {
+    let Modal::DnsLookup {
+        domain,
+        record_type_index,
+        dns_server_index,
+        focus,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let record_types = get_all_record_types();
+    let dns_servers = get_all_dns_servers();
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 20, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" DNS Lookup ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 域名输入框
+    let domain_style = if *focus == 0 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("Domain: ", domain_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if domain.is_empty() {
+                "Enter domain (e.g., example.com)"
+            } else {
+                domain
+            },
+            if domain.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else if *focus == 0 {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // 记录类型选择
+    let record_type = &record_types[*record_type_index];
+    let record_style = if *focus == 1 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("Record Type: ", record_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  < ", if *focus == 1 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+        Span::styled(
+            record_type.name(),
+            if *focus == 1 {
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+        Span::styled(" >", if *focus == 1 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+    ]));
+    lines.push(Line::from(""));
+
+    // DNS 服务器选择
+    let dns_server = &dns_servers[*dns_server_index];
+    let server_style = if *focus == 2 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("DNS Server: ", server_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  < ", if *focus == 2 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+        Span::styled(
+            dns_server.name(),
+            if *focus == 2 {
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+        Span::styled(" >", if *focus == 2 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Querying...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        " Tab/↑↓: Navigate | ←→: Change selection | Enter: Query | Esc: Close ",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 WHOIS 查询工具弹窗
+fn render_whois_lookup(frame: &mut Frame, modal: &Modal) {
+    let Modal::WhoisLookup {
+        domain,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 18, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" WHOIS Lookup ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 域名输入框
+    lines.push(Line::from(vec![Span::styled(
+        "Domain: ",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if domain.is_empty() {
+                "Enter domain (e.g., example.com)"
+            } else {
+                domain
+            },
+            if domain.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Querying...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "  Enter: Query | Esc: Close",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 SSL 证书检查工具弹窗
+fn render_ssl_check(frame: &mut Frame, modal: &Modal) {
+    let Modal::SslCheck {
+        domain,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 18, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" SSL Certificate Check ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 域名输入框
+    lines.push(Line::from(vec![Span::styled(
+        "Domain: ",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if domain.is_empty() {
+                "Enter domain (e.g., example.com)"
+            } else {
+                domain
+            },
+            if domain.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Checking...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "Enter: Check | Esc: Close",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 IP 查询工具弹窗
+fn render_ip_lookup(frame: &mut Frame, modal: &Modal) {
+    let Modal::IpLookup {
+        input,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 18, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" IP Lookup ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // IP 或域名输入框
+    lines.push(Line::from(vec![Span::styled(
+        "IP or Domain: ",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if input.is_empty() {
+                "Enter IP or domain (e.g., 8.8.8.8 or google.com)"
+            } else {
+                input
+            },
+            if input.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Looking up...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "Enter: Lookup | Esc: Close",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 HTTP 头检查工具弹窗
+fn render_http_header_check(frame: &mut Frame, modal: &Modal) {
+    let Modal::HttpHeaderCheck {
+        url,
+        method_index,
+        focus,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let methods = ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"];
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 20, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" HTTP Header Check ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // URL 输入框
+    let url_style = if *focus == 0 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("URL: ", url_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if url.is_empty() {
+                "Enter URL (e.g., https://example.com)"
+            } else {
+                url
+            },
+            if url.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else if *focus == 0 {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // HTTP 方法选择
+    let method = methods[*method_index];
+    let method_style = if *focus == 1 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("Method: ", method_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  < ", if *focus == 1 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+        Span::styled(
+            method,
+            if *focus == 1 {
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+        Span::styled(" >", if *focus == 1 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Checking...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        " Tab/↑↓: Navigate | ←→: Change method | Enter: Check | Esc: Close ",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 DNS 传播检查工具弹窗
+fn render_dns_propagation(frame: &mut Frame, modal: &Modal) {
+    let Modal::DnsPropagation {
+        domain,
+        record_type_index,
+        focus,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let record_types = get_all_record_types();
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 20, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" DNS Propagation Check ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 域名输入框
+    let domain_style = if *focus == 0 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("Domain: ", domain_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if domain.is_empty() {
+                "Enter domain (e.g., example.com)"
+            } else {
+                domain
+            },
+            if domain.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else if *focus == 0 {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // 记录类型选择
+    let record_type = &record_types[*record_type_index];
+    let record_style = if *focus == 1 {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    lines.push(Line::from(vec![Span::styled("Record Type: ", record_style)]));
+    lines.push(Line::from(vec![
+        Span::styled("  < ", if *focus == 1 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+        Span::styled(
+            record_type.name(),
+            if *focus == 1 {
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            },
+        ),
+        Span::styled(" >", if *focus == 1 { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) }),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Checking propagation...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        " Tab/↑↓: Navigate | ←→: Change type | Enter: Check | Esc: Close ",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染 DNSSEC 验证工具弹窗
+fn render_dnssec_check(frame: &mut Frame, modal: &Modal) {
+    let Modal::DnssecCheck {
+        domain,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
+
+    let area = frame.area();
+    let modal_area = centered_rect(70, 18, area);
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(" DNSSEC Check ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 域名输入框
+    lines.push(Line::from(vec![Span::styled(
+        "Domain: ",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if domain.is_empty() {
+                "Enter domain (e.g., example.com)"
+            } else {
+                domain
+            },
+            if domain.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White).bg(Color::DarkGray)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled("Checking DNSSEC...", Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled("Result:", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "Enter: Check | Esc: Close",
+        Style::default().fg(Color::DarkGray),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
