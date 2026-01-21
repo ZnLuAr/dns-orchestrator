@@ -306,11 +306,27 @@ fn handle_execute(app: &mut App) {
 fn handle_toggle_prev(app: &mut App) {
     if matches!(app.current_page, Page::Settings) {
         app.settings.toggle_prev();
+        // 同步主题到 view 层（定义索引值 0=Dark, 1=Light）
+        if app.settings.current_item() == Some(crate::model::state::SettingItem::Theme) {
+            let theme_index = match app.settings.theme {
+                crate::model::state::Theme::Dark => 0,
+                crate::model::state::Theme::Light => 1,
+            };
+            crate::view::theme::set_theme_index(theme_index);
+        }
     }
 }
 
 fn handle_toggle_next(app: &mut App) {
     if matches!(app.current_page, Page::Settings) {
         app.settings.toggle_next();
+        // 同步主题到 view 层（定义索引值 0=Dark, 1=Light）
+        if app.settings.current_item() == Some(crate::model::state::SettingItem::Theme) {
+            let theme_index = match app.settings.theme {
+                crate::model::state::Theme::Dark => 0,
+                crate::model::state::Theme::Light => 1,
+            };
+            crate::view::theme::set_theme_index(theme_index);
+        }
     }
 }

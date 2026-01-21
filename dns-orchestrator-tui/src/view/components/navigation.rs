@@ -2,7 +2,7 @@
 
 use ratatui::{
     layout::Rect,
-    style::Style,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
@@ -11,23 +11,24 @@ use ratatui::{
 use crate::i18n::t;
 use crate::model::NavItemId;
 use crate::model::App;
-use crate::view::theme::Styles;
+use crate::view::theme::colors;
 
 /// 渲染导航面板
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     let texts = t();
+    let c = colors();
     let is_focused = app.focus.is_navigation();
 
     // 边框样式
     let border_style = if is_focused {
-        Styles::border_focused()
+        Style::default().fg(c.border_focused)
     } else {
-        Styles::border()
+        Style::default().fg(c.border)
     };
 
     let block = Block::default()
         .title(format!(" {} ", texts.nav.home))
-        .title_style(Styles::title())
+        .title_style(Style::default().fg(c.fg).add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
         .border_style(border_style);
 
@@ -53,9 +54,12 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
             let content = format!("{}{} {}", prefix, nav_item.icon, label);
 
             let style = if is_selected {
-                Styles::selected()
-            } else {
                 Style::default()
+                    .bg(c.selected_bg)
+                    .fg(c.selected_fg)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(c.fg)
             };
 
             ListItem::new(Line::from(Span::styled(content, style)))
@@ -64,7 +68,7 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     let list = List::new(items)
         .block(block)
-        .highlight_style(Styles::selected());
+        .highlight_style(Style::default().bg(c.selected_bg).fg(c.selected_fg).add_modifier(Modifier::BOLD));
 
     // 使用 ListState 来跟踪选中状态
     let mut state = ListState::default();

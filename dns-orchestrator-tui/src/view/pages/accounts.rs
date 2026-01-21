@@ -2,7 +2,7 @@
 
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState},
     Frame,
@@ -10,6 +10,7 @@ use ratatui::{
 
 use crate::i18n::t;
 use crate::model::App;
+use crate::view::theme::colors;
 
 /// 渲染账号管理页面
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
@@ -23,16 +24,17 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 /// 渲染空状态
 fn render_empty(frame: &mut Frame, area: Rect) {
     let texts = t();
+    let c = colors();
     let content = vec![
         Line::from(""),
         Line::styled(
             format!("  {}", texts.accounts.no_accounts),
-            Style::default().fg(Color::Gray),
+            Style::default().fg(c.muted),
         ),
         Line::from(""),
         Line::styled(
             format!("  Alt+a: {}", texts.accounts.add_account),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(c.muted),
         ),
     ];
 
@@ -42,6 +44,7 @@ fn render_empty(frame: &mut Frame, area: Rect) {
 
 /// 渲染账号列表
 fn render_list(app: &App, frame: &mut Frame, area: Rect) {
+    let c = colors();
     let items: Vec<ListItem> = app
         .accounts
         .accounts
@@ -53,17 +56,17 @@ fn render_list(app: &App, frame: &mut Frame, area: Rect) {
 
             let style = if is_selected {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(c.selected_fg)
+                    .bg(c.selected_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(c.fg)
             };
 
             let provider_style = if is_selected {
-                Style::default().fg(Color::Black).bg(Color::Cyan)
+                Style::default().fg(c.selected_fg).bg(c.selected_bg)
             } else {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(c.muted)
             };
 
             let line = Line::from(vec![

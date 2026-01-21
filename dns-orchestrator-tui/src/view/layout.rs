@@ -2,7 +2,7 @@
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -12,7 +12,7 @@ use crate::model::{App, Page};
 
 use super::components;
 use super::pages;
-use super::theme::Styles;
+use super::theme::colors;
 
 /// 渲染主布局
 pub fn render(app: &App, frame: &mut Frame) {
@@ -62,21 +62,23 @@ pub fn render(app: &App, frame: &mut Frame) {
 
 /// 渲染标题栏
 fn render_title_bar(frame: &mut Frame, area: Rect) {
+    let c = colors();
     let title = Paragraph::new(" DNS Orchestrator v0.1.0")
-        .style(Style::default().bg(Color::Rgb(40, 40, 40)).fg(Color::White));
+        .style(Style::default().bg(c.highlight).fg(c.selected_fg));
     frame.render_widget(title, area);
 }
 
 /// 根据当前页面渲染内容
 fn render_page_content(app: &App, frame: &mut Frame, area: Rect) {
     let texts = t();
+    let c = colors();
 
     // 内容区域的边框
     let is_focused = app.focus.is_content();
     let border_style = if is_focused {
-        Styles::border_focused()
+        Style::default().fg(c.border_focused)
     } else {
-        Styles::border()
+        Style::default().fg(c.border)
     };
 
     // 根据当前页面获取 i18n 标题
@@ -91,7 +93,7 @@ fn render_page_content(app: &App, frame: &mut Frame, area: Rect) {
 
     let block = Block::default()
         .title(format!(" {} ", page_title))
-        .title_style(Styles::title())
+        .title_style(Style::default().fg(c.fg).add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
         .border_style(border_style);
 

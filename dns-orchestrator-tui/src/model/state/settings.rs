@@ -2,6 +2,9 @@
 
 use crate::i18n::Language;
 
+
+
+
 /// 主题枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Theme {
@@ -30,6 +33,9 @@ impl Theme {
     }
 }
 
+
+
+
 /// 分页模式枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PaginationMode {
@@ -57,6 +63,10 @@ impl PaginationMode {
         self.next()
     }
 }
+
+
+
+
 
 /// 设置项枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +105,9 @@ impl SettingItem {
         }
     }
 }
+
+
+
 
 /// 设置页面状态
 #[derive(Debug)]

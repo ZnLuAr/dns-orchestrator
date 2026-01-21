@@ -9,6 +9,7 @@ use ratatui::{
 };
 
 use crate::model::App;
+use crate::view::theme::colors;
 
 /// 渲染 DNS 记录页面
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
@@ -21,16 +22,17 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
 /// 渲染空状态
 fn render_empty(frame: &mut Frame, area: Rect) {
+    let c = colors();
     let content = vec![
         Line::from(""),
         Line::styled(
             "  No DNS records found.",
-            Style::default().fg(Color::Gray),
+            Style::default().fg(c.muted),
         ),
         Line::from(""),
         Line::styled(
             "  Press Alt+a to add a new record, or Esc to go back.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(c.muted),
         ),
     ];
 
@@ -40,6 +42,7 @@ fn render_empty(frame: &mut Frame, area: Rect) {
 
 /// 渲染 DNS 记录列表
 fn render_list(app: &App, frame: &mut Frame, area: Rect) {
+    let c = colors();
     let items: Vec<ListItem> = app
         .dns_records
         .records
@@ -60,26 +63,26 @@ fn render_list(app: &App, frame: &mut Frame, area: Rect) {
 
             let style = if is_selected {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(c.selected_fg)
+                    .bg(c.selected_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(c.fg)
             };
 
             let type_style = if is_selected {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(c.selected_fg)
+                    .bg(c.selected_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::Yellow)
             };
 
             let value_style = if is_selected {
-                Style::default().fg(Color::Black).bg(Color::Cyan)
+                Style::default().fg(c.selected_fg).bg(c.selected_bg)
             } else {
-                Style::default().fg(Color::Gray)
+                Style::default().fg(c.muted)
             };
 
             let line = Line::from(vec![
