@@ -2,7 +2,7 @@
 
 use ratatui::{
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
@@ -10,10 +10,12 @@ use ratatui::{
 
 use crate::i18n::t;
 use crate::model::{App, FocusPanel, Page};
-use crate::view::theme::Styles;
+use crate::view::theme::colors;
 
 /// 渲染状态栏
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
+    let c = colors();
+
     // 根据当前焦点和页面生成快捷键提示
     let hints = get_hints(app);
 
@@ -22,22 +24,23 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     for (i, (key, desc)) in hints.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::styled(" │ ", Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(" │ ", Style::default().fg(c.muted)));
         }
-        spans.push(Span::styled(key.to_string(), Styles::hint_key()));
+        spans.push(Span::styled(key.to_string(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
         spans.push(Span::raw(" "));
-        spans.push(Span::styled(desc.to_string(), Styles::hint_desc()));
+        spans.push(Span::styled(desc.to_string(), Style::default().fg(c.muted)));
     }
 
     // 如果有状态消息，显示在右侧
     if let Some(ref msg) = app.status_message {
         // Add分隔符
-        spans.push(Span::styled(" │ ", Style::default().fg(Color::DarkGray)));
-        spans.push(Span::styled(msg.clone(), Style::default().fg(Color::Yellow)));
+        spans.push(Span::styled(" │ ", Style::default().fg(c.muted)));
+        spans.push(Span::styled(msg.clone(), Style::default().fg(c.warning)));
     }
 
     let content = Line::from(spans);
-    let paragraph = Paragraph::new(content).style(Styles::statusbar());
+    let paragraph = Paragraph::new(content)
+        .style(Style::default().bg(c.highlight).fg(c.selected_fg));
 
     frame.render_widget(paragraph, area);
 }

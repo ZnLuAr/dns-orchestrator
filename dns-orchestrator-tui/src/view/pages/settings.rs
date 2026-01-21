@@ -12,6 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::i18n::t;
 use crate::model::state::{PaginationMode, Theme};
 use crate::model::App;
+use crate::view::theme::colors;
 
 /// 设置项的标签宽度（用于对齐，基于显示宽度）
 const LABEL_WIDTH: usize = 20;
@@ -21,6 +22,7 @@ const VALUE_WIDTH: usize = 20;
 /// 渲染设置页面
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     let texts = t();
+    let c = colors();
     let settings = &app.settings;
 
     let mut lines = vec![Line::from("")];
@@ -63,17 +65,17 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         Span::styled(format!("  {}", texts.hints.keys.arrows_ud), Style::default().fg(Color::Yellow)),
         Span::styled(
             format!(" {} | ", texts.hints.actions.move_up_down),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(c.muted),
         ),
         Span::styled(texts.hints.keys.arrows_lr, Style::default().fg(Color::Yellow)),
         Span::styled(
             format!(" {} | ", texts.hints.actions.switch_option),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(c.muted),
         ),
         Span::styled(texts.hints.keys.tab, Style::default().fg(Color::Yellow)),
         Span::styled(
             format!(" {}", texts.hints.actions.switch_panel),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(c.muted),
         ),
     ]));
 
@@ -83,18 +85,19 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
 /// 渲染单行设置项
 fn render_setting_row<'a>(label: &'a str, value: &'a str, is_selected: bool) -> Line<'a> {
+    let c = colors();
     let prefix = if is_selected { "▶ " } else { "  " };
 
     let label_style = if is_selected {
-        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+        Style::default().fg(c.fg).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::Gray)
+        Style::default().fg(c.muted)
     };
 
     let value_style = if is_selected {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(c.highlight)
     };
 
     // 使用 unicode-width 计算显示宽度
@@ -115,7 +118,7 @@ fn render_setting_row<'a>(label: &'a str, value: &'a str, is_selected: bool) -> 
             Span::styled(prefix, label_style),
             Span::styled(format!("  {}", label_display), label_style),
             Span::styled(format!("{:width$}", "", width = label_padding), Style::default()),
-            Span::styled(": ", Style::default().fg(Color::DarkGray)),
+            Span::styled(": ", Style::default().fg(c.muted)),
             Span::styled("◀ ", Style::default().fg(Color::Yellow)),
             Span::styled(format!("{:>width$}", "", width = left_padding), Style::default()),
             Span::styled(value_display, value_style),
@@ -128,7 +131,7 @@ fn render_setting_row<'a>(label: &'a str, value: &'a str, is_selected: bool) -> 
             Span::styled(prefix, label_style),
             Span::styled(format!("  {}", label_display), label_style),
             Span::styled(format!("{:width$}", "", width = label_padding), Style::default()),
-            Span::styled(": ", Style::default().fg(Color::DarkGray)),
+            Span::styled(": ", Style::default().fg(c.muted)),
             Span::styled("  ", Style::default()), // 占位符，与 "◀ " 对齐
             Span::styled(format!("{:>width$}", "", width = left_padding), Style::default()),
             Span::styled(value_display, value_style),

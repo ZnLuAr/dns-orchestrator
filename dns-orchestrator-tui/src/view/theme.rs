@@ -1,6 +1,17 @@
 //! 主题和样式定义
 
 use ratatui::style::{Color, Modifier, Style};
+use std::sync::atomic::{AtomicU8, Ordering};
+
+// 默认为 0 (Dark)，相应地，1 为 Light
+static CURRENT_THEME: AtomicU8 = AtomicU8::new(0);
+
+/// 设置主题（通过索引值）
+/// 定义索引值 0 = Dark, 1 = Light
+/// 这个函数接受 u8 而不是 Theme 类型
+pub fn set_theme_index(index: u8) {
+    CURRENT_THEME.store(index, Ordering::SeqCst);
+}
 
 /// 主题枚举
 #[derive(Debug, Clone, Copy, Default)]
@@ -11,14 +22,13 @@ pub enum Theme {
 }
 
 /// 获取当前主题的颜色方案
-impl Theme {
-    pub fn colors(&self) -> ThemeColors {
-        match self {
-            Theme::Dark => ThemeColors::dark(),
-            Theme::Light => ThemeColors::light(),
-        }
+pub fn colors() -> ThemeColors {
+    match CURRENT_THEME.load(Ordering::SeqCst) {
+        0 => ThemeColors::dark(),
+        _ => ThemeColors::light(),
     }
 }
+
 
 /// 主题颜色
 #[derive(Debug, Clone)]
@@ -57,7 +67,7 @@ impl ThemeColors {
     /// 浅色主题
     pub fn light() -> Self {
         Self {
-            bg: Color::Rgb(255, 255, 255),
+            bg: Color::Rgb(250, 250, 250),
             fg: Color::Rgb(51, 51, 51),
             border: Color::Rgb(204, 204, 204),
             border_focused: Color::Rgb(0, 102, 204),

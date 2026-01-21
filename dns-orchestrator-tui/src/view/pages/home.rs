@@ -10,10 +10,12 @@ use ratatui::{
 
 use crate::i18n::t;
 use crate::model::App;
+use crate::view::theme::colors;
 
 /// 渲染首页
 pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
     let texts = t();
+    let c = colors();
 
     // 首页布局：欢迎信息 + 统计信息
     let layout = Layout::default()
@@ -30,13 +32,13 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
         Line::from(Span::styled(
             format!("  {}", texts.home.welcome),
             Style::default()
-                .fg(Color::Cyan)
+                .fg(c.highlight)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
             format!("  {}", texts.home.welcome_desc),
-            Style::default().fg(Color::Gray),
+            Style::default().fg(c.muted),
         )),
         Line::from(""),
     ];
@@ -57,12 +59,12 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
     let accounts_block = Block::default()
         .title(format!(" {} ", texts.nav.accounts))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(c.border));
 
     let accounts_content = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled("  0", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled(format!("  {}", texts.home.manage_accounts), Style::default().fg(Color::Gray))),
+        Line::from(Span::styled(format!("  {}", texts.home.manage_accounts), Style::default().fg(c.muted))),
     ])
     .block(accounts_block);
 
@@ -72,12 +74,12 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
     let domains_block = Block::default()
         .title(format!(" {} ", texts.nav.domains))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(c.border));
 
     let domains_content = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled("  0", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled(format!("  {}", texts.home.manage_domains), Style::default().fg(Color::Gray))),
+        Line::from(Span::styled(format!("  {}", texts.home.manage_domains), Style::default().fg(c.muted))),
     ])
     .block(domains_block);
 

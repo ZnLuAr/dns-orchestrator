@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use tokio::fs;
 use tokio::sync::Mutex;
 
+use crate::view::pages::accounts;
+
 /// 获取配置目录路径
 fn get_config_dir() -> PathBuf {
     dirs::config_dir()
@@ -108,7 +110,15 @@ impl AccountRepository for JsonAccountRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> CoreResult<Option<Account>> {
-        let accounts = self.find_all().await?;
+        let accounts = {
+            let  cache = self.cache.lock().await;
+            if cache.is_empty() {
+                drop(cache);                        // 释放锁
+                self.load_from_file().await?
+            } else {
+                cache.clone()
+            }
+        };
         Ok(accounts.into_iter().find(|a| a.id == id))
     }
 
