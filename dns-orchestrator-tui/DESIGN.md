@@ -39,43 +39,44 @@ src/
 │   ├── navigation.rs        # 导航状态
 │   ├── page.rs              # 页面枚举和状态
 │   │
-│   └── domain/              # 业务领域模型（与 UI 无关）
+│   ├── domain/              # 业务领域模型（与 UI 无关）
+│   │   ├── mod.rs
+│   │   ├── account.rs       # Account 数据模型
+│   │   ├── domain.rs        # Domain 数据模型
+│   │   └── dns_record.rs    # DnsRecord 数据模型
+│   │
+│   └── state/               # 各页面/组件的 UI 状态
 │       ├── mod.rs
-│       ├── account.rs       # Account 数据模型
-│       ├── domain.rs        # Domain 数据模型
-│       └── dns_record.rs    # DnsRecord 数据模型
+│       ├── accounts.rs      # 账号页面状态
+│       ├── domains.rs       # 域名页面状态
+│       ├── dns_records.rs   # DNS 记录页面状态
+│       ├── toolbox.rs       # 工具箱页面状态
+│       ├── settings.rs      # 设置页面状态
+│       └── modal.rs         # 弹窗状态（Modal 枚举）
 │
 ├── message/                 # ═══ Message 层：事件定义 ═══
 │   ├── mod.rs
 │   ├── app.rs               # AppMessage 主消息枚举
 │   ├── navigation.rs        # 导航相关消息
-│   ├── accounts.rs          # 账号页面消息
-│   ├── domains.rs           # 域名页面消息
-│   └── toolbox.rs           # 工具箱消息
+│   ├── content.rs           # 内容区域消息
+│   └── modal.rs             # 弹窗相关消息
 │
 ├── update/                  # ═══ Update 层：状态变更逻辑 ═══
 │   ├── mod.rs               # update(app, msg) -> 主分发
 │   ├── navigation.rs        # 导航更新逻辑
-│   ├── accounts.rs          # 账号页面更新
-│   ├── domains.rs           # 域名页面更新
-│   ├── dns.rs               # DNS 记录更新
-│   ├── toolbox.rs           # 工具箱更新
-│   └── settings.rs          # 设置更新
+│   ├── content.rs           # 内容区域更新（各页面逻辑）
+│   └── modal.rs             # 弹窗更新逻辑
 │
 ├── view/                    # ═══ View 层：纯 UI 渲染 ═══
 │   ├── mod.rs               # view(app, frame) -> 主渲染入口
 │   ├── layout.rs            # 主布局结构
-│   ├── theme.rs             # 主题和样式定义
+│   ├── theme.rs             # 主题和样式定义（支持深色/浅色切换）
 │   │
 │   ├── components/          # 可复用 UI 组件（纯函数）
 │   │   ├── mod.rs
 │   │   ├── navigation.rs    # 左侧导航面板
 │   │   ├── statusbar.rs     # 底部状态栏
-│   │   ├── table.rs         # 通用表格组件
-│   │   ├── tree.rs          # 树形列表组件
-│   │   ├── dialog.rs        # 对话框组件
-│   │   ├── input.rs         # 输入框组件
-│   │   └── tabs.rs          # 标签页组件
+│   │   └── modal.rs         # 弹窗组件（帮助、添加账号、工具弹窗等）
 │   │
 │   └── pages/               # 页面视图（组合组件）
 │       ├── mod.rs
@@ -92,12 +93,19 @@ src/
 │   └── keymap.rs            # 快捷键配置
 │
 ├── backend/                 # ═══ Backend 层：业务服务 ═══
-│   ├── mod.rs               # （与 UI 完全解耦）
-│   ├── account_service.rs   # 账号服务
-│   ├── domain_service.rs    # 域名服务
-│   ├── dns_service.rs       # DNS 记录服务
-│   ├── toolbox_service.rs   # 工具箱服务
-│   └── config_service.rs    # 配置服务
+│   ├── mod.rs
+│   ├── account_service.rs   # 账号服务（CRUD 操作）
+│   ├── account_repository.rs # 账号持久化（JSON 文件存储）
+│   ├── core_service.rs      # dns-orchestrator-core 集成
+│   ├── credential_service.rs # 凭证加密服务
+│   ├── config_service.rs    # 配置服务
+│   └── domain_metadata_repository.rs # 域名元数据持久化
+│
+├── i18n/                    # ═══ 国际化层 ═══
+│   ├── mod.rs               # i18n 主模块，提供 t() 函数
+│   ├── keys.rs              # 文本键定义（UiTexts 结构体）
+│   ├── en_us.rs             # 英文翻译
+│   └── zh_cn.rs             # 中文翻译
 │
 └── util/                    # ═══ 工具层 ═══
     ├── mod.rs
@@ -182,21 +190,31 @@ pub fn update(app: &mut App, msg: AppMessage) {
 
 **3. Backend 层原则**
 ```rust
-// Backend 完全不知道 UI 的存在
-// 后期可直接替换为 dns-orchestrator-core 的调用
+// 可以说 Backend 完全不知道 UI 的存在
+// 通过 Repository 模式实现数据持久化
+// 通过 CoreService 集成 dns-orchestrator-core
 
-pub trait AccountService {
-    async fn list_accounts(&self) -> Result<Vec<Account>>;
-    async fn create_account(&self, req: CreateAccountRequest) -> Result<Account>;
-    async fn delete_account(&self, id: &str) -> Result<()>;
+// 账号持久化：使用 JSON 文件 + 内存缓存
+pub struct JsonAccountRepository {
+    cache: Mutex<Vec<Account>>,
 }
 
-// 当前实现：Mock 数据
-pub struct MockAccountService;
+impl AccountRepository for JsonAccountRepository {
+    async fn find_all(&self) -> CoreResult<Vec<Account>>;
+    async fn save(&self, account: &Account) -> CoreResult<()>;
+    async fn delete(&self, id: &str) -> CoreResult<()>;
+    // ...
+}
 
-// 未来实现：对接 core
-pub struct CoreAccountService {
-    core: dns_orchestrator_core::AccountService,
+// 通过 CoreService 执行 DNS 操作
+pub struct CoreService {
+    orchestrator: DnsOrchestrator,
+}
+
+impl CoreService {
+    pub async fn list_domains(&self, account_id: &str) -> Result<Vec<Domain>>;
+    pub async fn list_dns_records(&self, account_id: &str, domain: &str) -> Result<Vec<DnsRecord>>;
+    // ...
 }
 ```
 
@@ -554,39 +572,52 @@ Light:
 ### Phase 1: 基础框架 ✅
 - [x] 搭建 Ratatui + Crossterm 基础
 - [x] 实现基本布局（左右分栏）
-- [ ] 实现状态管理结构
-- [ ] 实现键盘事件路由
+- [x] 实现状态管理结构（Elm Architecture）
+- [x] 实现键盘事件路由
 
-### Phase 2: 导航和页面
-- [ ] 实现左侧导航面板
-- [ ] 实现 Home 页面（静态仪表板）
-- [ ] 实现页面切换逻辑
-- [ ] 实现状态栏和快捷键提示
+### Phase 2: 导航和页面 ✅
+- [x] 实现左侧导航面板
+- [x] 实现 Home 页面（静态仪表板）
+- [x] 实现页面切换逻辑
+- [x] 实现状态栏和快捷键提示
 
-### Phase 3: Accounts 模块
-- [ ] 实现账号列表显示
-- [ ] 实现添加账号（Mock 数据）
-- [ ] 实现编辑/删除账号
-- [ ] 集成 dns-orchestrator-core
+### Phase 3: Accounts 模块 ✅
+- [x] 实现账号列表显示
+- [x] 实现添加账号弹窗
+- [x] 实现编辑/删除账号
+- [x] 集成 dns-orchestrator-core（AccountRepository trait）
+- [x] 实现账号持久化（JSON 文件 + 内存缓存）
+- [x] 实现凭证加密服务
 
-### Phase 4: Domains 模块
-- [ ] 实现账号-域名树形视图
-- [ ] 实现域名选择和导航
-- [ ] 实现 DNS 记录列表
-- [ ] 实现 DNS 记录 CRUD
+### Phase 4: Domains 模块 ✅
+- [x] 实现账号-域名列表视图
+- [x] 实现域名选择和导航
+- [x] 实现 DNS 记录列表
+- [ ] 🔜 实现 DNS 记录 CRUD（添加/编辑/删除）
 
-### Phase 5: Toolbox & Settings
-- [ ] 实现 DNS 查询工具
-- [ ] 实现 WHOIS 查询
-- [ ] 实现 SSL 检查
-- [ ] 实现 Settings 页面
+### Phase 5: Toolbox & Settings ✅
+- [x] 实现 DNS 查询工具弹窗
+- [x] 实现 WHOIS 查询弹窗
+- [x] 实现 SSL 证书检查弹窗
+- [x] 实现 IP 查询工具弹窗
+- [x] 实现 HTTP 头检查弹窗
+- [x] 实现 DNS 传播检查弹窗
+- [x] 实现 DNSSEC 验证弹窗
+- [x] 实现 Settings 页面（主题、语言设置）
 
-### Phase 6: 完善和优化
-- [ ] 主题切换
-- [ ] 错误处理和友好提示
-- [ ] 帮助系统
-- [ ] 性能优化
-- [ ] 测试和文档
+### Phase 6: 国际化与主题 ✅
+- [x] 实现 i18n 国际化支持（中文/英文）
+- [x] 实现深色/浅色主题切换
+- [x] 实现帮助弹窗（显示快捷键）
+
+### Phase 7: 完善和优化 🔜
+- [ ] 实现账号导入/导出功能
+- [ ] 实现域名搜索/过滤
+- [ ] 实现 DNS 记录搜索/过滤
+- [ ] 错误处理和友好提示优化
+- [ ] 性能优化（虚拟滚动）
+- [ ] 单元测试覆盖
+- [ ] 文档完善
 
 ## 八、技术决策
 
@@ -595,7 +626,10 @@ Light:
 - **ratatui**: 成熟的 TUI 框架，积极维护
 - **crossterm**: 跨平台终端控制，支持 Windows/Linux/macOS
 - **tokio**: 异步运行时，支持后期网络请求
-- **anyhow**: 简化错误处理
+- **dns-orchestrator-core**: 核心 DNS 管理库
+- **serde/serde_json**: JSON 序列化/反序列化
+- **chrono**: 时间日期处理
+- **dirs**: 跨平台配置目录获取
 
 ### 8.2 架构原则
 
@@ -604,22 +638,48 @@ Light:
 - **可扩展性**: 模块化设计，易于添加新功能
 - **可维护性**: 清晰的目录结构和命名规范
 
-## 九、待定问题
+## 九、已解决的设计问题
 
-1. **异步加载**: 如何在 TUI 中优雅地显示加载状态？
-   - 方案: 使用 Spinner 组件 + 异步任务队列
+1. **异步加载**: 使用 loading 状态标志 + 弹窗内显示加载提示
+   - 各工具弹窗都实现了 `loading` 状态
 
-2. **长时间操作**: 如何处理耗时的 API 调用？
-   - 方案: 后台任务 + 进度条 + 可取消
+2. **多语言支持**: 实现了完整的 i18n 系统
+   - 支持中文 (zh-CN) 和英文 (en-US)
+   - 通过 `t()` 函数获取当前语言文本
+   - 设置页面可切换语言
 
-3. **多语言支持**: 是否需要国际化？
-   - 暂定: 先支持中文，后期可扩展
+3. **主题系统**: 实现了全局主题切换
+   - 支持深色和浅色主题
+   - 通过 `colors()` 函数获取当前主题颜色
+   - 设置页面可切换主题
 
-4. **配置持久化**: 配置文件存储位置？
-   - 方案: 使用 `dirs` crate 获取标准配置目录
+4. **配置持久化**: 使用 `dirs` crate 获取标准配置目录
+   - 账号数据存储在 `~/.config/dns-orchestrator-tui/accounts.json`
+   - 设置数据存储在 `~/.config/dns-orchestrator-tui/settings.json`
+
+## 十、待实现功能
+
+1. **DNS 记录 CRUD**: 添加/编辑/删除 DNS 记录的弹窗和逻辑
+
+2. **账号导入/导出**:
+   - 支持从文件导入账号配置
+   - 支持导出账号配置到文件
+
+3. **搜索和过滤**:
+   - 域名搜索功能
+   - DNS 记录类型过滤
+   - 账号搜索功能
+
+4. **批量操作**:
+   - 多选账号批量删除
+   - 多选 DNS 记录批量操作
+
+5. **性能优化**:
+   - 大列表虚拟滚动
+   - 搜索防抖
 
 ---
 
-**文档版本**: v0.1
-**最后更新**: 2025-01-XX
+**文档版本**: v0.2
+**最后更新**: 2025-01
 **维护者**: AptS-1547
