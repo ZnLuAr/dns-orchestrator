@@ -11,8 +11,6 @@ use std::path::PathBuf;
 use tokio::fs;
 use tokio::sync::Mutex;
 
-use crate::view::pages::accounts;
-
 /// 获取配置目录路径
 fn get_config_dir() -> PathBuf {
     dirs::config_dir()
@@ -111,9 +109,9 @@ impl AccountRepository for JsonAccountRepository {
 
     async fn find_by_id(&self, id: &str) -> CoreResult<Option<Account>> {
         let accounts = {
-            let  cache = self.cache.lock().await;
+            let cache = self.cache.lock().await;
             if cache.is_empty() {
-                drop(cache);                        // 释放锁
+                drop(cache);
                 self.load_from_file().await?
             } else {
                 cache.clone()
@@ -123,7 +121,15 @@ impl AccountRepository for JsonAccountRepository {
     }
 
     async fn save(&self, account: &Account) -> CoreResult<()> {
-        let mut accounts = self.load_from_file().await?;
+        let mut accounts = {
+            let  cache = self.cache.lock().await;
+            if cache.is_empty() {
+                drop(cache);                        // 释放锁
+                self.load_from_file().await?
+            } else {
+                cache.clone()
+            }
+        };
 
         // 查找是否已存在
         if let Some(pos) = accounts.iter().position(|a| a.id == account.id) {
@@ -141,7 +147,15 @@ impl AccountRepository for JsonAccountRepository {
     }
 
     async fn delete(&self, id: &str) -> CoreResult<()> {
-        let mut accounts = self.load_from_file().await?;
+        let mut accounts = {
+            let cache = self.cache.lock().await;
+            if cache.is_empty() {
+                drop(cache);
+                self.load_from_file().await?
+            } else {
+                cache.clone()
+            }
+        };
 
         let original_len = accounts.len();
         accounts.retain(|a| a.id != id);
@@ -159,7 +173,15 @@ impl AccountRepository for JsonAccountRepository {
     }
 
     async fn save_all(&self, accounts: &[Account]) -> CoreResult<()> {
-        let mut existing = self.load_from_file().await?;
+        let mut existing = {
+            let cache = self.cache.lock().await;
+            if cache.is_empty() {
+                drop(cache);
+                self.load_from_file().await?
+            } else {
+                cache.clone()
+            }
+        };
 
         for account in accounts {
             if let Some(pos) = existing.iter().position(|a| a.id == account.id) {
@@ -183,7 +205,15 @@ impl AccountRepository for JsonAccountRepository {
         status: AccountStatus,
         error: Option<String>,
     ) -> CoreResult<()> {
-        let mut accounts = self.load_from_file().await?;
+        let mut accounts = {
+            let cache = self.cache.lock().await;
+            if cache.is_empty() {
+                drop(cache);
+                self.load_from_file().await?
+            } else {
+                cache.clone()
+            }
+        };
 
         if let Some(account) = accounts.iter_mut().find(|a| a.id == id) {
             account.status = Some(status);
