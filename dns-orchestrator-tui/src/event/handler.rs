@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+use crate::event::keymap::DefaultKeymap;
 use crate::message::{AppMessage, ContentMessage, ModalMessage, NavigationMessage};
 use crate::model::{App, Page};
 
@@ -49,30 +50,30 @@ fn handle_key_event(key: KeyEvent, app: &App) -> AppMessage {
     }
 
     // 全局快捷键（无论焦点在哪里）
-    match (key.modifiers, key.code) {
-        // Ctrl+C: 强制退出
-        (KeyModifiers::CONTROL, KeyCode::Char('c')) => return AppMessage::Quit,
+    if DefaultKeymap::FORCE_QUIT.matches(&key) {
+        return AppMessage::Quit;
+    }
 
-        // Tab: 切换焦点面板
-        (KeyModifiers::NONE, KeyCode::Tab) => {
-            return AppMessage::ToggleFocus;
-        }
+    if DefaultKeymap::HELP.matches(&key) || (key.modifiers.is_empty() && key.code == KeyCode::Char('?')) {
+        return AppMessage::ShowHelp;
+    }
 
-        // Alt+h 或 ?: 显示帮助
-        (KeyModifiers::ALT, KeyCode::Char('h')) | (KeyModifiers::NONE, KeyCode::Char('?')) => {
-            return AppMessage::ShowHelp;
-        }
+    if DefaultKeymap::REFRESH.matches(&key) {
+        return AppMessage::Refresh;
+    }
 
-        // Alt+q: 退出
-        (KeyModifiers::ALT, KeyCode::Char('q')) => return AppMessage::Quit,
+    if DefaultKeymap::BACK.matches(&key) {
+        return AppMessage::GoBack;
+    }
 
-        // Alt+r: 刷新
-        (KeyModifiers::ALT, KeyCode::Char('r')) => return AppMessage::Refresh,
+    // Tab: 切换焦点面板
+    if key.modifiers.is_empty() && key.code == KeyCode::Tab {
+        return AppMessage::ToggleFocus;
+    }
 
-        // Esc: 返回/取消
-        (KeyModifiers::NONE, KeyCode::Esc) => return AppMessage::GoBack,
-
-        _ => {}
+    // Alt+q: 退出
+    if key.modifiers == KeyModifiers::ALT && key.code == KeyCode::Char('q') {
+        return AppMessage::Quit;
     }
 
     // 根据焦点位置处理按键
@@ -111,29 +112,21 @@ fn handle_navigation_keys(key: KeyEvent) -> AppMessage {
 
 /// 处理内容面板的按键
 fn handle_content_keys(key: KeyEvent, app: &App) -> AppMessage {
-    // 通用操作快捷键（Alt+键）
-    match (key.modifiers, key.code) {
-        // Alt+a: 添加
-        (KeyModifiers::ALT, KeyCode::Char('a')) => {
-            return AppMessage::Content(ContentMessage::Add);
-        }
-        // Alt+e: 编辑
-        (KeyModifiers::ALT, KeyCode::Char('e')) => {
-            return AppMessage::Content(ContentMessage::Edit);
-        }
-        // Alt+d: 删除
-        (KeyModifiers::ALT, KeyCode::Char('d')) => {
-            return AppMessage::Content(ContentMessage::Delete);
-        }
-        // Alt+i: 导入
-        (KeyModifiers::ALT, KeyCode::Char('i')) => {
-            return AppMessage::Content(ContentMessage::Import);
-        }
-        // Alt+x: 导出
-        (KeyModifiers::ALT, KeyCode::Char('x')) => {
-            return AppMessage::Content(ContentMessage::Export);
-        }
-        _ => {}
+    // 通用操作快捷键
+    if DefaultKeymap::ACTION_ADD.matches(&key) {
+        return AppMessage::Content(ContentMessage::Add);
+    }
+    if DefaultKeymap::ACTION_EDIT.matches(&key) {
+        return AppMessage::Content(ContentMessage::Edit);
+    }
+    if DefaultKeymap::ACTION_DELETE.matches(&key) {
+        return AppMessage::Content(ContentMessage::Delete);
+    }
+    if DefaultKeymap::ACTION_IMPORT.matches(&key) {
+        return AppMessage::Content(ContentMessage::Import);
+    }
+    if DefaultKeymap::ACTION_EXPORT.matches(&key) {
+        return AppMessage::Content(ContentMessage::Export);
     }
 
     // 根据当前页面处理特定按键
