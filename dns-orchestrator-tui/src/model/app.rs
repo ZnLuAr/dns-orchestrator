@@ -55,8 +55,7 @@ impl App {
             modal: ModalState::new(),
         };
 
-        // 加载模拟数据（开发阶段）
-        app.accounts.load_mock_data();
+        // 开发阶段：加载域名模拟数据
         app.domains.load_mock_data();
 
         app

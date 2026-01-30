@@ -9,6 +9,7 @@ use ratatui::{
 };
 
 use crate::i18n::t;
+use crate::model::domain::ProviderType;
 use crate::model::App;
 use crate::view::theme::colors;
 
@@ -52,7 +53,9 @@ fn render_list(app: &App, frame: &mut Frame, area: Rect) {
         .enumerate()
         .map(|(i, account)| {
             let is_selected = i == app.accounts.selected;
-            let provider_badge = format!("[{}]", account.provider.short_name());
+            // 将 core ProviderType 转换为 TUI 的包装类型以获取 short_name()
+            let tui_provider = ProviderType::from_core(&account.provider);
+            let provider_badge = format!("[{}]", tui_provider.short_name());
 
             let style = if is_selected {
                 Style::default()

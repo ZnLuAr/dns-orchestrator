@@ -1,6 +1,6 @@
 //! 账号页面状态
 
-use crate::model::domain::{Account, ProviderType};
+use crate::model::domain::Account;
 
 /// 账号页面状态
 #[derive(Debug, Default)]
@@ -58,39 +58,5 @@ impl AccountsState {
         self.selected = 0;
         self.loading = false;
         self.error = None;
-    }
-
-    /// 添加模拟数据（开发测试用）
-    pub fn load_mock_data(&mut self) {
-        self.accounts = vec![
-            Account {
-                id: "acc_1".to_string(),
-                name: "Aliyun Main".to_string(),
-                provider: ProviderType::Aliyun,
-                status: None,
-                error: None,
-                created_at: "2024-01-01".to_string(),
-                updated_at: "2024-01-01".to_string(),
-            },
-            Account {
-                id: "acc_2".to_string(),
-                name: "Cloudflare".to_string(),
-                provider: ProviderType::Cloudflare,
-                status: None,
-                error: None,
-                created_at: "2024-01-02".to_string(),
-                updated_at: "2024-01-02".to_string(),
-            },
-            Account {
-                id: "acc_3".to_string(),
-                name: "DNSPod".to_string(),
-                provider: ProviderType::Dnspod,
-                status: None,
-                error: None,
-                created_at: "2024-01-03".to_string(),
-                updated_at: "2024-01-03".to_string(),
-            },
-        ];
-        self.loading = false;
     }
 }
