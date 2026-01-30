@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::Utc;
 
 use crate::model::domain::{Account, AccountStatus, ProviderType};
 
@@ -28,25 +29,26 @@ pub struct MockAccountService {
 
 impl MockAccountService {
     pub fn new() -> Self {
+        let now = Utc::now();
         Self {
             accounts: vec![
                 Account {
                     id: "1".to_string(),
                     name: "Production CF".to_string(),
-                    provider: ProviderType::Cloudflare,
+                    provider: ProviderType::Cloudflare.to_core(),
                     status: Some(AccountStatus::Active),
                     error: None,
-                    created_at: "2024-01-01".to_string(),
-                    updated_at: "2024-01-01".to_string(),
+                    created_at: now,
+                    updated_at: now,
                 },
                 Account {
                     id: "2".to_string(),
                     name: "Aliyun DNS".to_string(),
-                    provider: ProviderType::Aliyun,
+                    provider: ProviderType::Aliyun.to_core(),
                     status: Some(AccountStatus::Active),
                     error: None,
-                    created_at: "2024-02-01".to_string(),
-                    updated_at: "2024-02-01".to_string(),
+                    created_at: now,
+                    updated_at: now,
                 },
             ],
         }

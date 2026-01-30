@@ -1,13 +1,14 @@
 //! 账号数据模型
 //!
-//! 对应 dns-orchestrator-core/src/types/account.rs
-//! 和 dns-orchestrator-provider/src/types.rs 中的 ProviderType
+//! TUI 使用 dns-orchestrator-core 的 Account 和 AccountStatus
+//! 本地仅定义 ProviderType 包装类，提供 UI 渲染所需的显示方法
 
-/// DNS 服务商类型
+use dns_orchestrator_provider::ProviderType as CoreProviderType;
+
+/// DNS 服务商类型（TUI 包装）
 ///
-/// 对应 dns-orchestrator-provider 中的 ProviderType 枚举
-/// TUI 版本不使用 feature flags，直接包含所有服务商
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// 提供 display_name() 和 short_name() 方法用于 UI 渲染
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderType {
     Cloudflare,
     Aliyun,
@@ -35,31 +36,24 @@ impl ProviderType {
             ProviderType::Huaweicloud => "HW",
         }
     }
-}
 
-/// 账号状态
-///
-/// 对应 dns-orchestrator-core 中的 AccountStatus
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum AccountStatus {
-    #[default]
-    Active,
-    Error,
-}
+    /// 转换为 core 库的 ProviderType
+    pub fn to_core(&self) -> CoreProviderType {
+        match self {
+            ProviderType::Cloudflare => CoreProviderType::Cloudflare,
+            ProviderType::Aliyun => CoreProviderType::Aliyun,
+            ProviderType::Dnspod => CoreProviderType::Dnspod,
+            ProviderType::Huaweicloud => CoreProviderType::Huaweicloud,
+        }
+    }
 
-/// 账号
-///
-/// 对应 dns-orchestrator-core 中的 Account
-/// TUI 版本使用 String 存储时间戳（简化处理，避免引入 chrono）
-#[derive(Debug, Clone)]
-pub struct Account {
-    pub id: String,
-    pub name: String,
-    pub provider: ProviderType,
-    /// 账号状态（可选，None 表示未知）
-    pub status: Option<AccountStatus>,
-    /// 错误信息（状态为 Error 时）
-    pub error: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    /// 从 core 库的 ProviderType 转换
+    pub fn from_core(core_provider: &CoreProviderType) -> Self {
+        match core_provider {
+            CoreProviderType::Cloudflare => ProviderType::Cloudflare,
+            CoreProviderType::Aliyun => ProviderType::Aliyun,
+            CoreProviderType::Dnspod => ProviderType::Dnspod,
+            CoreProviderType::Huaweicloud => ProviderType::Huaweicloud,
+        }
+    }
 }
