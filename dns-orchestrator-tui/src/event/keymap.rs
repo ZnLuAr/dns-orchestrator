@@ -2,7 +2,7 @@
 //!
 //! 定义可配置的快捷键映射（未来可支持用户自定义）
 
-use crossterm::event::{KeyCode, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// 快捷键绑定
 #[derive(Debug, Clone)]
@@ -26,6 +26,11 @@ impl KeyBinding {
 
     pub const fn ctrl(code: KeyCode) -> Self {
         Self::new(KeyModifiers::CONTROL, code)
+    }
+
+    /// 检查按键事件是否匹配此快捷键绑定
+    pub fn matches(&self, key: &KeyEvent) -> bool {
+        key.modifiers == self.modifiers && key.code == self.code
     }
 }
 
