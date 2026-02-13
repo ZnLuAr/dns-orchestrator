@@ -197,3 +197,131 @@ fn backoff_delay(attempt: u32) -> Duration {
     let delay_ms = delay_ms.min(10_000); // 最大 10 秒
     Duration::from_millis(delay_ms)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::ProviderError;
+    use std::time::Duration;
+
+    // ---- is_retryable ----
+
+    #[test]
+    fn retryable_network_error() {
+        let e = ProviderError::NetworkError {
+            provider: "test".into(),
+            detail: "err".into(),
+        };
+        assert!(is_retryable(&e));
+    }
+
+    #[test]
+    fn retryable_timeout() {
+        let e = ProviderError::Timeout {
+            provider: "test".into(),
+            detail: "err".into(),
+        };
+        assert!(is_retryable(&e));
+    }
+
+    #[test]
+    fn retryable_rate_limited() {
+        let e = ProviderError::RateLimited {
+            provider: "test".into(),
+            retry_after: None,
+            raw_message: None,
+        };
+        assert!(is_retryable(&e));
+    }
+
+    #[test]
+    fn not_retryable_auth_error() {
+        let e = ProviderError::InvalidCredentials {
+            provider: "test".into(),
+            raw_message: None,
+        };
+        assert!(!is_retryable(&e));
+    }
+
+    #[test]
+    fn not_retryable_record_not_found() {
+        let e = ProviderError::RecordNotFound {
+            provider: "test".into(),
+            record_id: "1".into(),
+            raw_message: None,
+        };
+        assert!(!is_retryable(&e));
+    }
+
+    #[test]
+    fn not_retryable_parse_error() {
+        let e = ProviderError::ParseError {
+            provider: "test".into(),
+            detail: "err".into(),
+        };
+        assert!(!is_retryable(&e));
+    }
+
+    #[test]
+    fn not_retryable_domain_not_found() {
+        let e = ProviderError::DomainNotFound {
+            provider: "test".into(),
+            domain: "x".into(),
+            raw_message: None,
+        };
+        assert!(!is_retryable(&e));
+    }
+
+    // ---- backoff_delay ----
+
+    #[test]
+    fn backoff_attempt_0() {
+        assert_eq!(backoff_delay(0), Duration::from_millis(100));
+    }
+
+    #[test]
+    fn backoff_attempt_1() {
+        assert_eq!(backoff_delay(1), Duration::from_millis(200));
+    }
+
+    #[test]
+    fn backoff_attempt_2() {
+        assert_eq!(backoff_delay(2), Duration::from_millis(400));
+    }
+
+    #[test]
+    fn backoff_attempt_3() {
+        assert_eq!(backoff_delay(3), Duration::from_millis(800));
+    }
+
+    #[test]
+    fn backoff_capped_at_10s() {
+        // attempt 7: 100 * 2^7 = 12800ms, capped to 10000ms
+        assert_eq!(backoff_delay(7), Duration::from_millis(10_000));
+    }
+
+    // ---- parse_json ----
+
+    #[test]
+    fn parse_json_valid() {
+        #[derive(serde::Deserialize, Debug, PartialEq)]
+        struct Foo {
+            x: i32,
+        }
+        let result: Result<Foo, ProviderError> = HttpUtils::parse_json(r#"{"x":42}"#, "test");
+        assert_eq!(result.unwrap(), Foo { x: 42 });
+    }
+
+    #[test]
+    fn parse_json_invalid() {
+        #[derive(serde::Deserialize, Debug)]
+        #[allow(dead_code)]
+        struct Foo {
+            x: i32,
+        }
+        let result: Result<Foo, ProviderError> = HttpUtils::parse_json("not json", "test");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ProviderError::ParseError { .. }));
+    }
+}

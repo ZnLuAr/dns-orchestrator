@@ -165,3 +165,128 @@ pub struct UpdateDomainRecordResponse {}
 
 #[derive(Debug, Deserialize)]
 pub struct DeleteDomainRecordResponse {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+
+    // ---- url_encode ----
+
+    #[test]
+    fn url_encode_alphanumeric() {
+        assert_eq!(url_encode("abc123"), "abc123");
+    }
+
+    #[test]
+    fn url_encode_unreserved() {
+        assert_eq!(url_encode("-._~"), "-._~");
+    }
+
+    #[test]
+    fn url_encode_space() {
+        assert_eq!(url_encode("hello world"), "hello%20world");
+    }
+
+    #[test]
+    fn url_encode_chinese() {
+        assert_eq!(url_encode("你好"), "%E4%BD%A0%E5%A5%BD");
+    }
+
+    #[test]
+    fn url_encode_empty() {
+        assert_eq!(url_encode(""), "");
+    }
+
+    #[test]
+    fn url_encode_special_chars() {
+        assert_eq!(url_encode("/?"), "%2F%3F");
+        assert_eq!(url_encode("&="), "%26%3D");
+    }
+
+    // ---- flatten_value ----
+
+    #[test]
+    fn flatten_simple_object() {
+        let val = json!({"a": "1", "b": "2"});
+        let mut map = BTreeMap::new();
+        flatten_value("", &val, &mut map);
+        assert_eq!(map.get("a").unwrap(), "1");
+        assert_eq!(map.get("b").unwrap(), "2");
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn flatten_nested_object() {
+        let val = json!({"a": {"b": "1"}});
+        let mut map = BTreeMap::new();
+        flatten_value("", &val, &mut map);
+        assert_eq!(map.get("a.b").unwrap(), "1");
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn flatten_array() {
+        let val = json!({"a": [10, 20]});
+        let mut map = BTreeMap::new();
+        flatten_value("", &val, &mut map);
+        assert_eq!(map.get("a.1").unwrap(), "10");
+        assert_eq!(map.get("a.2").unwrap(), "20");
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn flatten_bool_and_number() {
+        let val = json!({"flag": true, "count": 42});
+        let mut map = BTreeMap::new();
+        flatten_value("", &val, &mut map);
+        assert_eq!(map.get("flag").unwrap(), "true");
+        assert_eq!(map.get("count").unwrap(), "42");
+    }
+
+    #[test]
+    fn flatten_null_skipped() {
+        let val = json!({"a": null});
+        let mut map = BTreeMap::new();
+        flatten_value("", &val, &mut map);
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn flatten_empty_object() {
+        let val = json!({});
+        let mut map = BTreeMap::new();
+        flatten_value("", &val, &mut map);
+        assert!(map.is_empty());
+    }
+
+    // ---- serialize_to_query_string ----
+
+    #[test]
+    fn query_string_simple() {
+        let val = json!({"b": "2", "a": "1"});
+        let mut flat_map = BTreeMap::new();
+        flatten_value("", &val, &mut flat_map);
+        let qs = flat_map
+            .iter()
+            .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
+        // BTreeMap sorts keys, so "a" comes before "b"
+        assert_eq!(qs, "a=1&b=2");
+    }
+
+    #[test]
+    fn query_string_encodes_values() {
+        let val = json!({"key": "hello world", "path": "/foo"});
+        let mut flat_map = BTreeMap::new();
+        flatten_value("", &val, &mut flat_map);
+        let qs = flat_map
+            .iter()
+            .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
+        assert_eq!(qs, "key=hello%20world&path=%2Ffoo");
+    }
+}

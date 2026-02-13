@@ -57,3 +57,103 @@ fn parse_unix_timestamp(ts: i64) -> Option<DateTime<Utc>> {
         DateTime::from_timestamp(ts, 0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, TimeZone, Utc};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Wrapper {
+        #[serde(with = "super")]
+        ts: Option<DateTime<Utc>>,
+    }
+
+    #[test]
+    fn serialize_some_datetime() {
+        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
+        let w = Wrapper { ts: Some(dt) };
+        let json = serde_json::to_string(&w).unwrap();
+        // RFC3339 string should be in the output
+        assert!(json.contains("2024-01-15T12:30:00+00:00"));
+    }
+
+    #[test]
+    fn serialize_none() {
+        let w = Wrapper { ts: None };
+        let json = serde_json::to_string(&w).unwrap();
+        assert!(json.contains("null"));
+    }
+
+    #[test]
+    fn deserialize_rfc3339() {
+        let json = r#"{"ts":"2024-01-15T12:30:00+00:00"}"#;
+        let w: Wrapper = serde_json::from_str(json).unwrap();
+        let expected = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
+        assert_eq!(w.ts, Some(expected));
+    }
+
+    #[test]
+    fn deserialize_unix_seconds() {
+        // 1700000000 = 2023-11-14T22:13:20Z
+        let json = r#"{"ts":1700000000}"#;
+        let w: Wrapper = serde_json::from_str(json).unwrap();
+        let expected = Utc.with_ymd_and_hms(2023, 11, 14, 22, 13, 20).unwrap();
+        assert_eq!(w.ts, Some(expected));
+    }
+
+    #[test]
+    fn deserialize_unix_millis() {
+        // 1700000000000 ms = same as 1700000000 seconds
+        let json = r#"{"ts":1700000000000}"#;
+        let w: Wrapper = serde_json::from_str(json).unwrap();
+        let expected = Utc.with_ymd_and_hms(2023, 11, 14, 22, 13, 20).unwrap();
+        assert_eq!(w.ts, Some(expected));
+    }
+
+    #[test]
+    fn deserialize_null() {
+        let json = r#"{"ts":null}"#;
+        let w: Wrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.ts, None);
+    }
+
+    #[test]
+    fn deserialize_invalid_rfc3339() {
+        let json = r#"{"ts":"not-a-date"}"#;
+        let result = serde_json::from_str::<Wrapper>(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn roundtrip_some() {
+        let dt = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
+        let original = Wrapper { ts: Some(dt) };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: Wrapper = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+    }
+
+    #[test]
+    fn roundtrip_none() {
+        let original = Wrapper { ts: None };
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: Wrapper = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+    }
+
+    #[test]
+    fn boundary_seconds_vs_millis() {
+        // 100_000_000_000 is exactly the boundary -- treated as seconds (not > threshold)
+        let json_seconds = r#"{"ts":100000000000}"#;
+        let w_sec: Wrapper = serde_json::from_str(json_seconds).unwrap();
+        let expected_sec = DateTime::from_timestamp(100_000_000_000, 0).unwrap();
+        assert_eq!(w_sec.ts, Some(expected_sec));
+
+        // 100_000_000_001 is > threshold -- treated as millis
+        let json_millis = r#"{"ts":100000000001}"#;
+        let w_ms: Wrapper = serde_json::from_str(json_millis).unwrap();
+        let expected_ms = DateTime::from_timestamp_millis(100_000_000_001).unwrap();
+        assert_eq!(w_ms.ts, Some(expected_ms));
+    }
+}
