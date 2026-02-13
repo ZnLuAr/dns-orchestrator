@@ -10,7 +10,7 @@ authors = ["AptS-1547 <apts-1547@esaps.net>"]
 default = ["rustls"]
 # TLS 后端选择（二选一）
 # native-tls = ["dep:native-tls-crate", "dep:x509-parser", "reqwest/native-tls"]  # 已弃用，统一使用 rustls
-rustls = ["dep:rustls", "dep:tokio-rustls", "dep:rustls-pki-types", "dep:webpki-roots", "dep:x509-parser", "reqwest/rustls-tls"]
+rustls = ["dep:rustls", "dep:tokio-rustls", "dep:rustls-pki-types", "dep:webpki-roots", "dep:x509-parser", "reqwest/rustls-tls", "dns-orchestrator-provider/rustls"]
 
 [dependencies]
 # DNS Provider 抽象库

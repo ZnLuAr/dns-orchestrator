@@ -3,7 +3,7 @@
 //! 将同步的 keyring/stronghold 实现包装为 async trait
 
 use async_trait::async_trait;
-use dns_orchestrator_provider::ProviderCredentials;
+use dns_orchestrator_core::types::ProviderCredentials;
 use serde::Deserialize;
 use std::collections::HashMap;
 

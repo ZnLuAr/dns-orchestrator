@@ -1878,7 +1878,6 @@ dependencies = [
  "chrono",
  "cocoa",
  "dns-orchestrator-core",
- "dns-orchestrator-provider",
  "futures",
  "keyring",
  "log",
