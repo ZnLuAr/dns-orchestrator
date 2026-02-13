@@ -31,25 +31,3 @@ pub struct BatchDeleteRequest {
     /// 记录 ID 列表
     pub record_ids: Vec<String>,
 }
-
-/// 批量删除结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BatchDeleteResult {
-    /// 成功删除的数量
-    pub success_count: usize,
-    /// 失败的数量
-    pub failed_count: usize,
-    /// 失败详情
-    pub failures: Vec<BatchDeleteFailure>,
-}
-
-/// 批量删除失败项
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BatchDeleteFailure {
-    /// 记录 ID
-    pub record_id: String,
-    /// 失败原因
-    pub reason: String,
-}

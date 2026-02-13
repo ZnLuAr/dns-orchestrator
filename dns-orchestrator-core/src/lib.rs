@@ -20,12 +20,3 @@ pub mod utils;
 pub use error::{CoreError, CoreResult};
 pub use services::ServiceContext;
 pub use traits::{AccountRepository, CredentialStore, ProviderRegistry};
-
-// Re-export provider 库的公共类型
-pub use dns_orchestrator_provider::{
-    BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
-    BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest, DnsProvider,
-    DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderCredentials, ProviderDomain, ProviderError, ProviderMetadata, ProviderType,
-    RecordQueryParams, UpdateDnsRecordRequest,
-};

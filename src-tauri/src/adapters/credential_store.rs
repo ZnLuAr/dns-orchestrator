@@ -14,7 +14,7 @@ use dns_orchestrator_core::traits::{CredentialStore, CredentialsMap};
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum StorageFormat {
-    V2(HashMap<String, ProviderCredentials>),     // 新格式
+    V2(HashMap<String, ProviderCredentials>), // 新格式
     #[allow(dead_code)]
     V1(HashMap<String, HashMap<String, String>>), // 旧格式
 }

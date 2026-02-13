@@ -2,9 +2,7 @@
 
 use std::sync::Arc;
 
-use dns_orchestrator_provider::ProviderError;
-
-use crate::error::{CoreError, CoreResult};
+use crate::error::CoreResult;
 use crate::services::{DomainMetadataService, ServiceContext};
 use crate::types::{AppDomain, DomainMetadataKey, PaginatedResponse, PaginationParams};
 
@@ -68,7 +66,7 @@ impl DomainService {
                     lib_response.total_count,
                 ))
             }
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
@@ -81,17 +79,7 @@ impl DomainService {
                 provider_domain,
                 account_id.to_string(),
             )),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
-    }
-
-    /// 处理 Provider 错误，如果是凭证失效则更新账户状态
-    async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
-        if let ProviderError::InvalidCredentials { .. } = &err {
-            self.ctx
-                .mark_account_invalid(account_id, "凭证已失效")
-                .await;
-        }
-        CoreError::Provider(err)
     }
 }

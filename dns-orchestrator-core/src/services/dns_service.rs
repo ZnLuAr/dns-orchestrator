@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use dns_orchestrator_provider::ProviderError;
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::CoreResult;
 use crate::services::ServiceContext;
 use crate::types::{
     BatchDeleteFailure, BatchDeleteRequest, BatchDeleteResult, CreateDnsRecordRequest, DnsRecord,
@@ -44,7 +44,7 @@ impl DnsService {
 
         match provider.list_records(domain_id, &params).await {
             Ok(response) => Ok(response),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
@@ -57,7 +57,7 @@ impl DnsService {
         let provider = self.ctx.get_provider(account_id).await?;
         match provider.create_record(&request).await {
             Ok(record) => Ok(record),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
@@ -71,7 +71,7 @@ impl DnsService {
         let provider = self.ctx.get_provider(account_id).await?;
         match provider.update_record(record_id, &request).await {
             Ok(record) => Ok(record),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
@@ -85,7 +85,7 @@ impl DnsService {
         let provider = self.ctx.get_provider(account_id).await?;
         match provider.delete_record(record_id, domain_id).await {
             Ok(()) => Ok(()),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
@@ -142,15 +142,5 @@ impl DnsService {
             failed_count: failures.len(),
             failures,
         })
-    }
-
-    /// 处理 Provider 错误，如果是凭证失效则更新账户状态
-    async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
-        if let ProviderError::InvalidCredentials { .. } = &err {
-            self.ctx
-                .mark_account_invalid(account_id, "凭证已失效")
-                .await;
-        }
-        CoreError::Provider(err)
     }
 }

@@ -17,7 +17,7 @@ pub use export::{
     ExportAccountsRequest, ExportAccountsResponse, ExportFile, ExportFileHeader, ExportedAccount,
     ImportAccountsRequest, ImportFailure, ImportPreview, ImportPreviewAccount, ImportResult,
 };
-pub use response::{ApiResponse, BatchDeleteFailure, BatchDeleteRequest, BatchDeleteResult};
+pub use response::{ApiResponse, BatchDeleteRequest};
 pub use toolbox::{
     CertChainItem, DnsLookupRecord, DnsLookupResult, DnsPropagationResult, DnsPropagationServer,
     DnsPropagationServerResult, DnskeyRecord, DnssecResult, DsRecord, HttpHeader,
@@ -27,7 +27,9 @@ pub use toolbox::{
 
 // Re-export provider 库的公共类型
 pub use dns_orchestrator_provider::{
-    CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
+    BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
+    BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest,
+    CredentialValidationError, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
     PaginationParams, ProviderCredentials, ProviderDomain, ProviderMetadata, ProviderType,
-    RecordQueryParams, UpdateDnsRecordRequest,
+    RecordData, RecordQueryParams, UpdateDnsRecordRequest,
 };

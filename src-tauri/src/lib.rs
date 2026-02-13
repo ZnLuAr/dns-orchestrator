@@ -14,10 +14,8 @@ use tauri_plugin_log::{Target, TargetKind};
 
 use adapters::{TauriAccountRepository, TauriCredentialStore, TauriDomainMetadataRepository};
 use dns_orchestrator_core::services::{
-    AccountBootstrapService, AccountLifecycleService, AccountMetadataService,
-    CredentialManagementService, DnsService, DomainMetadataService, DomainService,
-    ImportExportService, MigrationResult, MigrationService, ProviderMetadataService,
-    ServiceContext,
+    AccountService, DnsService, DomainMetadataService, DomainService, ImportExportService,
+    MigrationResult, MigrationService, ProviderMetadataService, ServiceContext,
 };
 use dns_orchestrator_core::traits::InMemoryProviderRegistry;
 
@@ -25,14 +23,8 @@ use dns_orchestrator_core::traits::InMemoryProviderRegistry;
 pub struct AppState {
     /// 服务上下文
     pub ctx: Arc<ServiceContext>,
-    /// 账户元数据服务
-    pub account_metadata_service: Arc<AccountMetadataService>,
-    /// 凭证管理服务
-    pub credential_management_service: Arc<CredentialManagementService>,
-    /// 账户生命周期服务
-    pub account_lifecycle_service: Arc<AccountLifecycleService>,
-    /// 账户启动恢复服务
-    pub account_bootstrap_service: Arc<AccountBootstrapService>,
+    /// 统一账户服务
+    pub account_service: Arc<AccountService>,
     /// Provider 元数据服务
     pub provider_metadata_service: ProviderMetadataService,
     /// 导入导出服务
@@ -68,19 +60,11 @@ impl AppState {
             domain_metadata_repository.clone(),
         ));
 
-        // 创建细粒度账户服务
-        let account_metadata_service = Arc::new(AccountMetadataService::new(account_repository));
-        let credential_management_service = Arc::new(CredentialManagementService::new(
+        // 创建统一账户服务
+        let account_service = Arc::new(AccountService::new(
+            account_repository,
             credential_store,
             provider_registry,
-        ));
-        let account_lifecycle_service = Arc::new(AccountLifecycleService::new(
-            Arc::clone(&account_metadata_service),
-            Arc::clone(&credential_management_service),
-        ));
-        let account_bootstrap_service = Arc::new(AccountBootstrapService::new(
-            Arc::clone(&account_metadata_service),
-            Arc::clone(&credential_management_service),
         ));
         let provider_metadata_service = ProviderMetadataService::new();
 
@@ -93,10 +77,7 @@ impl AppState {
 
         Self {
             ctx,
-            account_metadata_service,
-            credential_management_service,
-            account_lifecycle_service,
-            account_bootstrap_service,
+            account_service,
             provider_metadata_service,
             import_export_service,
             domain_service,
@@ -242,7 +223,7 @@ pub fn run() {
                         // 将失败的账户标记为 Error 状态
                         for (account_id, error_msg) in &failed_accounts {
                             if let Err(e) = state
-                                .account_metadata_service
+                                .account_service
                                 .update_status(
                                     account_id,
                                     dns_orchestrator_core::types::AccountStatus::Error,
@@ -282,7 +263,7 @@ pub fn run() {
         let app_handle = app.handle().clone();
         tauri::async_runtime::spawn(async move {
             let state = app_handle.state::<AppState>();
-            let result = state.account_bootstrap_service.restore_accounts().await;
+            let result = state.account_service.restore_accounts().await;
 
             match result {
                 Ok(restore_result) => {

@@ -1,9 +1,6 @@
 //! 业务逻辑服务层
 
-mod account_bootstrap_service;
-mod account_lifecycle_service;
-mod account_metadata_service;
-mod credential_management_service;
+mod account_service;
 mod dns_service;
 mod domain_metadata_service;
 mod domain_service;
@@ -12,10 +9,7 @@ mod migration_service;
 mod provider_metadata_service;
 mod toolbox;
 
-pub use account_bootstrap_service::{AccountBootstrapService, RestoreResult};
-pub use account_lifecycle_service::AccountLifecycleService;
-pub use account_metadata_service::AccountMetadataService;
-pub use credential_management_service::CredentialManagementService;
+pub use account_service::{AccountService, RestoreResult};
 pub use dns_service::DnsService;
 pub use domain_metadata_service::DomainMetadataService;
 pub use domain_service::DomainService;
@@ -27,6 +21,8 @@ pub use toolbox::ToolboxService;
 use std::sync::Arc;
 
 use dns_orchestrator_provider::DnsProvider;
+
+use dns_orchestrator_provider::ProviderError;
 
 use crate::error::{CoreError, CoreResult};
 use crate::traits::{
@@ -90,5 +86,13 @@ impl ServiceContext {
             return;
         }
         log::warn!("Account {account_id} marked as invalid: {error_msg}");
+    }
+
+    /// 处理 Provider 错误，如果是凭证失效则更新账户状态
+    pub async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
+        if let ProviderError::InvalidCredentials { .. } = &err {
+            self.mark_account_invalid(account_id, "凭证已失效").await;
+        }
+        CoreError::Provider(err)
     }
 }

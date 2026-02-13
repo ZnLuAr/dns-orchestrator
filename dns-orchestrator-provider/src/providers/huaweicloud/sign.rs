@@ -40,12 +40,13 @@ impl HuaweicloudProvider {
         let mut sorted_headers: Vec<_> = headers.iter().collect();
         sorted_headers.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
 
-        let canonical_headers: String = sorted_headers
-            .iter()
-            .fold(String::new(), |mut acc, (k, v)| {
-                let _ = writeln!(acc, "{}:{}", k.to_lowercase(), v.trim());
-                acc
-            });
+        let canonical_headers: String =
+            sorted_headers
+                .iter()
+                .fold(String::new(), |mut acc, (k, v)| {
+                    let _ = writeln!(acc, "{}:{}", k.to_lowercase(), v.trim());
+                    acc
+                });
 
         let signed_headers: String = sorted_headers
             .iter()

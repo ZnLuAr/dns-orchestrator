@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::error::DnsError;
+use crate::error::AppError;
 use crate::types::{
     Account, ApiResponse, BatchDeleteResult, CreateAccountRequest, ExportAccountsRequest,
     ExportAccountsResponse, ImportAccountsRequest, ImportPreview, ImportResult, ProviderMetadata,
@@ -8,77 +8,13 @@ use crate::types::{
 };
 use crate::AppState;
 
-// 从 core 类型转换到本地类型的辅助函数
-fn convert_account(core_account: dns_orchestrator_core::types::Account) -> Account {
-    Account {
-        id: core_account.id,
-        name: core_account.name,
-        provider: core_account.provider,
-        created_at: core_account.created_at,
-        updated_at: core_account.updated_at,
-        status: core_account.status.map(convert_account_status),
-        error: core_account.error,
-    }
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn convert_account_status(
-    status: dns_orchestrator_core::types::AccountStatus,
-) -> crate::types::AccountStatus {
-    match status {
-        dns_orchestrator_core::types::AccountStatus::Active => crate::types::AccountStatus::Active,
-        dns_orchestrator_core::types::AccountStatus::Error => crate::types::AccountStatus::Error,
-    }
-}
-
-fn convert_export_response(
-    response: dns_orchestrator_core::types::ExportAccountsResponse,
-) -> ExportAccountsResponse {
-    ExportAccountsResponse {
-        content: response.content,
-        suggested_filename: response.suggested_filename,
-    }
-}
-
-fn convert_import_preview(preview: dns_orchestrator_core::types::ImportPreview) -> ImportPreview {
-    ImportPreview {
-        encrypted: preview.encrypted,
-        account_count: preview.account_count,
-        accounts: preview.accounts.map(|accounts| {
-            accounts
-                .into_iter()
-                .map(|a| crate::types::ImportPreviewAccount {
-                    name: a.name,
-                    provider: a.provider,
-                    has_conflict: a.has_conflict,
-                })
-                .collect()
-        }),
-    }
-}
-
-fn convert_import_result(result: dns_orchestrator_core::types::ImportResult) -> ImportResult {
-    ImportResult {
-        success_count: result.success_count,
-        failures: result
-            .failures
-            .into_iter()
-            .map(|f| crate::types::ImportFailure {
-                name: f.name,
-                reason: f.reason,
-            })
-            .collect(),
-    }
-}
-
 /// 列出所有账号
 #[tauri::command]
 pub async fn list_accounts(
     state: State<'_, AppState>,
-) -> Result<ApiResponse<Vec<Account>>, DnsError> {
-    let accounts = state.account_metadata_service.list_accounts().await?;
-    let converted: Vec<Account> = accounts.into_iter().map(convert_account).collect();
-    Ok(ApiResponse::success(converted))
+) -> Result<ApiResponse<Vec<Account>>, AppError> {
+    let accounts = state.account_service.list_accounts().await?;
+    Ok(ApiResponse::success(accounts))
 }
 
 /// 创建新账号
@@ -86,19 +22,9 @@ pub async fn list_accounts(
 pub async fn create_account(
     state: State<'_, AppState>,
     request: CreateAccountRequest,
-) -> Result<ApiResponse<Account>, DnsError> {
-    // 转换请求类型
-    let core_request = dns_orchestrator_core::types::CreateAccountRequest {
-        name: request.name,
-        provider: request.provider,
-        credentials: request.credentials,
-    };
-
-    let account = state
-        .account_lifecycle_service
-        .create_account(core_request)
-        .await?;
-    Ok(ApiResponse::success(convert_account(account)))
+) -> Result<ApiResponse<Account>, AppError> {
+    let account = state.account_service.create_account(request).await?;
+    Ok(ApiResponse::success(account))
 }
 
 /// 删除账号
@@ -106,11 +32,8 @@ pub async fn create_account(
 pub async fn delete_account(
     state: State<'_, AppState>,
     account_id: String,
-) -> Result<ApiResponse<()>, DnsError> {
-    state
-        .account_lifecycle_service
-        .delete_account(&account_id)
-        .await?;
+) -> Result<ApiResponse<()>, AppError> {
+    state.account_service.delete_account(&account_id).await?;
     Ok(ApiResponse::success(()))
 }
 
@@ -119,36 +42,9 @@ pub async fn delete_account(
 pub async fn update_account(
     state: State<'_, AppState>,
     request: UpdateAccountRequest,
-) -> Result<ApiResponse<Account>, DnsError> {
-    // 转换请求类型
-    let core_request = dns_orchestrator_core::types::UpdateAccountRequest {
-        id: request.id,
-        name: request.name,
-        credentials: request.credentials,
-    };
-
-    let account = state
-        .account_lifecycle_service
-        .update_account(core_request)
-        .await?;
-    Ok(ApiResponse::success(convert_account(account)))
-}
-
-fn convert_batch_delete_result(
-    result: dns_orchestrator_core::types::BatchDeleteResult,
-) -> BatchDeleteResult {
-    BatchDeleteResult {
-        success_count: result.success_count,
-        failed_count: result.failed_count,
-        failures: result
-            .failures
-            .into_iter()
-            .map(|f| crate::types::BatchDeleteFailure {
-                record_id: f.record_id,
-                reason: f.reason,
-            })
-            .collect(),
-    }
+) -> Result<ApiResponse<Account>, AppError> {
+    let account = state.account_service.update_account(request).await?;
+    Ok(ApiResponse::success(account))
 }
 
 /// 批量删除账号
@@ -156,19 +52,19 @@ fn convert_batch_delete_result(
 pub async fn batch_delete_accounts(
     state: State<'_, AppState>,
     account_ids: Vec<String>,
-) -> Result<ApiResponse<BatchDeleteResult>, DnsError> {
+) -> Result<ApiResponse<BatchDeleteResult>, AppError> {
     let result = state
-        .account_lifecycle_service
+        .account_service
         .batch_delete_accounts(account_ids)
         .await?;
-    Ok(ApiResponse::success(convert_batch_delete_result(result)))
+    Ok(ApiResponse::success(result))
 }
 
 /// 获取所有支持的提供商列表
 #[tauri::command]
 pub async fn list_providers(
     state: State<'_, AppState>,
-) -> Result<ApiResponse<Vec<ProviderMetadata>>, DnsError> {
+) -> Result<ApiResponse<Vec<ProviderMetadata>>, AppError> {
     let providers = state.provider_metadata_service.list_providers();
     Ok(ApiResponse::success(providers))
 }
@@ -178,20 +74,14 @@ pub async fn list_providers(
 pub async fn export_accounts(
     state: State<'_, AppState>,
     request: ExportAccountsRequest,
-) -> Result<ApiResponse<ExportAccountsResponse>, DnsError> {
-    let core_request = dns_orchestrator_core::types::ExportAccountsRequest {
-        account_ids: request.account_ids,
-        encrypt: request.encrypt,
-        password: request.password,
-    };
-
+) -> Result<ApiResponse<ExportAccountsResponse>, AppError> {
     let app_version = env!("CARGO_PKG_VERSION");
     let response = state
         .import_export_service
-        .export_accounts(core_request, app_version)
+        .export_accounts(request, app_version)
         .await?;
 
-    Ok(ApiResponse::success(convert_export_response(response)))
+    Ok(ApiResponse::success(response))
 }
 
 /// 预览导入文件
@@ -200,13 +90,13 @@ pub async fn preview_import(
     state: State<'_, AppState>,
     content: String,
     password: Option<String>,
-) -> Result<ApiResponse<ImportPreview>, DnsError> {
+) -> Result<ApiResponse<ImportPreview>, AppError> {
     let preview = state
         .import_export_service
         .preview_import(&content, password.as_deref())
         .await?;
 
-    Ok(ApiResponse::success(convert_import_preview(preview)))
+    Ok(ApiResponse::success(preview))
 }
 
 /// 执行导入
@@ -214,18 +104,10 @@ pub async fn preview_import(
 pub async fn import_accounts(
     state: State<'_, AppState>,
     request: ImportAccountsRequest,
-) -> Result<ApiResponse<ImportResult>, DnsError> {
-    let core_request = dns_orchestrator_core::types::ImportAccountsRequest {
-        content: request.content,
-        password: request.password,
-    };
+) -> Result<ApiResponse<ImportResult>, AppError> {
+    let result = state.import_export_service.import_accounts(request).await?;
 
-    let result = state
-        .import_export_service
-        .import_accounts(core_request)
-        .await?;
-
-    Ok(ApiResponse::success(convert_import_result(result)))
+    Ok(ApiResponse::success(result))
 }
 
 /// 检查账户恢复是否完成
