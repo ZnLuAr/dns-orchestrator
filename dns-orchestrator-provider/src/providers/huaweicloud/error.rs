@@ -219,3 +219,588 @@ impl ProviderErrorMapper for HuaweicloudProvider {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
+
+    fn provider() -> HuaweicloudProvider {
+        HuaweicloudProvider::new(String::new(), String::new())
+    }
+
+    fn default_ctx() -> ErrorContext {
+        ErrorContext::default()
+    }
+
+    fn ctx_with_record(name: &str, id: &str) -> ErrorContext {
+        ErrorContext {
+            record_name: Some(name.to_string()),
+            record_id: Some(id.to_string()),
+            domain: None,
+        }
+    }
+
+    fn ctx_with_domain(domain: &str) -> ErrorContext {
+        ErrorContext {
+            record_name: None,
+            record_id: None,
+            domain: Some(domain.to_string()),
+        }
+    }
+
+    // ============ 1. 认证错误 ============
+
+    #[test]
+    fn auth_apigw_0301() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("APIGW.0301", "iam auth failed"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn auth_apigw_0101() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("APIGW.0101", "api not found"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn auth_dns_0005() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0005", "auth failed"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn auth_dns_0040() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0040", "not verified"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::InvalidCredentials { .. }));
+    }
+
+    // ============ 2. 权限拒绝 ============
+
+    #[test]
+    fn permission_apigw_0302() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("APIGW.0302", "access denied"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::PermissionDenied { .. }));
+    }
+
+    #[test]
+    fn permission_dns_0030() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0030", "resource forbidden"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::PermissionDenied { .. }));
+    }
+
+    #[test]
+    fn permission_dns_1802() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.1802", "policy denied"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::PermissionDenied { .. }));
+    }
+
+    // ============ 3. 配额超限 ============
+
+    #[test]
+    fn quota_dns_0403() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0403", "recordset quota"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::QuotaExceeded { .. }));
+    }
+
+    #[test]
+    fn quota_dns_0404() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0404", "zone quota"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::QuotaExceeded { .. }));
+    }
+
+    #[test]
+    fn quota_dns_2002() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.2002", "tenant quota"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::QuotaExceeded { .. }));
+    }
+
+    // ============ 4. 频率限流 ============
+
+    #[test]
+    fn rate_limited_apigw_0308() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("APIGW.0308", "throttled"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::RateLimited {
+                retry_after: None,
+                ..
+            }
+        ));
+    }
+
+    // ============ 5. 记录已存在 ============
+
+    #[test]
+    fn record_exists_dns_0312() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0312", "name exists"),
+            ctx_with_record("www", ""),
+        );
+        assert!(matches!(err, ProviderError::RecordExists { .. }));
+    }
+
+    #[test]
+    fn record_exists_dns_0335() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0335", "duplicate"),
+            ctx_with_record("mx", ""),
+        );
+        assert!(matches!(err, ProviderError::RecordExists { .. }));
+    }
+
+    #[test]
+    fn record_exists_dns_0016() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0016", "conflict"),
+            ctx_with_record("txt", ""),
+        );
+        assert!(matches!(err, ProviderError::RecordExists { .. }));
+    }
+
+    // ============ 6. 记录不存在 ============
+
+    #[test]
+    fn record_not_found_dns_0313() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0313", "not found"),
+            ctx_with_record("", "rec-123"),
+        );
+        assert!(matches!(err, ProviderError::RecordNotFound { .. }));
+    }
+
+    #[test]
+    fn record_not_found_dns_0004() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0004", "not found"),
+            ctx_with_record("", "rec-456"),
+        );
+        assert!(matches!(err, ProviderError::RecordNotFound { .. }));
+    }
+
+    // ============ 7. 域名不存在 ============
+
+    #[test]
+    fn domain_not_found_dns_0302() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0302", "zone not found"),
+            ctx_with_domain("example.com"),
+        );
+        assert!(matches!(err, ProviderError::DomainNotFound { .. }));
+    }
+
+    #[test]
+    fn domain_not_found_dns_0101() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0101", "zone not found"),
+            ctx_with_domain("example.com"),
+        );
+        assert!(matches!(err, ProviderError::DomainNotFound { .. }));
+    }
+
+    #[test]
+    fn domain_not_found_dns_1206() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.1206", "invalid domain"),
+            ctx_with_domain("bad.example"),
+        );
+        assert!(matches!(err, ProviderError::DomainNotFound { .. }));
+    }
+
+    // ============ 8. 域名被锁定 ============
+
+    #[test]
+    fn domain_locked_dns_0213() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0213", "suspended"),
+            ctx_with_domain("locked.com"),
+        );
+        assert!(matches!(err, ProviderError::DomainLocked { .. }));
+    }
+
+    #[test]
+    fn domain_locked_dns_0214() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0214", "abnormal"),
+            ctx_with_domain("locked.com"),
+        );
+        assert!(matches!(err, ProviderError::DomainLocked { .. }));
+    }
+
+    #[test]
+    fn domain_locked_dns_0209() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0209", "not normal"),
+            ctx_with_domain("locked.com"),
+        );
+        assert!(matches!(err, ProviderError::DomainLocked { .. }));
+    }
+
+    #[test]
+    fn domain_locked_dns_2003() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.2003", "frozen"),
+            ctx_with_domain("locked.com"),
+        );
+        assert!(matches!(err, ProviderError::DomainLocked { .. }));
+    }
+
+    // ============ 9. 参数无效 - TTL ============
+
+    #[test]
+    fn invalid_param_ttl_dns_0303() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0303", "ttl invalid"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "ttl"
+        ));
+    }
+
+    #[test]
+    fn invalid_param_ttl_dns_0319() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0319", "ttl out of range"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "ttl"
+        ));
+    }
+
+    // ============ 10. 参数无效 - type ============
+
+    #[test]
+    fn invalid_param_type_dns_0307() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0307", "bad type"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "type"
+        ));
+    }
+
+    // ============ 11. 参数无效 - value ============
+
+    #[test]
+    fn invalid_param_value_dns_0308() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0308", "bad value"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "value"
+        ));
+    }
+
+    // ============ 12. 参数无效 - name ============
+
+    #[test]
+    fn invalid_param_name_dns_0304() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0304", "bad name"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "name"
+        ));
+    }
+
+    // ============ 13. 参数无效 - subdomain ============
+
+    #[test]
+    fn invalid_param_subdomain_dns_0321() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0321", "too deep"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "subdomain"
+        ));
+    }
+
+    // ============ 14. 参数无效 - weight ============
+
+    #[test]
+    fn invalid_param_weight_dns_0323() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0323", "bad weight"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "weight"
+        ));
+    }
+
+    // ============ 15. 参数无效 - line ============
+
+    #[test]
+    fn invalid_param_line_dns_0806() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0806", "unsupported line"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "line"
+        ));
+    }
+
+    // ============ 16. 参数无效 - line_group ============
+
+    #[test]
+    fn invalid_param_line_group_dns_1702() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.1702", "invalid line in group"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "line_group"
+        ));
+    }
+
+    // ============ 17. 参数无效 - record_id ============
+
+    #[test]
+    fn invalid_param_record_id_dns_0309() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0309", "bad record id"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "record_id"
+        ));
+    }
+
+    // ============ 18. 参数无效 - description ============
+
+    #[test]
+    fn invalid_param_description_dns_0206() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0206", "description too long"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "description"
+        ));
+    }
+
+    // ============ 19. 网络错误 ============
+
+    #[test]
+    fn network_error_apigw_0201() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("APIGW.0201", "backend unavailable"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::NetworkError { .. }));
+    }
+
+    #[test]
+    fn network_error_dns_0012() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0012", "vpc error"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::NetworkError { .. }));
+    }
+
+    // ============ 20. Fallback - unknown code ============
+
+    #[test]
+    fn fallback_unknown_code() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("TOTALLY.UNKNOWN", "mystery error"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::Unknown {
+                ref raw_code,
+                ref raw_message,
+                ..
+            } if raw_code.as_deref() == Some("TOTALLY.UNKNOWN")
+                && raw_message == "mystery error"
+        ));
+    }
+
+    // ============ 21. Fallback - no code ============
+
+    #[test]
+    fn fallback_no_code() {
+        let p = provider();
+        let err = p.map_error(RawApiError::new("something broke"), default_ctx());
+        assert!(matches!(
+            err,
+            ProviderError::Unknown {
+                ref raw_code,
+                ref raw_message,
+                ..
+            } if raw_code.is_none() && raw_message == "something broke"
+        ));
+    }
+
+    // ============ 验证 provider_name ============
+
+    #[test]
+    fn provider_name_is_huaweicloud() {
+        let p = provider();
+        assert_eq!(p.provider_name(), "huaweicloud");
+    }
+
+    // ============ 验证上下文字段传递 ============
+
+    #[test]
+    fn record_exists_carries_record_name() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0312", "exists"),
+            ctx_with_record("www.example.com", ""),
+        );
+        match err {
+            ProviderError::RecordExists { record_name, .. } => {
+                assert_eq!(record_name, "www.example.com");
+            }
+            other => panic!("expected RecordExists, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn record_not_found_carries_record_id() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0313", "not found"),
+            ctx_with_record("", "rec-abc-123"),
+        );
+        match err {
+            ProviderError::RecordNotFound { record_id, .. } => {
+                assert_eq!(record_id, "rec-abc-123");
+            }
+            other => panic!("expected RecordNotFound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn domain_not_found_carries_domain() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0302", "zone gone"),
+            ctx_with_domain("example.org"),
+        );
+        match err {
+            ProviderError::DomainNotFound { domain, .. } => {
+                assert_eq!(domain, "example.org");
+            }
+            other => panic!("expected DomainNotFound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn domain_locked_carries_domain() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DNS.0213", "suspended"),
+            ctx_with_domain("frozen.io"),
+        );
+        match err {
+            ProviderError::DomainLocked { domain, .. } => {
+                assert_eq!(domain, "frozen.io");
+            }
+            other => panic!("expected DomainLocked, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn default_context_yields_empty_strings() {
+        let p = provider();
+        let err = p.map_error(RawApiError::with_code("DNS.0312", "exists"), default_ctx());
+        match err {
+            ProviderError::RecordExists { record_name, .. } => {
+                assert_eq!(record_name, "");
+            }
+            other => panic!("expected RecordExists, got {other:?}"),
+        }
+    }
+}

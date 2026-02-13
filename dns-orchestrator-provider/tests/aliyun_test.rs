@@ -27,11 +27,7 @@ async fn test_aliyun_validate_credentials() {
     let ctx = TestContext::aliyun().expect("创建测试上下文失败");
     let result = ctx.provider.validate_credentials().await;
 
-    assert!(
-        result.is_ok(),
-        "validate_credentials 调用失败: {:?}",
-        result
-    );
+    assert!(result.is_ok(), "validate_credentials 调用失败: {result:?}");
     assert!(result.unwrap(), "凭证应该有效");
 
     println!("✓ validate_credentials 测试通过");
@@ -50,7 +46,7 @@ async fn test_aliyun_list_domains() {
     let params = PaginationParams::default();
 
     let result = ctx.provider.list_domains(&params).await;
-    assert!(result.is_ok(), "list_domains 调用失败: {:?}", result);
+    assert!(result.is_ok(), "list_domains 调用失败: {result:?}");
 
     let response = result.unwrap();
     assert!(!response.items.is_empty(), "域名列表不应为空");
@@ -74,7 +70,7 @@ async fn test_aliyun_get_domain() {
     let domain_id = ctx.find_domain_id().await.expect("找不到测试域名");
 
     let result = ctx.provider.get_domain(&domain_id).await;
-    assert!(result.is_ok(), "get_domain 调用失败: {:?}", result);
+    assert!(result.is_ok(), "get_domain 调用失败: {result:?}");
 
     let domain = result.unwrap();
     assert_eq!(domain.name, ctx.domain, "域名名称不匹配");
@@ -96,7 +92,7 @@ async fn test_aliyun_list_records() {
 
     let params = RecordQueryParams::default();
     let result = ctx.provider.list_records(&domain_id, &params).await;
-    assert!(result.is_ok(), "list_records 调用失败: {:?}", result);
+    assert!(result.is_ok(), "list_records 调用失败: {result:?}");
 
     let response = result.unwrap();
     println!(

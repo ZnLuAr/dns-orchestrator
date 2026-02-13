@@ -201,3 +201,292 @@ impl ProviderErrorMapper for DnspodProvider {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::traits::RawApiError;
+
+    fn provider() -> DnspodProvider {
+        DnspodProvider::new(String::new(), String::new())
+    }
+
+    fn default_ctx() -> ErrorContext {
+        ErrorContext::default()
+    }
+
+    fn ctx_with_record_name(name: &str) -> ErrorContext {
+        ErrorContext {
+            record_name: Some(name.to_string()),
+            ..Default::default()
+        }
+    }
+
+    fn ctx_with_domain(domain: &str) -> ErrorContext {
+        ErrorContext {
+            domain: Some(domain.to_string()),
+            ..Default::default()
+        }
+    }
+
+    // ---- 认证错误 ----
+
+    #[test]
+    fn auth_failure_maps_to_invalid_credentials() {
+        let p = provider();
+        for code in [
+            "AuthFailure",
+            "AuthFailure.InvalidSecretId",
+            "InvalidParameter.LoginTokenNotExists",
+        ] {
+            let raw = RawApiError::with_code(code, "auth failed");
+            let err = p.map_error(raw, default_ctx());
+            assert!(
+                matches!(err, ProviderError::InvalidCredentials { .. }),
+                "expected InvalidCredentials for code '{code}', got {err:?}"
+            );
+        }
+    }
+
+    // ---- 配额限制 ----
+
+    #[test]
+    fn quota_codes_map_to_quota_exceeded() {
+        let p = provider();
+        for code in [
+            "LimitExceeded",
+            "LimitExceeded.AAAACountLimit",
+            "RequestLimitExceeded.IPLimitExceeded",
+        ] {
+            let raw = RawApiError::with_code(code, "quota hit");
+            let err = p.map_error(raw, default_ctx());
+            assert!(
+                matches!(err, ProviderError::QuotaExceeded { .. }),
+                "expected QuotaExceeded for code '{code}', got {err:?}"
+            );
+        }
+    }
+
+    // ---- 频率限流 ----
+
+    #[test]
+    fn rate_limit_codes_map_to_rate_limited() {
+        let p = provider();
+        for code in [
+            "RequestLimitExceeded",
+            "FailedOperation.FrequencyLimit",
+            "InvalidParameter.OperationIsTooFrequent",
+        ] {
+            let raw = RawApiError::with_code(code, "slow down");
+            let err = p.map_error(raw, default_ctx());
+            assert!(
+                matches!(
+                    err,
+                    ProviderError::RateLimited {
+                        retry_after: None,
+                        ..
+                    }
+                ),
+                "expected RateLimited for code '{code}', got {err:?}"
+            );
+        }
+    }
+
+    // ---- 记录已存在 ----
+
+    #[test]
+    fn record_exist_maps_to_record_exists() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.DomainRecordExist", "dup");
+        let err = p.map_error(raw, ctx_with_record_name("www"));
+        assert!(
+            matches!(err, ProviderError::RecordExists { ref record_name, .. } if record_name == "www"),
+            "expected RecordExists, got {err:?}"
+        );
+    }
+
+    // ---- 域名不存在 ----
+
+    #[test]
+    fn domain_not_found_codes() {
+        let p = provider();
+        for code in [
+            "ResourceNotFound.NoDataOfDomain",
+            "InvalidParameterValue.DomainNotExists",
+        ] {
+            let raw = RawApiError::with_code(code, "no domain");
+            let err = p.map_error(raw, ctx_with_domain("example.com"));
+            assert!(
+                matches!(err, ProviderError::DomainNotFound { ref domain, .. } if domain == "example.com"),
+                "expected DomainNotFound for code '{code}', got {err:?}"
+            );
+        }
+    }
+
+    // ---- 域名被锁定 ----
+
+    #[test]
+    fn domain_locked_codes() {
+        let p = provider();
+        for code in [
+            "FailedOperation.DomainIsLocked",
+            "FailedOperation.DomainIsSpam",
+        ] {
+            let raw = RawApiError::with_code(code, "locked");
+            let err = p.map_error(raw, ctx_with_domain("example.com"));
+            assert!(
+                matches!(err, ProviderError::DomainLocked { ref domain, .. } if domain == "example.com"),
+                "expected DomainLocked for code '{code}', got {err:?}"
+            );
+        }
+    }
+
+    // ---- 权限被拒绝 ----
+
+    #[test]
+    fn permission_denied_codes() {
+        let p = provider();
+        for code in [
+            "OperationDenied",
+            "UnauthorizedOperation",
+            "FailedOperation.NotDomainOwner",
+        ] {
+            let raw = RawApiError::with_code(code, "denied");
+            let err = p.map_error(raw, default_ctx());
+            assert!(
+                matches!(err, ProviderError::PermissionDenied { .. }),
+                "expected PermissionDenied for code '{code}', got {err:?}"
+            );
+        }
+    }
+
+    // ---- 参数无效 - 线路 ----
+
+    #[test]
+    fn invalid_param_line() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.RecordLineInvalid", "bad line");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "line"),
+            "expected InvalidParameter(line), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - 记录类型 ----
+
+    #[test]
+    fn invalid_param_type() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.RecordTypeInvalid", "bad type");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "type"),
+            "expected InvalidParameter(type), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - 记录值 ----
+
+    #[test]
+    fn invalid_param_value() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.RecordValueInvalid", "bad value");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "value"),
+            "expected InvalidParameter(value), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - 子域名 ----
+
+    #[test]
+    fn invalid_param_subdomain() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.SubdomainInvalid", "bad sub");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "subdomain"),
+            "expected InvalidParameter(subdomain), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - TTL ----
+
+    #[test]
+    fn invalid_param_ttl() {
+        let p = provider();
+        let raw = RawApiError::with_code("LimitExceeded.RecordTtlLimit", "ttl too high");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "ttl"),
+            "expected InvalidParameter(ttl), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - MX ----
+
+    #[test]
+    fn invalid_param_mx() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.MxInvalid", "bad mx");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "mx"),
+            "expected InvalidParameter(mx), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - 域名 ----
+
+    #[test]
+    fn invalid_param_domain() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.DomainIdInvalid", "bad domain id");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "domain"),
+            "expected InvalidParameter(domain), got {err:?}"
+        );
+    }
+
+    // ---- 参数无效 - 记录ID ----
+
+    #[test]
+    fn invalid_param_record_id() {
+        let p = provider();
+        let raw = RawApiError::with_code("InvalidParameter.RecordIdInvalid", "bad record id");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::InvalidParameter { ref param, .. } if param == "record_id"),
+            "expected InvalidParameter(record_id), got {err:?}"
+        );
+    }
+
+    // ---- Fallback: 未知错误码 ----
+
+    #[test]
+    fn unknown_code_maps_to_unknown() {
+        let p = provider();
+        let raw = RawApiError::with_code("SomeNewError.NeverSeenBefore", "surprise");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::Unknown { ref raw_code, .. } if raw_code.as_deref() == Some("SomeNewError.NeverSeenBefore")),
+            "expected Unknown with raw_code, got {err:?}"
+        );
+    }
+
+    // ---- Fallback: 无错误码 ----
+
+    #[test]
+    fn no_code_maps_to_unknown() {
+        let p = provider();
+        let raw = RawApiError::new("something went wrong");
+        let err = p.map_error(raw, default_ctx());
+        assert!(
+            matches!(err, ProviderError::Unknown { ref raw_code, .. } if raw_code.is_none()),
+            "expected Unknown with no raw_code, got {err:?}"
+        );
+    }
+}

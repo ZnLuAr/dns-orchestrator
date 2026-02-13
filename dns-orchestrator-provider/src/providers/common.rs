@@ -183,6 +183,82 @@ pub fn parse_mx_from_string(value: &str, provider: &str) -> Result<RecordData> {
     }
 }
 
+/// 从 type/value/priority 解析记录数据（Aliyun/DNSPod 格式）
+///
+/// MX 使用独立的 priority 参数，SRV/CAA 从 value 字符串解析。
+pub fn parse_record_data_with_priority(
+    record_type: &str,
+    value: &str,
+    priority: Option<u16>,
+    provider: &str,
+) -> Result<RecordData> {
+    match record_type {
+        "A" => Ok(RecordData::A {
+            address: value.to_string(),
+        }),
+        "AAAA" => Ok(RecordData::AAAA {
+            address: value.to_string(),
+        }),
+        "CNAME" => Ok(RecordData::CNAME {
+            target: value.to_string(),
+        }),
+        "MX" => Ok(RecordData::MX {
+            priority: priority.ok_or_else(|| ProviderError::ParseError {
+                provider: provider.to_string(),
+                detail: "MX record missing priority field".to_string(),
+            })?,
+            exchange: value.to_string(),
+        }),
+        "TXT" => Ok(RecordData::TXT {
+            text: value.to_string(),
+        }),
+        "NS" => Ok(RecordData::NS {
+            nameserver: value.to_string(),
+        }),
+        "SRV" => parse_srv_from_string(value, provider),
+        "CAA" => parse_caa_from_string(value, provider),
+        _ => Err(ProviderError::UnsupportedRecordType {
+            provider: provider.to_string(),
+            record_type: record_type.to_string(),
+        }),
+    }
+}
+
+/// 从 type/record 字符串解析记录数据（华为云格式）
+///
+/// MX priority 从 record 字符串解析（`"priority exchange"` 格式），
+/// SRV/CAA 同样从字符串解析。
+pub fn parse_record_data_from_string(
+    record_type: &str,
+    record: &str,
+    provider: &str,
+) -> Result<RecordData> {
+    match record_type {
+        "A" => Ok(RecordData::A {
+            address: record.to_string(),
+        }),
+        "AAAA" => Ok(RecordData::AAAA {
+            address: record.to_string(),
+        }),
+        "CNAME" => Ok(RecordData::CNAME {
+            target: record.to_string(),
+        }),
+        "MX" => parse_mx_from_string(record, provider),
+        "TXT" => Ok(RecordData::TXT {
+            text: record.to_string(),
+        }),
+        "NS" => Ok(RecordData::NS {
+            nameserver: record.to_string(),
+        }),
+        "SRV" => parse_srv_from_string(record, provider),
+        "CAA" => parse_caa_from_string(record, provider),
+        _ => Err(ProviderError::UnsupportedRecordType {
+            provider: provider.to_string(),
+            record_type: record_type.to_string(),
+        }),
+    }
+}
+
 /// 将 `RecordData` 转换为 (value, priority) 格式
 ///
 /// Aliyun 和 `DNSPod` 使用此格式：主值在 value 字段，MX priority 在独立字段。
@@ -656,5 +732,175 @@ mod tests {
         assert_eq!(record_type_to_string(&DnsRecordType::Ns), "NS");
         assert_eq!(record_type_to_string(&DnsRecordType::Srv), "SRV");
         assert_eq!(record_type_to_string(&DnsRecordType::Caa), "CAA");
+    }
+
+    // ============ parse_record_data_with_priority 测试 ============
+
+    #[test]
+    fn with_priority_all_simple_types() {
+        // A
+        assert_eq!(
+            parse_record_data_with_priority("A", "1.2.3.4", None, "test").unwrap(),
+            RecordData::A {
+                address: "1.2.3.4".to_string()
+            }
+        );
+        // AAAA
+        assert_eq!(
+            parse_record_data_with_priority("AAAA", "::1", None, "test").unwrap(),
+            RecordData::AAAA {
+                address: "::1".to_string()
+            }
+        );
+        // CNAME
+        assert_eq!(
+            parse_record_data_with_priority("CNAME", "cdn.example.com", None, "test").unwrap(),
+            RecordData::CNAME {
+                target: "cdn.example.com".to_string()
+            }
+        );
+        // TXT
+        assert_eq!(
+            parse_record_data_with_priority("TXT", "v=spf1", None, "test").unwrap(),
+            RecordData::TXT {
+                text: "v=spf1".to_string()
+            }
+        );
+        // NS
+        assert_eq!(
+            parse_record_data_with_priority("NS", "ns1.example.com", None, "test").unwrap(),
+            RecordData::NS {
+                nameserver: "ns1.example.com".to_string()
+            }
+        );
+        // MX
+        assert_eq!(
+            parse_record_data_with_priority("MX", "mail.example.com", Some(10), "test").unwrap(),
+            RecordData::MX {
+                priority: 10,
+                exchange: "mail.example.com".to_string()
+            }
+        );
+        // SRV
+        assert_eq!(
+            parse_record_data_with_priority("SRV", "10 20 443 srv.example.com", None, "test")
+                .unwrap(),
+            RecordData::SRV {
+                priority: 10,
+                weight: 20,
+                port: 443,
+                target: "srv.example.com".to_string()
+            }
+        );
+        // CAA
+        assert_eq!(
+            parse_record_data_with_priority("CAA", r#"0 issue "letsencrypt.org""#, None, "test")
+                .unwrap(),
+            RecordData::CAA {
+                flags: 0,
+                tag: "issue".to_string(),
+                value: "letsencrypt.org".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn with_priority_mx_missing_priority() {
+        let err =
+            parse_record_data_with_priority("MX", "mail.example.com", None, "aliyun").unwrap_err();
+        assert!(matches!(err, ProviderError::ParseError { provider, detail }
+            if provider == "aliyun" && detail.contains("priority")));
+    }
+
+    #[test]
+    fn with_priority_unsupported_type() {
+        let err = parse_record_data_with_priority("LOC", "some data", None, "test").unwrap_err();
+        assert!(
+            matches!(err, ProviderError::UnsupportedRecordType { record_type, .. } if record_type == "LOC")
+        );
+    }
+
+    // ============ parse_record_data_from_string 测试 ============
+
+    #[test]
+    fn from_string_all_simple_types() {
+        // A
+        assert_eq!(
+            parse_record_data_from_string("A", "1.2.3.4", "test").unwrap(),
+            RecordData::A {
+                address: "1.2.3.4".to_string()
+            }
+        );
+        // AAAA
+        assert_eq!(
+            parse_record_data_from_string("AAAA", "::1", "test").unwrap(),
+            RecordData::AAAA {
+                address: "::1".to_string()
+            }
+        );
+        // CNAME
+        assert_eq!(
+            parse_record_data_from_string("CNAME", "cdn.example.com", "test").unwrap(),
+            RecordData::CNAME {
+                target: "cdn.example.com".to_string()
+            }
+        );
+        // TXT
+        assert_eq!(
+            parse_record_data_from_string("TXT", "v=spf1", "test").unwrap(),
+            RecordData::TXT {
+                text: "v=spf1".to_string()
+            }
+        );
+        // NS
+        assert_eq!(
+            parse_record_data_from_string("NS", "ns1.example.com", "test").unwrap(),
+            RecordData::NS {
+                nameserver: "ns1.example.com".to_string()
+            }
+        );
+        // MX (from string format)
+        assert_eq!(
+            parse_record_data_from_string("MX", "10 mail.example.com", "test").unwrap(),
+            RecordData::MX {
+                priority: 10,
+                exchange: "mail.example.com".to_string()
+            }
+        );
+        // SRV
+        assert_eq!(
+            parse_record_data_from_string("SRV", "10 20 443 srv.example.com", "test").unwrap(),
+            RecordData::SRV {
+                priority: 10,
+                weight: 20,
+                port: 443,
+                target: "srv.example.com".to_string()
+            }
+        );
+        // CAA
+        assert_eq!(
+            parse_record_data_from_string("CAA", r#"0 issue "letsencrypt.org""#, "test").unwrap(),
+            RecordData::CAA {
+                flags: 0,
+                tag: "issue".to_string(),
+                value: "letsencrypt.org".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn from_string_mx_invalid_format() {
+        let err = parse_record_data_from_string("MX", "just-exchange", "huaweicloud").unwrap_err();
+        assert!(
+            matches!(err, ProviderError::ParseError { provider, .. } if provider == "huaweicloud")
+        );
+    }
+
+    #[test]
+    fn from_string_unsupported_type() {
+        let err = parse_record_data_from_string("PTR", "some data", "test").unwrap_err();
+        assert!(
+            matches!(err, ProviderError::UnsupportedRecordType { record_type, .. } if record_type == "PTR")
+        );
     }
 }

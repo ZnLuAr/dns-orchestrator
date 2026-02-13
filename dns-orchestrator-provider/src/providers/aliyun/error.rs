@@ -171,3 +171,341 @@ impl ProviderErrorMapper for AliyunProvider {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
+
+    fn provider() -> AliyunProvider {
+        AliyunProvider::new(String::new(), String::new())
+    }
+
+    fn default_ctx() -> ErrorContext {
+        ErrorContext::default()
+    }
+
+    // ---- 1. Auth errors ----
+
+    #[test]
+    fn map_invalid_access_key_id() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidAccessKeyId.NotFound", "key not found"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn map_signature_does_not_match() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("SignatureDoesNotMatch", "bad signature"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::InvalidCredentials { .. }));
+    }
+
+    // ---- 2. Record exists ----
+
+    #[test]
+    fn map_domain_record_duplicate() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DomainRecordDuplicate", "duplicate record"),
+            ErrorContext {
+                record_name: Some("www".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(err, ProviderError::RecordExists { .. }));
+    }
+
+    #[test]
+    fn map_domain_record_conflict() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DomainRecordConflict", "conflict"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::RecordExists { .. }));
+    }
+
+    // ---- 3. Record not found ----
+
+    #[test]
+    fn map_domain_record_not_belong_to_user() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DomainRecordNotBelongToUser", "not yours"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::RecordNotFound { .. }));
+    }
+
+    #[test]
+    fn map_invalid_record_id_not_found() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidRecordId.NotFound", "no such record"),
+            ErrorContext {
+                record_id: Some("12345".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(err, ProviderError::RecordNotFound { .. }));
+    }
+
+    #[test]
+    fn map_pdns_record_not_exists() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("PdnsRecord.NotExists", "not exists"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::RecordNotFound { .. }));
+    }
+
+    // ---- 4. Domain not found ----
+
+    #[test]
+    fn map_invalid_domain_name_no_exist() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidDomainName.NoExist", "domain not found"),
+            ErrorContext {
+                domain: Some("example.com".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(err, ProviderError::DomainNotFound { .. }));
+    }
+
+    #[test]
+    fn map_domain_not_found() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DomainNotFound", "not found"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::DomainNotFound { .. }));
+    }
+
+    #[test]
+    fn map_pdns_zone_not_exists() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("PdnsZone.NotExists", "zone missing"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::DomainNotFound { .. }));
+    }
+
+    // ---- 5. Quota exceeded ----
+
+    #[test]
+    fn map_quota_exceeded_a_record() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("QuotaExceeded.ARecord", "too many A records"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::QuotaExceeded { .. }));
+    }
+
+    #[test]
+    fn map_quota_exceeded_record() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("QuotaExceeded.Record", "limit reached"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::QuotaExceeded { .. }));
+    }
+
+    // ---- 6. Rate limited ----
+
+    #[test]
+    fn map_throttling() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("Throttling", "slow down"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::RateLimited { .. }));
+    }
+
+    #[test]
+    fn map_throttling_user() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("Throttling.User", "user throttled"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::RateLimited { .. }));
+    }
+
+    // ---- 7. Domain locked ----
+
+    #[test]
+    fn map_domain_record_locked() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("DomainRecordLocked", "record is locked"),
+            ErrorContext {
+                domain: Some("example.com".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(err, ProviderError::DomainLocked { .. }));
+    }
+
+    // ---- 8. Permission denied ----
+
+    #[test]
+    fn map_forbidden() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("Forbidden", "access denied"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::PermissionDenied { .. }));
+    }
+
+    #[test]
+    fn map_forbidden_risk_control() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("Forbidden.RiskControl", "risk control"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::PermissionDenied { .. }));
+    }
+
+    // ---- 9. Invalid parameter: type ----
+
+    #[test]
+    fn map_invalid_rr_type_empty() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidRR.TypeEmpty", "type is empty"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "type"
+        ));
+    }
+
+    // ---- 10. Invalid parameter: value ----
+
+    #[test]
+    fn map_invalid_rr_a_value() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidRR.AValue", "bad A value"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "value"
+        ));
+    }
+
+    // ---- 11. Invalid parameter: rr ----
+
+    #[test]
+    fn map_invalid_rr_rr_empty() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidRR.RrEmpty", "rr is empty"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "rr"
+        ));
+    }
+
+    // ---- 12. Invalid parameter: ttl ----
+
+    #[test]
+    fn map_subdomain_invalid_ttl() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("SubDomainInvalid.TTL", "invalid ttl"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "ttl"
+        ));
+    }
+
+    // ---- 13. Invalid parameter: line ----
+
+    #[test]
+    fn map_subdomain_invalid_line() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("SubDomainInvalid.Line", "invalid line"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "line"
+        ));
+    }
+
+    // ---- 14. Invalid parameter: priority ----
+
+    #[test]
+    fn map_subdomain_invalid_priority() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("SubDomainInvalid.Priority", "invalid priority"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "priority"
+        ));
+    }
+
+    // ---- 15. Invalid parameter: domain ----
+
+    #[test]
+    fn map_invalid_domain_name_format() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("InvalidDomainName.Format", "bad domain format"),
+            default_ctx(),
+        );
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { ref param, .. } if param == "domain"
+        ));
+    }
+
+    // ---- 16. Fallback: unknown code ----
+
+    #[test]
+    fn map_unknown_error_code() {
+        let p = provider();
+        let err = p.map_error(
+            RawApiError::with_code("SomeWeirdCode.NeverSeen", "weird stuff"),
+            default_ctx(),
+        );
+        assert!(matches!(err, ProviderError::Unknown { .. }));
+    }
+
+    // ---- 17. Fallback: no code ----
+
+    #[test]
+    fn map_no_error_code() {
+        let p = provider();
+        let err = p.map_error(RawApiError::new("something went wrong"), default_ctx());
+        assert!(matches!(err, ProviderError::Unknown { .. }));
+    }
+}

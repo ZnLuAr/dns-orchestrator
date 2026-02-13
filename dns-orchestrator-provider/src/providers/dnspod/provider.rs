@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{ProviderError, Result};
 use crate::providers::common::{
-    parse_caa_from_string, parse_srv_from_string, record_data_to_value_priority,
-    record_type_to_string,
+    parse_record_data_with_priority, record_data_to_value_priority, record_type_to_string,
 };
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper};
 use crate::types::{
@@ -33,36 +32,7 @@ impl DnspodProvider {
 
     /// 解析 `DNSPod` 记录为 RecordData（使用 mx 字段作为 priority）
     fn parse_record_data(record_type: &str, value: &str, mx: Option<u16>) -> Result<RecordData> {
-        match record_type {
-            "A" => Ok(RecordData::A {
-                address: value.to_string(),
-            }),
-            "AAAA" => Ok(RecordData::AAAA {
-                address: value.to_string(),
-            }),
-            "CNAME" => Ok(RecordData::CNAME {
-                target: value.to_string(),
-            }),
-            "MX" => Ok(RecordData::MX {
-                priority: mx.ok_or_else(|| ProviderError::ParseError {
-                    provider: "dnspod".to_string(),
-                    detail: "MX record missing priority field".to_string(),
-                })?,
-                exchange: value.to_string(),
-            }),
-            "TXT" => Ok(RecordData::TXT {
-                text: value.to_string(),
-            }),
-            "NS" => Ok(RecordData::NS {
-                nameserver: value.to_string(),
-            }),
-            "SRV" => parse_srv_from_string(value, "dnspod"),
-            "CAA" => parse_caa_from_string(value, "dnspod"),
-            _ => Err(ProviderError::UnsupportedRecordType {
-                provider: "dnspod".to_string(),
-                record_type: record_type.to_string(),
-            }),
-        }
+        parse_record_data_with_priority(record_type, value, mx, "dnspod")
     }
 
     /// 将 `RecordData` 转换为 `DNSPod` API 格式 (value, mx)

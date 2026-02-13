@@ -161,7 +161,7 @@ impl TestContext {
         })
     }
 
-    /// 创建 DNSPod 测试上下文
+    /// 创建 `DNSPod` 测试上下文
     pub fn dnspod() -> Option<Self> {
         let secret_id = env::var("DNSPOD_SECRET_ID").ok()?;
         let secret_key = env::var("DNSPOD_SECRET_KEY").ok()?;
@@ -199,7 +199,7 @@ impl TestContext {
         })
     }
 
-    /// 查找测试域名的 domain_id
+    /// 查找测试域名的 `domain_id`
     pub async fn find_domain_id(&mut self) -> Option<String> {
         if self.domain_id.is_some() {
             return self.domain_id.clone();

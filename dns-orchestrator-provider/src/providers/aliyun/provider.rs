@@ -6,8 +6,7 @@ use serde::Serialize;
 
 use crate::error::{ProviderError, Result};
 use crate::providers::common::{
-    parse_caa_from_string, parse_srv_from_string, record_data_to_value_priority,
-    record_type_to_string,
+    parse_record_data_with_priority, record_data_to_value_priority, record_type_to_string,
 };
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
@@ -45,36 +44,7 @@ impl AliyunProvider {
         value: &str,
         priority: Option<u16>,
     ) -> Result<RecordData> {
-        match record_type {
-            "A" => Ok(RecordData::A {
-                address: value.to_string(),
-            }),
-            "AAAA" => Ok(RecordData::AAAA {
-                address: value.to_string(),
-            }),
-            "CNAME" => Ok(RecordData::CNAME {
-                target: value.to_string(),
-            }),
-            "MX" => Ok(RecordData::MX {
-                priority: priority.ok_or_else(|| ProviderError::ParseError {
-                    provider: "aliyun".to_string(),
-                    detail: "MX record missing priority field".to_string(),
-                })?,
-                exchange: value.to_string(),
-            }),
-            "TXT" => Ok(RecordData::TXT {
-                text: value.to_string(),
-            }),
-            "NS" => Ok(RecordData::NS {
-                nameserver: value.to_string(),
-            }),
-            "SRV" => parse_srv_from_string(value, "aliyun"),
-            "CAA" => parse_caa_from_string(value, "aliyun"),
-            _ => Err(ProviderError::UnsupportedRecordType {
-                provider: "aliyun".to_string(),
-                record_type: record_type.to_string(),
-            }),
-        }
+        parse_record_data_with_priority(record_type, value, priority, "aliyun")
     }
 
     /// 将 `RecordData` 转换为阿里云 API 格式 (value, priority)

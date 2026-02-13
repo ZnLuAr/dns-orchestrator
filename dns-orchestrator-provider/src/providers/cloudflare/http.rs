@@ -26,18 +26,16 @@ impl CloudflareProvider {
         Ok(())
     }
 
-    /// 统一处理 Cloudflare API 响应
-    fn handle_cf_response<T: for<'de> Deserialize<'de>>(
+    /// 检查 Cloudflare 响应中的错误字段，失败则返回映射后的错误
+    fn check_cf_errors<T>(
         &self,
-        response_text: &str,
+        cf_response: &CloudflareResponse<T>,
         ctx: ErrorContext,
-    ) -> Result<T> {
-        let cf_response: CloudflareResponse<T> =
-            HttpUtils::parse_json(response_text, self.provider_name())?;
-
+    ) -> Result<()> {
         if !cf_response.success {
             let (code, message) = cf_response
                 .errors
+                .as_ref()
                 .and_then(|errors| {
                     errors
                         .first()
@@ -47,6 +45,19 @@ impl CloudflareProvider {
             log::error!("API 错误: {message}");
             return Err(self.map_error(RawApiError::with_code(code, message), ctx));
         }
+        Ok(())
+    }
+
+    /// 统一处理 Cloudflare API 响应
+    fn handle_cf_response<T: for<'de> Deserialize<'de>>(
+        &self,
+        response_text: &str,
+        ctx: ErrorContext,
+    ) -> Result<T> {
+        let cf_response: CloudflareResponse<T> =
+            HttpUtils::parse_json(response_text, self.provider_name())?;
+
+        self.check_cf_errors(&cf_response, ctx)?;
 
         cf_response
             .result
@@ -62,18 +73,7 @@ impl CloudflareProvider {
         let cf_response: CloudflareResponse<Vec<T>> =
             HttpUtils::parse_json(response_text, self.provider_name())?;
 
-        if !cf_response.success {
-            let (code, message) = cf_response
-                .errors
-                .and_then(|errors| {
-                    errors
-                        .first()
-                        .map(|e| (e.code.to_string(), e.message.clone()))
-                })
-                .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
-            log::error!("API 错误: {message}");
-            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
-        }
+        self.check_cf_errors(&cf_response, ctx)?;
 
         let total_count = cf_response.result_info.map_or(0, |i| i.total_count);
         let items = cf_response.result.unwrap_or_default();
@@ -253,18 +253,7 @@ impl CloudflareProvider {
         let cf_response: CloudflareResponse<serde_json::Value> =
             HttpUtils::parse_json(&response_text, self.provider_name())?;
 
-        if !cf_response.success {
-            let (code, message) = cf_response
-                .errors
-                .and_then(|errors| {
-                    errors
-                        .first()
-                        .map(|e| (e.code.to_string(), e.message.clone()))
-                })
-                .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
-            log::error!("API 错误: {message}");
-            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
-        }
+        self.check_cf_errors(&cf_response, ctx)?;
 
         Ok(())
     }

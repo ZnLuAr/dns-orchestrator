@@ -7,9 +7,8 @@ use serde::Serialize;
 
 use crate::error::{ProviderError, Result};
 use crate::providers::common::{
-    full_name_to_relative, normalize_domain_name, parse_caa_from_string, parse_mx_from_string,
-    parse_srv_from_string, record_data_to_single_string, record_type_to_string,
-    relative_to_full_name,
+    full_name_to_relative, normalize_domain_name, parse_record_data_from_string,
+    record_data_to_single_string, record_type_to_string, relative_to_full_name,
 };
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
@@ -45,30 +44,7 @@ impl HuaweicloudProvider {
     /// 解析华为云记录为 `RecordData`
     /// 华为云格式：MX/SRV/CAA 的所有字段都编码在 records 字符串中
     fn parse_record_data(record_type: &str, record: &str) -> Result<RecordData> {
-        match record_type {
-            "A" => Ok(RecordData::A {
-                address: record.to_string(),
-            }),
-            "AAAA" => Ok(RecordData::AAAA {
-                address: record.to_string(),
-            }),
-            "CNAME" => Ok(RecordData::CNAME {
-                target: record.to_string(),
-            }),
-            "MX" => parse_mx_from_string(record, "huaweicloud"),
-            "TXT" => Ok(RecordData::TXT {
-                text: record.to_string(),
-            }),
-            "NS" => Ok(RecordData::NS {
-                nameserver: record.to_string(),
-            }),
-            "SRV" => parse_srv_from_string(record, "huaweicloud"),
-            "CAA" => parse_caa_from_string(record, "huaweicloud"),
-            _ => Err(ProviderError::UnsupportedRecordType {
-                provider: "huaweicloud".to_string(),
-                record_type: record_type.to_string(),
-            }),
-        }
+        parse_record_data_from_string(record_type, record, "huaweicloud")
     }
 
     /// 将 `RecordData` 转换为华为云 API 格式（records 字符串）
