@@ -81,16 +81,6 @@ pub fn serialize_to_query_string<T: Serialize>(params: &T) -> Result<String> {
     Ok(query_string)
 }
 
-// ============ 阿里云 API 响应结构 ============
-
-#[derive(Debug, Deserialize)]
-pub struct AliyunResponse {
-    #[serde(rename = "Code")]
-    pub code: Option<String>,
-    #[serde(rename = "Message")]
-    pub message: Option<String>,
-}
-
 // ============ 域名相关结构 ============
 
 #[derive(Debug, Deserialize)]

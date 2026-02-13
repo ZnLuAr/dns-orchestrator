@@ -31,7 +31,7 @@ impl DnspodProvider {
     }
 
     /// 解析 `DNSPod` 记录为 RecordData（使用 mx 字段作为 priority）
-    fn parse_record_data(record_type: &str, value: &str, mx: Option<u16>) -> Result<RecordData> {
+    fn parse_record_data(record_type: &str, value: String, mx: Option<u16>) -> Result<RecordData> {
         parse_record_data_with_priority(record_type, value, mx, "dnspod")
     }
 
@@ -256,7 +256,7 @@ impl DnsProvider for DnspodProvider {
                     .unwrap_or_default()
                     .into_iter()
                     .filter_map(|r| {
-                        let data = Self::parse_record_data(&r.record_type, &r.value, r.mx).ok()?;
+                        let data = Self::parse_record_data(&r.record_type, r.value, r.mx).ok()?;
                         Some(DnsRecord {
                             id: r.record_id.to_string(),
                             domain_id: domain_id.to_string(),

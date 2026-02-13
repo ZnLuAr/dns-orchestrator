@@ -41,7 +41,7 @@ impl AliyunProvider {
     /// 解析阿里云记录为 `RecordData`
     fn parse_record_data(
         record_type: &str,
-        value: &str,
+        value: String,
         priority: Option<u16>,
     ) -> Result<RecordData> {
         parse_record_data_with_priority(record_type, value, priority, "aliyun")
@@ -239,7 +239,7 @@ impl DnsProvider for AliyunProvider {
             .unwrap_or_default()
             .into_iter()
             .filter_map(|r| {
-                let data = Self::parse_record_data(&r.record_type, &r.value, r.priority).ok()?;
+                let data = Self::parse_record_data(&r.record_type, r.value, r.priority).ok()?;
                 Some(DnsRecord {
                     id: r.record_id,
                     domain_id: domain_id.to_string(),

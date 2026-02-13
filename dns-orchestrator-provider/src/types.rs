@@ -201,14 +201,14 @@ impl RecordData {
     }
 
     /// 获取显示用的主要值（用于列表显示）
-    pub fn display_value(&self) -> String {
+    pub fn display_value(&self) -> &str {
         match self {
-            Self::A { address } | Self::AAAA { address } => address.clone(),
-            Self::CNAME { target } | Self::SRV { target, .. } => target.clone(),
-            Self::MX { exchange, .. } => exchange.clone(),
-            Self::TXT { text } => text.clone(),
-            Self::NS { nameserver } => nameserver.clone(),
-            Self::CAA { value, .. } => value.clone(),
+            Self::A { address } | Self::AAAA { address } => address,
+            Self::CNAME { target } | Self::SRV { target, .. } => target,
+            Self::MX { exchange, .. } => exchange,
+            Self::TXT { text } => text,
+            Self::NS { nameserver } => nameserver,
+            Self::CAA { value, .. } => value,
         }
     }
 }

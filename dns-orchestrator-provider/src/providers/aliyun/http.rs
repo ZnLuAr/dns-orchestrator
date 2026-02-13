@@ -3,12 +3,12 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::error::{ProviderError, Result};
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 
 use super::{
-    ALIYUN_DNS_HOST, ALIYUN_DNS_VERSION, AliyunProvider, AliyunResponse, EMPTY_BODY_SHA256,
+    ALIYUN_DNS_HOST, ALIYUN_DNS_VERSION, AliyunProvider, EMPTY_BODY_SHA256,
     serialize_to_query_string,
 };
 
@@ -57,15 +57,22 @@ impl AliyunProvider {
         )
         .await?;
 
-        // 5. 先检查是否有错误响应
-        if let Ok(error_response) = serde_json::from_str::<AliyunResponse>(&response_text)
-            && let (Some(code), Some(message)) = (error_response.code, error_response.message)
-        {
+        // 5. 解析为 Value（只做一次字符串解析）
+        let value: serde_json::Value = HttpUtils::parse_json(&response_text, self.provider_name())?;
+
+        // 6. 检查错误
+        if let (Some(code), Some(message)) = (
+            value.get("Code").and_then(|v| v.as_str()),
+            value.get("Message").and_then(|v| v.as_str()),
+        ) {
             log::error!("API 错误: {code} - {message}");
-            return Err(self.map_error(RawApiError::with_code(&code, &message), ctx));
+            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
         }
 
-        // 6. 解析成功响应
-        HttpUtils::parse_json(&response_text, self.provider_name())
+        // 7. 转换为目标类型（Value → T，不需要重新 tokenize）
+        serde_json::from_value(value).map_err(|e| ProviderError::ParseError {
+            provider: self.provider_name().to_string(),
+            detail: e.to_string(),
+        })
     }
 }

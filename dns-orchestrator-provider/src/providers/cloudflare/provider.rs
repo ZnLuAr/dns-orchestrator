@@ -46,21 +46,34 @@ impl CloudflareProvider {
         zone_id: &str,
         zone_name: &str,
     ) -> Result<DnsRecord> {
-        let data = self.parse_record_data(&cf_record)?;
+        let CloudflareDnsRecord {
+            id,
+            record_type,
+            name,
+            content,
+            ttl,
+            priority,
+            proxied,
+            created_on,
+            modified_on,
+            data,
+        } = cf_record;
+
+        let record_data = self.parse_record_data(&record_type, content, priority, data)?;
 
         Ok(DnsRecord {
-            id: cf_record.id,
+            id,
             domain_id: zone_id.to_string(),
-            name: full_name_to_relative(&cf_record.name, zone_name),
-            ttl: cf_record.ttl,
-            data,
-            proxied: cf_record.proxied,
-            created_at: cf_record.created_on.and_then(|s| {
+            name: full_name_to_relative(&name, zone_name),
+            ttl,
+            data: record_data,
+            proxied,
+            created_at: created_on.and_then(|s| {
                 chrono::DateTime::parse_from_rfc3339(&s)
                     .ok()
                     .map(|dt| dt.with_timezone(&chrono::Utc))
             }),
-            updated_at: cf_record.modified_on.and_then(|s| {
+            updated_at: modified_on.and_then(|s| {
                 chrono::DateTime::parse_from_rfc3339(&s)
                     .ok()
                     .map(|dt| dt.with_timezone(&chrono::Utc))
@@ -69,33 +82,30 @@ impl CloudflareProvider {
     }
 
     /// 解析 Cloudflare 记录为 `RecordData`
-    fn parse_record_data(&self, cf_record: &CloudflareDnsRecord) -> Result<RecordData> {
-        match cf_record.record_type.as_str() {
-            "A" => Ok(RecordData::A {
-                address: cf_record.content.clone(),
-            }),
-            "AAAA" => Ok(RecordData::AAAA {
-                address: cf_record.content.clone(),
-            }),
-            "CNAME" => Ok(RecordData::CNAME {
-                target: cf_record.content.clone(),
-            }),
+    fn parse_record_data(
+        &self,
+        record_type: &str,
+        content: String,
+        priority: Option<u16>,
+        data: Option<serde_json::Value>,
+    ) -> Result<RecordData> {
+        match record_type {
+            "A" => Ok(RecordData::A { address: content }),
+            "AAAA" => Ok(RecordData::AAAA { address: content }),
+            "CNAME" => Ok(RecordData::CNAME { target: content }),
             "MX" => Ok(RecordData::MX {
-                priority: cf_record
-                    .priority
+                priority: priority
                     .ok_or_else(|| self.parse_error("MX record missing priority field"))?,
-                exchange: cf_record.content.clone(),
+                exchange: content,
             }),
-            "TXT" => Ok(RecordData::TXT {
-                text: cf_record.content.clone(),
-            }),
+            "TXT" => Ok(RecordData::TXT { text: content }),
             "NS" => Ok(RecordData::NS {
-                nameserver: cf_record.content.clone(),
+                nameserver: content,
             }),
             "SRV" => {
                 // SRV 记录使用 data 字段
-                if let Some(ref data) = cf_record.data {
-                    let srv: CloudflareSrvData = serde_json::from_value(data.clone())
+                if let Some(data) = data {
+                    let srv: CloudflareSrvData = serde_json::from_value(data)
                         .map_err(|e| self.parse_error(format!("Failed to parse SRV data: {e}")))?;
                     Ok(RecordData::SRV {
                         priority: srv.priority,
@@ -105,10 +115,10 @@ impl CloudflareProvider {
                     })
                 } else {
                     // Fallback: 尝试从 content 解析
-                    let parts: Vec<&str> = cf_record.content.split_whitespace().collect();
+                    let parts: Vec<&str> = content.split_whitespace().collect();
                     if parts.len() >= 3 {
                         Ok(RecordData::SRV {
-                            priority: cf_record.priority.ok_or_else(|| {
+                            priority: priority.ok_or_else(|| {
                                 self.parse_error("SRV record missing priority field")
                             })?,
                             weight: parts[0].parse().map_err(|_| {
@@ -121,16 +131,15 @@ impl CloudflareProvider {
                         })
                     } else {
                         Err(self.parse_error(format!(
-                            "Invalid SRV record format: expected 'weight port target', got '{}'",
-                            cf_record.content
+                            "Invalid SRV record format: expected 'weight port target', got '{content}'"
                         )))
                     }
                 }
             }
             "CAA" => {
                 // CAA 记录使用 data 字段
-                if let Some(ref data) = cf_record.data {
-                    let caa: CloudflareCaaData = serde_json::from_value(data.clone())
+                if let Some(data) = data {
+                    let caa: CloudflareCaaData = serde_json::from_value(data)
                         .map_err(|e| self.parse_error(format!("Failed to parse CAA data: {e}")))?;
                     Ok(RecordData::CAA {
                         flags: caa.flags,
@@ -139,7 +148,7 @@ impl CloudflareProvider {
                     })
                 } else {
                     // Fallback: 尝试从 content 解析 "flags tag value"
-                    let parts: Vec<&str> = cf_record.content.splitn(3, ' ').collect();
+                    let parts: Vec<&str> = content.splitn(3, ' ').collect();
                     if parts.len() >= 3 {
                         Ok(RecordData::CAA {
                             flags: parts[0].parse().map_err(|_| {
@@ -150,15 +159,14 @@ impl CloudflareProvider {
                         })
                     } else {
                         Err(self.parse_error(format!(
-                            "Invalid CAA record format: expected 'flags tag value', got '{}'",
-                            cf_record.content
+                            "Invalid CAA record format: expected 'flags tag value', got '{content}'"
                         )))
                     }
                 }
             }
             _ => Err(ProviderError::UnsupportedRecordType {
                 provider: self.provider_name().to_string(),
-                record_type: cf_record.record_type.clone(),
+                record_type: record_type.to_string(),
             }),
         }
     }

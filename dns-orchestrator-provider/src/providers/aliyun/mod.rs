@@ -11,9 +11,9 @@ use reqwest::Client;
 use crate::providers::common::create_http_client;
 
 pub(crate) use types::{
-    AddDomainRecordResponse, AliyunResponse, DeleteDomainRecordResponse,
-    DescribeDomainInfoResponse, DescribeDomainRecordsResponse, DescribeDomainsResponse,
-    UpdateDomainRecordResponse, serialize_to_query_string,
+    AddDomainRecordResponse, DeleteDomainRecordResponse, DescribeDomainInfoResponse,
+    DescribeDomainRecordsResponse, DescribeDomainsResponse, UpdateDomainRecordResponse,
+    serialize_to_query_string,
 };
 
 pub(crate) const ALIYUN_DNS_HOST: &str = "alidns.cn-hangzhou.aliyuncs.com";

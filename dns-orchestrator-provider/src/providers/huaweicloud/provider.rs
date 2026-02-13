@@ -43,7 +43,7 @@ impl HuaweicloudProvider {
 
     /// 解析华为云记录为 `RecordData`
     /// 华为云格式：MX/SRV/CAA 的所有字段都编码在 records 字符串中
-    fn parse_record_data(record_type: &str, record: &str) -> Result<RecordData> {
+    fn parse_record_data(record_type: &str, record: String) -> Result<RecordData> {
         parse_record_data_from_string(record_type, record, "huaweicloud")
     }
 
@@ -202,7 +202,7 @@ impl DnsProvider for HuaweicloudProvider {
                 }
 
                 let value = r.records.as_ref()?.first()?.clone();
-                let data = Self::parse_record_data(&r.record_type, &value).ok()?;
+                let data = Self::parse_record_data(&r.record_type, value).ok()?;
 
                 Some(DnsRecord {
                     id: r.id,
