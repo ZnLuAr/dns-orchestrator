@@ -5,6 +5,8 @@ description = "DNS Orchestrator built with Tauri"
 license = "MIT"
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 edition = "2021"
+rust-version = "1.89"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -31,6 +33,7 @@ urlencoding.workspace = true
 
 # Common deps (all platforms)
 dns-orchestrator-core = { workspace = true, features = ["rustls"] }
+dns-orchestrator-toolbox = { workspace = true, features = ["rustls"] }
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true

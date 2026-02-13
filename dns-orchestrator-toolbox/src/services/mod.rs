@@ -10,7 +10,7 @@ mod ip;
 mod ssl;
 mod whois;
 
-use crate::error::CoreResult;
+use crate::error::ToolboxResult;
 use crate::types::{
     DnsLookupResult, DnsPropagationResult, DnssecResult, HttpHeaderCheckResult, IpLookupResult,
     WhoisResult,
@@ -24,7 +24,7 @@ pub struct ToolboxService;
 
 impl ToolboxService {
     /// WHOIS 查询
-    pub async fn whois_lookup(domain: &str) -> CoreResult<WhoisResult> {
+    pub async fn whois_lookup(domain: &str) -> ToolboxResult<WhoisResult> {
         whois::whois_lookup(domain, WHOIS_SERVERS).await
     }
 
@@ -33,12 +33,12 @@ impl ToolboxService {
         domain: &str,
         record_type: &str,
         nameserver: Option<&str>,
-    ) -> CoreResult<DnsLookupResult> {
+    ) -> ToolboxResult<DnsLookupResult> {
         dns::dns_lookup(domain, record_type, nameserver).await
     }
 
     /// IP/域名 地理位置查询
-    pub async fn ip_lookup(query: &str) -> CoreResult<IpLookupResult> {
+    pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
         ip::ip_lookup(query).await
     }
 
@@ -47,14 +47,14 @@ impl ToolboxService {
     pub async fn ssl_check(
         domain: &str,
         port: Option<u16>,
-    ) -> CoreResult<crate::types::SslCheckResult> {
+    ) -> ToolboxResult<crate::types::SslCheckResult> {
         ssl::ssl_check(domain, port).await
     }
 
     /// HTTP 头检查
     pub async fn http_header_check(
         request: &crate::types::HttpHeaderCheckRequest,
-    ) -> CoreResult<HttpHeaderCheckResult> {
+    ) -> ToolboxResult<HttpHeaderCheckResult> {
         http_headers::http_header_check(request).await
     }
 
@@ -62,12 +62,15 @@ impl ToolboxService {
     pub async fn dns_propagation_check(
         domain: &str,
         record_type: &str,
-    ) -> CoreResult<DnsPropagationResult> {
+    ) -> ToolboxResult<DnsPropagationResult> {
         dns_propagation::dns_propagation_check(domain, record_type).await
     }
 
     /// DNSSEC 验证
-    pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<DnssecResult> {
+    pub async fn dnssec_check(
+        domain: &str,
+        nameserver: Option<&str>,
+    ) -> ToolboxResult<DnssecResult> {
         dnssec::dnssec_check(domain, nameserver).await
     }
 }

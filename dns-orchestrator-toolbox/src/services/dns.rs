@@ -9,7 +9,7 @@ use hickory_resolver::{
     TokioResolver,
 };
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{DnsLookupRecord, DnsLookupResult};
 
 /// DNS 查询
@@ -17,7 +17,7 @@ pub async fn dns_lookup(
     domain: &str,
     record_type: &str,
     nameserver: Option<&str>,
-) -> CoreResult<DnsLookupResult> {
+) -> ToolboxResult<DnsLookupResult> {
     // 获取系统默认 DNS 服务器地址
     fn get_system_dns() -> String {
         let config = ResolverConfig::default();
@@ -43,9 +43,9 @@ pub async fn dns_lookup(
                 .build();
             (resolver, system_dns)
         } else {
-            let ns_ip: IpAddr = ns
-                .parse()
-                .map_err(|_| CoreError::ValidationError(format!("无效的 DNS 服务器地址: {ns}")))?;
+            let ns_ip: IpAddr = ns.parse().map_err(|_| {
+                ToolboxError::ValidationError(format!("无效的 DNS 服务器地址: {ns}"))
+            })?;
 
             let config = ResolverConfig::from_parts(
                 None,
@@ -101,7 +101,7 @@ pub async fn dns_lookup(
             }
         }
         _ => {
-            return Err(CoreError::ValidationError(format!(
+            return Err(ToolboxError::ValidationError(format!(
                 "不支持的记录类型: {record_type}"
             )));
         }

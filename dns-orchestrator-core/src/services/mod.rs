@@ -7,7 +7,6 @@ mod domain_service;
 mod import_export_service;
 mod migration_service;
 mod provider_metadata_service;
-mod toolbox;
 
 pub use account_service::{AccountService, RestoreResult};
 pub use dns_service::DnsService;
@@ -16,7 +15,6 @@ pub use domain_service::DomainService;
 pub use import_export_service::ImportExportService;
 pub use migration_service::{MigrationResult, MigrationService};
 pub use provider_metadata_service::ProviderMetadataService;
-pub use toolbox::ToolboxService;
 
 use std::sync::Arc;
 

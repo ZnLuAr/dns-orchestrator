@@ -1,7 +1,6 @@
-use dns_orchestrator_core::services::ToolboxService;
-use dns_orchestrator_core::types::{
+use dns_orchestrator_toolbox::{
     DnsLookupResult, DnsPropagationResult, DnssecResult, HttpHeaderCheckRequest,
-    HttpHeaderCheckResult, IpLookupResult, SslCheckResult, WhoisResult,
+    HttpHeaderCheckResult, IpLookupResult, SslCheckResult, ToolboxService, WhoisResult,
 };
 
 use crate::types::ApiResponse;

@@ -7,7 +7,7 @@ use log::debug;
 use reqwest::{Client, Method};
 use url::Url;
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{
     HttpHeader, HttpHeaderCheckRequest, HttpHeaderCheckResult, HttpMethod, SecurityHeaderAnalysis,
 };
@@ -29,7 +29,7 @@ const RECOMMENDED_SECURITY_HEADERS: &[&str] =
 /// HTTP 头检查
 pub async fn http_header_check(
     request: &HttpHeaderCheckRequest,
-) -> CoreResult<HttpHeaderCheckResult> {
+) -> ToolboxResult<HttpHeaderCheckResult> {
     debug!("[HTTP] Checking headers for {}", request.url);
     let start = Instant::now();
 
@@ -47,7 +47,9 @@ pub async fn http_header_check(
         .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
-        .map_err(|e| CoreError::NetworkError(format!("HTTP client initialization failed: {e}")))?;
+        .map_err(|e| {
+            ToolboxError::NetworkError(format!("HTTP client initialization failed: {e}"))
+        })?;
 
     // 转换 HTTP 方法
     let method = match request.method {
@@ -80,7 +82,7 @@ pub async fn http_header_check(
     let response = req_builder
         .send()
         .await
-        .map_err(|e| CoreError::NetworkError(format!("HTTP request failed: {e}")))?;
+        .map_err(|e| ToolboxError::NetworkError(format!("HTTP request failed: {e}")))?;
 
     let elapsed = start.elapsed();
     let status_code = response.status().as_u16();
@@ -103,7 +105,7 @@ pub async fn http_header_check(
     let body_bytes = response
         .bytes()
         .await
-        .map_err(|e| CoreError::NetworkError(format!("Failed to read response body: {e}")))?;
+        .map_err(|e| ToolboxError::NetworkError(format!("Failed to read response body: {e}")))?;
 
     // Content-Length - 计算实际大小
     let content_length = Some(body_bytes.len() as u64);

@@ -2,6 +2,7 @@
 members = [
     "dns-orchestrator-core",
     "dns-orchestrator-provider",
+    "dns-orchestrator-toolbox",
     "src-tauri",
     "src-tauri/tauri-plugin-apk-installer",
     "src-actix-web",
@@ -72,6 +73,7 @@ tauri-build = { version = "2", features = [] }
 # Internal crates
 dns-orchestrator-core = { path = "dns-orchestrator-core", default-features = false }
 dns-orchestrator-provider = { path = "dns-orchestrator-provider", default-features = false }
+dns-orchestrator-toolbox = { path = "dns-orchestrator-toolbox", default-features = false }
 migration = { path = "src-actix-web/migration" }
 tauri-plugin-apk-installer = { path = "src-tauri/tauri-plugin-apk-installer" }
 

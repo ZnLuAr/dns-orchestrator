@@ -3,21 +3,21 @@
 use regex::Regex;
 use whois_rust::{WhoIs, WhoIsLookupOptions};
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::WhoisResult;
 
 /// WHOIS 查询
-pub async fn whois_lookup(domain: &str, whois_servers: &str) -> CoreResult<WhoisResult> {
+pub async fn whois_lookup(domain: &str, whois_servers: &str) -> ToolboxResult<WhoisResult> {
     let whois = WhoIs::from_string(whois_servers)
-        .map_err(|e| CoreError::NetworkError(format!("初始化 WHOIS 客户端失败: {e}")))?;
+        .map_err(|e| ToolboxError::NetworkError(format!("初始化 WHOIS 客户端失败: {e}")))?;
 
     let options = WhoIsLookupOptions::from_string(domain)
-        .map_err(|e| CoreError::ValidationError(format!("无效的域名: {e}")))?;
+        .map_err(|e| ToolboxError::ValidationError(format!("无效的域名: {e}")))?;
 
     let raw = whois
         .lookup_async(options)
         .await
-        .map_err(|e| CoreError::NetworkError(format!("WHOIS 查询失败: {e}")))?;
+        .map_err(|e| ToolboxError::NetworkError(format!("WHOIS 查询失败: {e}")))?;
 
     Ok(parse_whois_response(domain, &raw))
 }

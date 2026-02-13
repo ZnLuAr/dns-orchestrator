@@ -2,25 +2,43 @@
 //!
 //! 使用 rustls 实现纯异步的 SSL 证书检查，支持完整证书链获取
 
+#[cfg(feature = "rustls")]
 use std::sync::Arc;
+#[cfg(feature = "rustls")]
 use std::time::Duration;
 
+#[cfg(feature = "rustls")]
 use log::{debug, error, trace, warn};
+#[cfg(feature = "rustls")]
 use rustls::crypto::CryptoProvider;
+#[cfg(feature = "rustls")]
 use rustls::{ClientConfig, RootCertStore};
+#[cfg(feature = "rustls")]
 use rustls_pki_types::{CertificateDer, ServerName};
+#[cfg(feature = "rustls")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(feature = "rustls")]
 use tokio::net::TcpStream;
+#[cfg(feature = "rustls")]
 use tokio::time::timeout;
+#[cfg(feature = "rustls")]
 use tokio_rustls::TlsConnector;
+#[cfg(feature = "rustls")]
 use x509_parser::prelude::*;
 
-use crate::error::CoreResult;
-use crate::types::{CertChainItem, SslCertInfo, SslCheckResult};
+#[cfg(not(feature = "rustls"))]
+use crate::error::ToolboxError;
+use crate::error::ToolboxResult;
+use crate::types::SslCheckResult;
+#[cfg(feature = "rustls")]
+use crate::types::{CertChainItem, SslCertInfo};
 
 // 超时配置常量
+#[cfg(feature = "rustls")]
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(feature = "rustls")]
 const TLS_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(feature = "rustls")]
 const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// 初始化 rustls CryptoProvider（仅初始化一次）
@@ -29,6 +47,7 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
 /// Panics if the default crypto provider cannot be installed. This is a fatal
 /// initialization error - TLS operations cannot function without a crypto provider,
 /// so there is no reasonable way to recover.
+#[cfg(feature = "rustls")]
 #[allow(clippy::panic)]
 fn ensure_crypto_provider() {
     use std::sync::Once;
@@ -45,6 +64,7 @@ fn ensure_crypto_provider() {
 }
 
 /// 检查 HTTP 连接是否可用（异步版本）
+#[cfg(feature = "rustls")]
 async fn check_http_connection(domain: &str, port: u16) -> bool {
     // 使用 timeout 包装整个 HTTP 检测过程
     let result = timeout(HTTP_TIMEOUT, async {
@@ -75,7 +95,7 @@ async fn check_http_connection(domain: &str, port: u16) -> bool {
 
 /// SSL 证书检查（使用 rustls 纯异步实现）
 #[cfg(feature = "rustls")]
-pub async fn ssl_check(domain: &str, port: Option<u16>) -> CoreResult<SslCheckResult> {
+pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslCheckResult> {
     // 确保 CryptoProvider 已初始化
     ensure_crypto_provider();
 
@@ -412,8 +432,9 @@ fn matches_domain(query: &str, pattern: &str) -> bool {
 
 /// 无 rustls 支持时的 SSL 检查（返回错误）
 #[cfg(not(feature = "rustls"))]
-pub async fn ssl_check(_domain: &str, _port: Option<u16>) -> CoreResult<SslCheckResult> {
-    Err(CoreError::ValidationError(
+#[allow(dead_code)]
+pub async fn ssl_check(_domain: &str, _port: Option<u16>) -> ToolboxResult<SslCheckResult> {
+    Err(ToolboxError::ValidationError(
         "SSL 检查功能未启用，请编译时启用 rustls feature".to_string(),
     ))
 }

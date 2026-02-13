@@ -7,7 +7,7 @@ use hickory_resolver::{
 };
 use serde::Deserialize;
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{IpGeoInfo, IpLookupResult};
 
 /// ipwhois.io 响应结构
@@ -41,7 +41,7 @@ struct IpWhoisConnection {
 }
 
 /// 查询单个 IP 的地理位置
-async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> CoreResult<IpGeoInfo> {
+async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> ToolboxResult<IpGeoInfo> {
     let url = format!(
         "https://ipwho.is/{ip}?fields=ip,success,message,type,country,country_code,region,city,latitude,longitude,timezone,connection"
     );
@@ -50,10 +50,10 @@ async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> CoreResult<IpGe
         .get(&url)
         .send()
         .await
-        .map_err(|e| CoreError::NetworkError(format!("请求失败: {e}")))?
+        .map_err(|e| ToolboxError::NetworkError(format!("请求失败: {e}")))?
         .json()
         .await
-        .map_err(|e| CoreError::NetworkError(format!("解析失败: {e}")))?;
+        .map_err(|e| ToolboxError::NetworkError(format!("解析失败: {e}")))?;
 
     if !response.success {
         let error_msg = match response.message.as_deref() {
@@ -65,7 +65,7 @@ async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> CoreResult<IpGe
             Some(msg) => format!("查询失败: {msg}"),
             None => "查询失败".to_string(),
         };
-        return Err(CoreError::NetworkError(error_msg));
+        return Err(ToolboxError::NetworkError(error_msg));
     }
 
     let ip_version = response.ip_type.unwrap_or_else(|| {
@@ -105,10 +105,10 @@ async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> CoreResult<IpGe
 }
 
 /// IP/域名 地理位置查询
-pub async fn ip_lookup(query: &str) -> CoreResult<IpLookupResult> {
+pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
     let query = query.trim().to_string();
     if query.is_empty() {
-        return Err(CoreError::ValidationError(
+        return Err(ToolboxError::ValidationError(
             "请输入 IP 地址或域名".to_string(),
         ));
     }
@@ -148,7 +148,7 @@ pub async fn ip_lookup(query: &str) -> CoreResult<IpLookupResult> {
     }
 
     if ips.is_empty() {
-        return Err(CoreError::NetworkError(format!("无法解析域名: {query}")));
+        return Err(ToolboxError::NetworkError(format!("无法解析域名: {query}")));
     }
 
     // 查询每个 IP 的地理位置
@@ -163,7 +163,7 @@ pub async fn ip_lookup(query: &str) -> CoreResult<IpLookupResult> {
     }
 
     if results.is_empty() {
-        return Err(CoreError::NetworkError(
+        return Err(ToolboxError::NetworkError(
             "所有 IP 地址查询均失败".to_string(),
         ));
     }

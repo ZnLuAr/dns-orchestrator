@@ -13,7 +13,7 @@ use hickory_resolver::{
     TokioResolver,
 };
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{DnskeyRecord, DnssecResult, DsRecord, RrsigRecord};
 
 /// Get algorithm name from algorithm number (RFC 8624)
@@ -91,7 +91,7 @@ fn extract_signature_record(
 }
 
 /// DNSSEC 验证
-pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<DnssecResult> {
+pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResult<DnssecResult> {
     // Get system default DNS server addresses
     fn get_system_dns() -> String {
         let config = ResolverConfig::default();
@@ -113,9 +113,9 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<
     let effective_ns = nameserver.filter(|s| !s.is_empty());
 
     let (resolver, used_nameserver) = if let Some(ns) = effective_ns {
-        let ns_ip: IpAddr = ns
-            .parse()
-            .map_err(|_| CoreError::ValidationError(format!("Invalid DNS server address: {ns}")))?;
+        let ns_ip: IpAddr = ns.parse().map_err(|_| {
+            ToolboxError::ValidationError(format!("Invalid DNS server address: {ns}"))
+        })?;
 
         let config = ResolverConfig::from_parts(
             None,

@@ -5,6 +5,11 @@ edition = "2021"
 description = "A Tauri plugin for installing APK files on Android using FileProvider"
 license = "MIT"
 links = "tauri-plugin-apk-installer"
+repository = "https://github.com/AptS-1547/dns-orchestrator"
+homepage = "https://github.com/AptS-1547/dns-orchestrator"
+keywords = ["tauri", "android", "apk", "plugin"]
+categories = ["os"]
+rust-version = "1.89"
 
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }

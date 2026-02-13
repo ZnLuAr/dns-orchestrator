@@ -6,7 +6,7 @@ use std::time::Instant;
 use futures::future::join_all;
 use tokio::time::{timeout, Duration};
 
-use crate::error::CoreResult;
+use crate::error::ToolboxResult;
 use crate::types::{DnsPropagationResult, DnsPropagationServer, DnsPropagationServerResult};
 
 use super::dns::dns_lookup;
@@ -150,7 +150,7 @@ fn calculate_consistency(results: &[DnsPropagationServerResult]) -> (f32, Vec<St
 pub async fn dns_propagation_check(
     domain: &str,
     record_type: &str,
-) -> CoreResult<DnsPropagationResult> {
+) -> ToolboxResult<DnsPropagationResult> {
     let servers = get_global_dns_servers();
     let start_time = Instant::now();
 

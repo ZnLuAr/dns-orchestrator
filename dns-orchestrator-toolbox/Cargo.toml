@@ -1,0 +1,62 @@
+[package]
+name = "dns-orchestrator-toolbox"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Network diagnostic toolbox: WHOIS, DNS lookup, IP geolocation, SSL certificate check, HTTP headers, DNSSEC validation"
+authors = ["AptS-1547 <apts-1547@esaps.net>"]
+repository = "https://github.com/AptS-1547/dns-orchestrator"
+homepage = "https://github.com/AptS-1547/dns-orchestrator"
+readme = "README.md"
+keywords = ["dns", "whois", "ssl", "dnssec", "network"]
+categories = ["network-programming", "web-programming"]
+rust-version = "1.89"
+
+[features]
+default = ["rustls"]
+rustls = ["dep:rustls", "dep:tokio-rustls", "dep:rustls-pki-types", "dep:webpki-roots", "dep:x509-parser"]
+
+[dependencies]
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Async
+tokio = { workspace = true, features = ["sync", "time", "net"] }
+futures.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Logging
+log.workspace = true
+
+# HTTP
+reqwest.workspace = true
+
+# WHOIS
+whois-rust = { version = "1.6", features = ["tokio"] }
+regex = "1"
+
+# DNS 查询
+hickory-resolver = { version = "0.25", features = ["dnssec-ring"] }
+
+# URL
+url = "2.5.8"
+
+# Time
+chrono.workspace = true
+
+# Crypto (DNSSEC)
+base64 = "0.22"
+hex.workspace = true
+
+# SSL 检查 (feature-gated)
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+tokio-rustls = { version = "0.26", optional = true }
+rustls-pki-types = { version = "1", optional = true }
+webpki-roots = { version = "1", optional = true }
+x509-parser = { version = "0.18", optional = true }
+
+[lints]
+workspace = true
