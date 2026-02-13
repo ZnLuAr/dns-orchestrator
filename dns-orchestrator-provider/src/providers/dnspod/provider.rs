@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{ProviderError, Result};
-use crate::providers::common::record_type_to_string;
+use crate::providers::common::{
+    parse_caa_from_string, parse_srv_from_string, record_data_to_value_priority,
+    record_type_to_string,
+};
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DomainStatus, FieldType, PaginatedResponse,
@@ -53,55 +56,8 @@ impl DnspodProvider {
             "NS" => Ok(RecordData::NS {
                 nameserver: value.to_string(),
             }),
-            "SRV" => {
-                // DNSPod SRV value 格式: "priority weight port target"（所有字段都在 value 中）
-                let parts: Vec<&str> = value.splitn(4, ' ').collect();
-                if parts.len() == 4 {
-                    Ok(RecordData::SRV {
-                        priority: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid SRV priority: '{}'", parts[0]),
-                        })?,
-                        weight: parts[1].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid SRV weight: '{}'", parts[1]),
-                        })?,
-                        port: parts[2].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid SRV port: '{}'", parts[2]),
-                        })?,
-                        target: parts[3].to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "dnspod".to_string(),
-                        detail: format!(
-                            "Invalid SRV record format: expected 'priority weight port target', got '{value}'"
-                        ),
-                    })
-                }
-            }
-            "CAA" => {
-                // DNSPod CAA value 格式: "flags tag value"
-                let parts: Vec<&str> = value.splitn(3, ' ').collect();
-                if parts.len() >= 3 {
-                    Ok(RecordData::CAA {
-                        flags: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid CAA flags: '{}'", parts[0]),
-                        })?,
-                        tag: parts[1].to_string(),
-                        value: parts[2].trim_matches('"').to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "dnspod".to_string(),
-                        detail: format!(
-                            "Invalid CAA record format: expected 'flags tag value', got '{value}'"
-                        ),
-                    })
-                }
-            }
+            "SRV" => parse_srv_from_string(value, "dnspod"),
+            "CAA" => parse_caa_from_string(value, "dnspod"),
             _ => Err(ProviderError::UnsupportedRecordType {
                 provider: "dnspod".to_string(),
                 record_type: record_type.to_string(),
@@ -111,21 +67,7 @@ impl DnspodProvider {
 
     /// 将 `RecordData` 转换为 `DNSPod` API 格式 (value, mx)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
-        match data {
-            RecordData::A { address } | RecordData::AAAA { address } => (address.clone(), None),
-            RecordData::CNAME { target } => (target.clone(), None),
-            RecordData::MX { priority, exchange } => (exchange.clone(), Some(*priority)),
-            RecordData::TXT { text } => (text.clone(), None),
-            RecordData::NS { nameserver } => (nameserver.clone(), None),
-            // DNSPod SRV：所有字段都在 Value 中（priority weight port target）
-            RecordData::SRV {
-                priority,
-                weight,
-                port,
-                target,
-            } => (format!("{priority} {weight} {port} {target}"), None),
-            RecordData::CAA { flags, tag, value } => (format!("{flags} {tag} \"{value}\""), None),
-        }
+        record_data_to_value_priority(data)
     }
 }
 

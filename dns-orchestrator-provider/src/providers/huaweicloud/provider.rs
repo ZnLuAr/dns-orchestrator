@@ -7,7 +7,9 @@ use serde::Serialize;
 
 use crate::error::{ProviderError, Result};
 use crate::providers::common::{
-    full_name_to_relative, normalize_domain_name, record_type_to_string, relative_to_full_name,
+    full_name_to_relative, normalize_domain_name, parse_caa_from_string, parse_mx_from_string,
+    parse_srv_from_string, record_data_to_single_string, record_type_to_string,
+    relative_to_full_name,
 };
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
@@ -53,81 +55,15 @@ impl HuaweicloudProvider {
             "CNAME" => Ok(RecordData::CNAME {
                 target: record.to_string(),
             }),
-            "MX" => {
-                // 华为云 MX 格式: "priority exchange"
-                let parts: Vec<&str> = record.splitn(2, ' ').collect();
-                if parts.len() == 2 {
-                    Ok(RecordData::MX {
-                        priority: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid MX priority: '{}'", parts[0]),
-                        })?,
-                        exchange: parts[1].to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "huaweicloud".to_string(),
-                        detail: format!(
-                            "Invalid MX record format: expected 'priority exchange', got '{record}'"
-                        ),
-                    })
-                }
-            }
+            "MX" => parse_mx_from_string(record, "huaweicloud"),
             "TXT" => Ok(RecordData::TXT {
                 text: record.to_string(),
             }),
             "NS" => Ok(RecordData::NS {
                 nameserver: record.to_string(),
             }),
-            "SRV" => {
-                // 华为云 SRV 格式: "priority weight port target"
-                let parts: Vec<&str> = record.splitn(4, ' ').collect();
-                if parts.len() == 4 {
-                    Ok(RecordData::SRV {
-                        priority: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid SRV priority: '{}'", parts[0]),
-                        })?,
-                        weight: parts[1].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid SRV weight: '{}'", parts[1]),
-                        })?,
-                        port: parts[2].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid SRV port: '{}'", parts[2]),
-                        })?,
-                        target: parts[3].to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "huaweicloud".to_string(),
-                        detail: format!(
-                            "Invalid SRV record format: expected 'priority weight port target', got '{record}'"
-                        ),
-                    })
-                }
-            }
-            "CAA" => {
-                // 华为云 CAA 格式: "flags tag value"
-                let parts: Vec<&str> = record.splitn(3, ' ').collect();
-                if parts.len() >= 3 {
-                    Ok(RecordData::CAA {
-                        flags: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid CAA flags: '{}'", parts[0]),
-                        })?,
-                        tag: parts[1].to_string(),
-                        value: parts[2].trim_matches('"').to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "huaweicloud".to_string(),
-                        detail: format!(
-                            "Invalid CAA record format: expected 'flags tag value', got '{record}'"
-                        ),
-                    })
-                }
-            }
+            "SRV" => parse_srv_from_string(record, "huaweicloud"),
+            "CAA" => parse_caa_from_string(record, "huaweicloud"),
             _ => Err(ProviderError::UnsupportedRecordType {
                 provider: "huaweicloud".to_string(),
                 record_type: record_type.to_string(),
@@ -137,20 +73,7 @@ impl HuaweicloudProvider {
 
     /// 将 `RecordData` 转换为华为云 API 格式（records 字符串）
     fn record_data_to_record_string(data: &RecordData) -> String {
-        match data {
-            RecordData::A { address } | RecordData::AAAA { address } => address.clone(),
-            RecordData::CNAME { target } => target.clone(),
-            RecordData::MX { priority, exchange } => format!("{priority} {exchange}"),
-            RecordData::TXT { text } => text.clone(),
-            RecordData::NS { nameserver } => nameserver.clone(),
-            RecordData::SRV {
-                priority,
-                weight,
-                port,
-                target,
-            } => format!("{priority} {weight} {port} {target}"),
-            RecordData::CAA { flags, tag, value } => format!("{flags} {tag} \"{value}\""),
-        }
+        record_data_to_single_string(data)
     }
 }
 

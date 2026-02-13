@@ -2,9 +2,10 @@ use async_trait::async_trait;
 
 use crate::error::{ProviderError, Result};
 use crate::types::{
-    BatchCreateResult, BatchDeleteResult, BatchUpdateItem, BatchUpdateResult,
-    CreateDnsRecordRequest, DnsRecord, PaginatedResponse, PaginationParams, ProviderDomain,
-    ProviderMetadata, RecordQueryParams, UpdateDnsRecordRequest,
+    BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
+    BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest, DnsRecord,
+    PaginatedResponse, PaginationParams, ProviderDomain, ProviderMetadata, RecordQueryParams,
+    UpdateDnsRecordRequest,
 };
 
 /// 原始 API 错误（内部使用）
@@ -119,61 +120,124 @@ pub trait DnsProvider: Send + Sync {
 
     /// 批量创建 DNS 记录
     ///
-    /// # 实现状态
-    /// 当前为占位实现，调用会 panic。
+    /// 默认实现逐条调用 `create_record()`，收集成功/失败结果。
+    /// Provider 可覆写以使用原生批量 API 提升性能。
     ///
-    /// # TODO - 实现计划
-    /// - [ ] Cloudflare: 使用 `POST /zones/{zone_id}/dns_records/batch` API
-    ///       文档: <https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/batch>/
-    ///       预期性能: 10,000 条记录快 850 倍
-    /// - [ ] `DNSPod`: 使用 `CreateRecordBatch` API（异步任务）
-    ///       文档: <https://cloud.tencent.com/document/product/1427/56194>
-    /// - [ ] Aliyun: 调研批量 API 支持
-    ///       文档: <https://help.aliyun.com/zh/dns/pubz-batch-operation>/
-    /// - [ ] Huaweicloud: 调研批量 API 支持
-    ///
-    /// # 未来优化
-    /// 默认实现可使用客户端并行循环 `join_all(create_record())`
+    /// # TODO — 各 Provider 原生批量 API 覆写
+    /// - [ ] Cloudflare: `POST /zones/{zone_id}/dns_records/batch`
+    ///       <https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/batch/>
+    /// - [ ] `DNSPod`: `CreateRecordBatch`（异步任务）
+    ///       <https://cloud.tencent.com/document/product/1427/56194>
+    /// - [ ] Aliyun: 批量操作 API
+    ///       <https://help.aliyun.com/zh/dns/pubz-batch-operation/>
+    /// - [ ] Huaweicloud: 待调研
     async fn batch_create_records(
         &self,
-        _requests: &[CreateDnsRecordRequest],
+        requests: &[CreateDnsRecordRequest],
     ) -> Result<BatchCreateResult> {
-        unimplemented!("批量创建 API 待实现 - 请查看 trait 文档中的 TODO 列表")
+        let futures: Vec<_> = requests.iter().map(|req| self.create_record(req)).collect();
+        let results = futures::future::join_all(futures).await;
+
+        let mut created_records = Vec::new();
+        let mut failures = Vec::new();
+
+        for (i, result) in results.into_iter().enumerate() {
+            match result {
+                Ok(record) => created_records.push(record),
+                Err(e) => failures.push(BatchCreateFailure {
+                    request_index: i,
+                    record_name: requests[i].name.clone(),
+                    reason: e.to_string(),
+                }),
+            }
+        }
+
+        Ok(BatchCreateResult {
+            success_count: created_records.len(),
+            failed_count: failures.len(),
+            created_records,
+            failures,
+        })
     }
 
     /// 批量更新 DNS 记录
     ///
-    /// # 实现状态
-    /// 当前为占位实现，调用会 panic。
+    /// 默认实现逐条调用 `update_record()`，收集成功/失败结果。
+    /// Provider 可覆写以使用原生批量 API 提升性能。
     ///
-    /// # TODO - 实现计划
-    /// - [ ] Cloudflare: 使用批量 API
-    /// - [ ] `DNSPod`: 使用 `ModifyRecordBatch` API
+    /// # TODO — 各 Provider 原生批量 API 覆写
+    /// - [ ] Cloudflare: 批量 API
+    /// - [ ] `DNSPod`: `ModifyRecordBatch`
+    ///       <https://cloud.tencent.com/document/product/1427/56198>
+    /// - [ ] Huaweicloud: `BatchUpdateRecordSetWithLine`
+    ///       <https://support.huaweicloud.com/api-dns/BatchUpdateRecordSetWithLine.html>
     /// - [ ] Aliyun: 调研批量 API 支持
-    /// - [ ] Huaweicloud: 使用 `BatchUpdateRecordSetWithLine` API
-    ///       文档: <https://support.huaweicloud.com/api-dns/BatchUpdateRecordSetWithLine.html>
-    async fn batch_update_records(
-        &self,
-        _updates: &[BatchUpdateItem],
-    ) -> Result<BatchUpdateResult> {
-        unimplemented!("批量更新 API 待实现 - 请查看 trait 文档中的 TODO 列表")
+    async fn batch_update_records(&self, updates: &[BatchUpdateItem]) -> Result<BatchUpdateResult> {
+        let futures: Vec<_> = updates
+            .iter()
+            .map(|item| self.update_record(&item.record_id, &item.request))
+            .collect();
+        let results = futures::future::join_all(futures).await;
+
+        let mut updated_records = Vec::new();
+        let mut failures = Vec::new();
+
+        for (i, result) in results.into_iter().enumerate() {
+            match result {
+                Ok(record) => updated_records.push(record),
+                Err(e) => failures.push(BatchUpdateFailure {
+                    record_id: updates[i].record_id.clone(),
+                    reason: e.to_string(),
+                }),
+            }
+        }
+
+        Ok(BatchUpdateResult {
+            success_count: updated_records.len(),
+            failed_count: failures.len(),
+            updated_records,
+            failures,
+        })
     }
 
     /// 批量删除 DNS 记录
     ///
-    /// # 实现状态
-    /// 当前为占位实现，调用会 panic。
+    /// 默认实现逐条调用 `delete_record()`，收集成功/失败结果。
+    /// Provider 可覆写以使用原生批量 API 提升性能。
     ///
-    /// # TODO - 实现计划
-    /// - [ ] Cloudflare: 使用批量 API
-    /// - [ ] `DNSPod`: 使用批量删除 API
+    /// # TODO — 各 Provider 原生批量 API 覆写
+    /// - [ ] Cloudflare: 批量 API
+    /// - [ ] `DNSPod`: 批量删除 API
     /// - [ ] Aliyun: 调研批量 API 支持
     /// - [ ] Huaweicloud: 调研批量 API 支持
     async fn batch_delete_records(
         &self,
-        _domain_id: &str,
-        _record_ids: &[String],
+        domain_id: &str,
+        record_ids: &[String],
     ) -> Result<BatchDeleteResult> {
-        unimplemented!("批量删除 API 待实现 - 请查看 trait 文档中的 TODO 列表")
+        let futures: Vec<_> = record_ids
+            .iter()
+            .map(|id| self.delete_record(id, domain_id))
+            .collect();
+        let results = futures::future::join_all(futures).await;
+
+        let mut success_count = 0;
+        let mut failures = Vec::new();
+
+        for (i, result) in results.into_iter().enumerate() {
+            match result {
+                Ok(()) => success_count += 1,
+                Err(e) => failures.push(BatchDeleteFailure {
+                    record_id: record_ids[i].clone(),
+                    reason: e.to_string(),
+                }),
+            }
+        }
+
+        Ok(BatchDeleteResult {
+            success_count,
+            failed_count: failures.len(),
+            failures,
+        })
     }
 }

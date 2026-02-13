@@ -36,7 +36,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message.clone()),
             },
 
-            // ============ 配额/频率限制 ============
+            // ============ 配额限制（资源用完，不可重试） ============
             Some(
                 "LimitExceeded"
                 | "LimitExceeded.AAAACountLimit"
@@ -54,17 +54,25 @@ impl ProviderErrorMapper for DnspodProvider {
                 | "LimitExceeded.SubdomainRollLimit"
                 | "LimitExceeded.SubdomainWcardLimit"
                 | "LimitExceeded.UrlCountLimit"
-                | "RequestLimitExceeded"
                 | "RequestLimitExceeded.GlobalRegionUinLimitExceeded"
                 | "RequestLimitExceeded.IPLimitExceeded"
                 | "RequestLimitExceeded.UinLimitExceeded"
                 | "RequestLimitExceeded.BatchTaskLimit"
-                | "RequestLimitExceeded.CreateDomainLimit"
+                | "RequestLimitExceeded.CreateDomainLimit",
+            ) => ProviderError::QuotaExceeded {
+                provider: self.provider_name().to_string(),
+                raw_message: Some(raw.message),
+            },
+
+            // ============ 频率限流（临时限制，可重试） ============
+            Some(
+                "RequestLimitExceeded"
                 | "RequestLimitExceeded.RequestLimitExceeded"
                 | "FailedOperation.FrequencyLimit"
                 | "InvalidParameter.OperationIsTooFrequent",
-            ) => ProviderError::QuotaExceeded {
+            ) => ProviderError::RateLimited {
                 provider: self.provider_name().to_string(),
+                retry_after: None,
                 raw_message: Some(raw.message),
             },
 

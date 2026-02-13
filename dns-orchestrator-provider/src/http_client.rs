@@ -40,13 +40,19 @@ impl HttpUtils {
         log::debug!("[{provider_name}] {method_name} {url_or_action}");
 
         // 发送请求
-        let response = request_builder
-            .send()
-            .await
-            .map_err(|e| ProviderError::NetworkError {
-                provider: provider_name.to_string(),
-                detail: e.to_string(),
-            })?;
+        let response = request_builder.send().await.map_err(|e| {
+            if e.is_timeout() {
+                ProviderError::Timeout {
+                    provider: provider_name.to_string(),
+                    detail: e.to_string(),
+                }
+            } else {
+                ProviderError::NetworkError {
+                    provider: provider_name.to_string(),
+                    detail: e.to_string(),
+                }
+            }
+        })?;
 
         let status_code = response.status().as_u16();
         log::debug!("[{provider_name}] Response Status: {status_code}");
@@ -172,9 +178,14 @@ impl HttpUtils {
 
 /// 判断错误是否可重试
 ///
-/// 只有网络错误才适合重试，业务错误（如认证失败、记录不存在）不应重试
+/// 网络错误、超时、限流适合重试，业务错误（如认证失败、记录不存在）不应重试
 fn is_retryable(error: &ProviderError) -> bool {
-    matches!(error, ProviderError::NetworkError { .. })
+    matches!(
+        error,
+        ProviderError::NetworkError { .. }
+            | ProviderError::Timeout { .. }
+            | ProviderError::RateLimited { .. }
+    )
 }
 
 /// 计算指数退避延迟

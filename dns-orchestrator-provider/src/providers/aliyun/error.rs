@@ -50,7 +50,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 }
             }
 
-            // ============ 配额/频率限制 ============
+            // ============ 配额限制 ============
             Some(
                 "QuotaExceeded.ARecord"
                 | "QuotaExceeded.Record"
@@ -61,11 +61,16 @@ impl ProviderErrorMapper for AliyunProvider {
                 | "QuotaExceeded.ALIASRecord"
                 | "QuotaExceeded.HTTPSRecord"
                 | "QuotaExceeded.SVCBRecord"
-                | "LineDnsSlb.QuotaExceeded"
-                | "Throttling"
-                | "Throttling.User",
+                | "LineDnsSlb.QuotaExceeded",
             ) => ProviderError::QuotaExceeded {
                 provider: self.provider_name().to_string(),
+                raw_message: Some(raw.message),
+            },
+
+            // ============ 频率限流（可重试） ============
+            Some("Throttling" | "Throttling.User") => ProviderError::RateLimited {
+                provider: self.provider_name().to_string(),
+                retry_after: None,
                 raw_message: Some(raw.message),
             },
 

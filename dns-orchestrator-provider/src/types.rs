@@ -563,3 +563,215 @@ impl ProviderCredentials {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    // ============ ProviderCredentials 往返测试 ============
+
+    #[test]
+    fn credentials_cloudflare_roundtrip() {
+        let map: HashMap<String, String> =
+            [("apiToken".to_string(), "my-token".to_string())].into();
+        let cred = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map).unwrap();
+        let back = cred.to_map();
+        assert_eq!(back.get("apiToken").unwrap(), "my-token");
+        assert_eq!(cred.provider_type(), ProviderType::Cloudflare);
+    }
+
+    #[test]
+    fn credentials_aliyun_roundtrip() {
+        let map: HashMap<String, String> = [
+            ("accessKeyId".to_string(), "id123".to_string()),
+            ("accessKeySecret".to_string(), "secret456".to_string()),
+        ]
+        .into();
+        let cred = ProviderCredentials::from_map(&ProviderType::Aliyun, &map).unwrap();
+        let back = cred.to_map();
+        assert_eq!(back.get("accessKeyId").unwrap(), "id123");
+        assert_eq!(back.get("accessKeySecret").unwrap(), "secret456");
+    }
+
+    #[test]
+    fn credentials_dnspod_roundtrip() {
+        let map: HashMap<String, String> = [
+            ("secretId".to_string(), "sid".to_string()),
+            ("secretKey".to_string(), "skey".to_string()),
+        ]
+        .into();
+        let cred = ProviderCredentials::from_map(&ProviderType::Dnspod, &map).unwrap();
+        let back = cred.to_map();
+        assert_eq!(back.get("secretId").unwrap(), "sid");
+        assert_eq!(back.get("secretKey").unwrap(), "skey");
+    }
+
+    #[test]
+    fn credentials_huaweicloud_roundtrip() {
+        let map: HashMap<String, String> = [
+            ("accessKeyId".to_string(), "ak".to_string()),
+            ("secretAccessKey".to_string(), "sk".to_string()),
+        ]
+        .into();
+        let cred = ProviderCredentials::from_map(&ProviderType::Huaweicloud, &map).unwrap();
+        let back = cred.to_map();
+        assert_eq!(back.get("accessKeyId").unwrap(), "ak");
+        assert_eq!(back.get("secretAccessKey").unwrap(), "sk");
+    }
+
+    #[test]
+    fn credentials_missing_field() {
+        let map: HashMap<String, String> = HashMap::new();
+        let err = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map).unwrap_err();
+        assert!(matches!(
+            err,
+            CredentialValidationError::MissingField { .. }
+        ));
+    }
+
+    #[test]
+    fn credentials_empty_field() {
+        let map: HashMap<String, String> = [("apiToken".to_string(), "  ".to_string())].into();
+        let err = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map).unwrap_err();
+        assert!(matches!(err, CredentialValidationError::EmptyField { .. }));
+    }
+
+    // ============ PaginatedResponse 分页计算测试 ============
+
+    #[test]
+    fn paginated_response_has_more() {
+        let resp = PaginatedResponse::new(vec![1, 2, 3], 1, 3, 10);
+        assert!(resp.has_more);
+        assert_eq!(resp.total_count, 10);
+    }
+
+    #[test]
+    fn paginated_response_no_more() {
+        let resp = PaginatedResponse::new(vec![1, 2], 2, 3, 5);
+        assert!(!resp.has_more); // page 2 * page_size 3 = 6 >= 5
+    }
+
+    #[test]
+    fn paginated_response_exact_boundary() {
+        let resp = PaginatedResponse::new(vec![1, 2, 3], 1, 3, 3);
+        assert!(!resp.has_more); // 1 * 3 = 3, not < 3
+    }
+
+    #[test]
+    fn paginated_response_empty() {
+        let resp: PaginatedResponse<i32> = PaginatedResponse::new(vec![], 1, 20, 0);
+        assert!(!resp.has_more);
+        assert_eq!(resp.items.len(), 0);
+    }
+
+    // ============ DnsRecordType serde 测试 ============
+
+    #[test]
+    fn dns_record_type_serialize() {
+        let a = DnsRecordType::A;
+        let json = serde_json::to_string(&a).unwrap();
+        assert_eq!(json, "\"A\"");
+    }
+
+    #[test]
+    fn dns_record_type_deserialize() {
+        let a: DnsRecordType = serde_json::from_str("\"AAAA\"").unwrap();
+        assert_eq!(a, DnsRecordType::Aaaa);
+    }
+
+    #[test]
+    fn dns_record_type_roundtrip_all() {
+        let types = vec![
+            DnsRecordType::A,
+            DnsRecordType::Aaaa,
+            DnsRecordType::Cname,
+            DnsRecordType::Mx,
+            DnsRecordType::Txt,
+            DnsRecordType::Ns,
+            DnsRecordType::Srv,
+            DnsRecordType::Caa,
+        ];
+        for t in types {
+            let json = serde_json::to_string(&t).unwrap();
+            let back: DnsRecordType = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, t);
+        }
+    }
+
+    // ============ RecordData serde 测试 ============
+
+    #[test]
+    fn record_data_srv_serde_roundtrip() {
+        let data = RecordData::SRV {
+            priority: 10,
+            weight: 20,
+            port: 443,
+            target: "example.com".to_string(),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let back: RecordData = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, data);
+    }
+
+    #[test]
+    fn record_data_caa_serde_roundtrip() {
+        let data = RecordData::CAA {
+            flags: 0,
+            tag: "issue".to_string(),
+            value: "letsencrypt.org".to_string(),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let back: RecordData = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, data);
+    }
+
+    #[test]
+    fn record_data_record_type() {
+        assert_eq!(
+            RecordData::A {
+                address: "1.2.3.4".into()
+            }
+            .record_type(),
+            DnsRecordType::A
+        );
+        assert_eq!(
+            RecordData::SRV {
+                priority: 0,
+                weight: 0,
+                port: 0,
+                target: ".".into()
+            }
+            .record_type(),
+            DnsRecordType::Srv
+        );
+    }
+
+    #[test]
+    fn record_data_display_value() {
+        assert_eq!(
+            RecordData::A {
+                address: "1.2.3.4".into()
+            }
+            .display_value(),
+            "1.2.3.4"
+        );
+        assert_eq!(
+            RecordData::MX {
+                priority: 10,
+                exchange: "mail.x.com".into()
+            }
+            .display_value(),
+            "mail.x.com"
+        );
+        assert_eq!(
+            RecordData::CAA {
+                flags: 0,
+                tag: "issue".into(),
+                value: "le.org".into()
+            }
+            .display_value(),
+            "le.org"
+        );
+    }
+}

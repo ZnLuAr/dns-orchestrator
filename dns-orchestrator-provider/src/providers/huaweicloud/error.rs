@@ -58,18 +58,24 @@ impl ProviderErrorMapper for HuaweicloudProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 配额/频率限制 ============
+            // ============ 配额限制（资源用完，不可重试） ============
             Some(
                 "DNS.0403"     // Record Set 配额不足
                 | "DNS.0404"   // Zone 配额不足
                 | "DNS.0405"   // PTR 配额不足
                 | "DNS.0408"   // 自定义线路配额不足
                 | "DNS.0409"   // 线路分组配额不足
-                | "APIGW.0308" // 流控阈值达到（429）
                 | "DNS.0021"   // 无法获取锁（并发冲突）
                 | "DNS.2002",  // 租户配额不足
             ) => ProviderError::QuotaExceeded {
                 provider: self.provider_name().to_string(),
+                raw_message: Some(raw.message),
+            },
+
+            // ============ 频率限流（可重试） ============
+            Some("APIGW.0308") => ProviderError::RateLimited { // 流控阈值达到（429）
+                provider: self.provider_name().to_string(),
+                retry_after: None,
                 raw_message: Some(raw.message),
             },
 
