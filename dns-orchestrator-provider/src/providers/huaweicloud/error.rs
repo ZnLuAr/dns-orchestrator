@@ -86,14 +86,14 @@ impl ProviderErrorMapper for HuaweicloudProvider {
                 | "DNS.0016",  // 记录已存在或冲突
             ) => ProviderError::RecordExists {
                 provider: self.provider_name().to_string(),
-                record_name: context.record_name.unwrap_or_default(),
+                record_name: context.record_name.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
             // ============ 记录不存在 ============
             Some("DNS.0313" | "DNS.0004") => ProviderError::RecordNotFound {
                 provider: self.provider_name().to_string(),
-                record_id: context.record_id.unwrap_or_default(),
+                record_id: context.record_id.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -104,7 +104,7 @@ impl ProviderErrorMapper for HuaweicloudProvider {
                 | "DNS.1206",  // 域名无效
             ) => ProviderError::DomainNotFound {
                 provider: self.provider_name().to_string(),
-                domain: context.domain.unwrap_or_default(),
+                domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -118,7 +118,7 @@ impl ProviderErrorMapper for HuaweicloudProvider {
                 | "DNS.2006",  // 域名冻结
             ) => ProviderError::DomainLocked {
                 provider: self.provider_name().to_string(),
-                domain: context.domain.unwrap_or_default(),
+                domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -793,12 +793,12 @@ mod tests {
     }
 
     #[test]
-    fn default_context_yields_empty_strings() {
+    fn default_context_yields_unknown_placeholder() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("DNS.0312", "exists"), default_ctx());
         match err {
             ProviderError::RecordExists { record_name, .. } => {
-                assert_eq!(record_name, "");
+                assert_eq!(record_name, "<unknown>");
             }
             other => panic!("expected RecordExists, got {other:?}"),
         }

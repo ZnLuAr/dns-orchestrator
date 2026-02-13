@@ -55,7 +55,7 @@ impl AliyunProvider {
 mod tests {
     use super::super::AliyunProvider;
 
-    /// 辅助函数: 创建测试用 AliyunProvider
+    /// 辅助函数: 创建测试用 `AliyunProvider`
     fn make_provider(key_id: &str, key_secret: &str) -> AliyunProvider {
         AliyunProvider::new(key_id.to_string(), key_secret.to_string())
     }
@@ -104,10 +104,7 @@ mod tests {
             .and_then(|s| s.split(',').next())
             .expect("failed to extract Credential value");
 
-        assert_eq!(
-            credential, key_id,
-            "Credential should equal access_key_id"
-        );
+        assert_eq!(credential, key_id, "Credential should equal access_key_id");
     }
 
     #[test]
@@ -139,28 +136,52 @@ mod tests {
 
         // 确认恰好有 6 个 header（用分号分隔）
         let count = signed_headers.split(';').count();
-        assert_eq!(count, 6, "SignedHeaders should contain exactly 6 headers, got {count}");
+        assert_eq!(
+            count, 6,
+            "SignedHeaders should contain exactly 6 headers, got {count}"
+        );
     }
 
     #[test]
     fn sign_deterministic() {
         let provider = make_provider("key-id", "key-secret");
-        let result1 = provider.sign("DescribeDomains", "DomainName=example.com", "2024-01-01T00:00:00Z", "nonce-1");
-        let result2 = provider.sign("DescribeDomains", "DomainName=example.com", "2024-01-01T00:00:00Z", "nonce-1");
+        let result1 = provider.sign(
+            "DescribeDomains",
+            "DomainName=example.com",
+            "2024-01-01T00:00:00Z",
+            "nonce-1",
+        );
+        let result2 = provider.sign(
+            "DescribeDomains",
+            "DomainName=example.com",
+            "2024-01-01T00:00:00Z",
+            "nonce-1",
+        );
 
-        assert_eq!(result1, result2, "same inputs should produce identical output");
+        assert_eq!(
+            result1, result2,
+            "same inputs should produce identical output"
+        );
     }
 
     #[test]
     fn sign_different_action_changes_signature() {
         let provider = make_provider("key-id", "key-secret");
         let result_a = provider.sign("DescribeDomains", "", "2024-01-01T00:00:00Z", "nonce-1");
-        let result_b = provider.sign("DescribeDomainRecords", "", "2024-01-01T00:00:00Z", "nonce-1");
+        let result_b = provider.sign(
+            "DescribeDomainRecords",
+            "",
+            "2024-01-01T00:00:00Z",
+            "nonce-1",
+        );
 
         let sig_a = extract_signature(&result_a);
         let sig_b = extract_signature(&result_b);
 
-        assert_ne!(sig_a, sig_b, "different actions should produce different signatures");
+        assert_ne!(
+            sig_a, sig_b,
+            "different actions should produce different signatures"
+        );
     }
 
     #[test]
@@ -174,7 +195,10 @@ mod tests {
         let sig_a = extract_signature(&result_a);
         let sig_b = extract_signature(&result_b);
 
-        assert_ne!(sig_a, sig_b, "different secrets should produce different signatures");
+        assert_ne!(
+            sig_a, sig_b,
+            "different secrets should produce different signatures"
+        );
     }
 
     #[test]

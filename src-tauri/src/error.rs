@@ -14,6 +14,7 @@ impl std::fmt::Display for AppError {
 
 impl From<CoreError> for AppError {
     fn from(err: CoreError) -> Self {
+        log::error!("AppError: {err}");
         Self(err)
     }
 }

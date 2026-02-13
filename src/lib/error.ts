@@ -175,8 +175,8 @@ export function extractErrorMessage(err: unknown): string {
       return obj.message
     }
 
-    // fallback: 序列化对象
-    return JSON.stringify(err)
+    // fallback: 返回通用未知错误
+    return i18n.t("errors.unknown")
   }
 
   return String(err)

@@ -114,7 +114,7 @@ mod tests {
             .expect("Access field not found")
     }
 
-    /// 从签名结果中提取 SignedHeaders 字段的值
+    /// 从签名结果中提取 `SignedHeaders` 字段的值
     fn extract_signed_headers(auth: &str) -> &str {
         auth.split("SignedHeaders=")
             .nth(1)
@@ -147,7 +147,10 @@ mod tests {
             result.starts_with("SDK-HMAC-SHA256 "),
             "output should start with 'SDK-HMAC-SHA256 '"
         );
-        assert!(result.contains("Access="), "output should contain 'Access='");
+        assert!(
+            result.contains("Access="),
+            "output should contain 'Access='"
+        );
         assert!(
             result.contains("SignedHeaders="),
             "output should contain 'SignedHeaders='"
@@ -181,8 +184,22 @@ mod tests {
     fn sign_deterministic() {
         let p = provider();
         let headers = default_headers();
-        let result1 = p.sign("GET", "/v2/zones", "a=1", &headers, "body", "20240101T000000Z");
-        let result2 = p.sign("GET", "/v2/zones", "a=1", &headers, "body", "20240101T000000Z");
+        let result1 = p.sign(
+            "GET",
+            "/v2/zones",
+            "a=1",
+            &headers,
+            "body",
+            "20240101T000000Z",
+        );
+        let result2 = p.sign(
+            "GET",
+            "/v2/zones",
+            "a=1",
+            &headers,
+            "body",
+            "20240101T000000Z",
+        );
 
         assert_eq!(result1, result2, "same inputs should produce same output");
     }
@@ -194,22 +211,8 @@ mod tests {
         let p = provider();
         let headers = default_headers();
 
-        let without_slash = p.sign(
-            "GET",
-            "/v2/zones",
-            "",
-            &headers,
-            "",
-            "20240101T000000Z",
-        );
-        let with_slash = p.sign(
-            "GET",
-            "/v2/zones/",
-            "",
-            &headers,
-            "",
-            "20240101T000000Z",
-        );
+        let without_slash = p.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
+        let with_slash = p.sign("GET", "/v2/zones/", "", &headers, "", "20240101T000000Z");
 
         assert_eq!(
             extract_signature(&without_slash),
@@ -259,14 +262,7 @@ mod tests {
             ("A-Header".to_string(), "2".to_string()),
         ];
 
-        let result = p.sign(
-            "GET",
-            "/v2/zones",
-            "",
-            &headers,
-            "",
-            "20240101T000000Z",
-        );
+        let result = p.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
 
         assert_eq!(
             extract_signed_headers(&result),

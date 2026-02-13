@@ -129,8 +129,16 @@ mod tests {
     #[test]
     fn sign_deterministic() {
         let p = provider();
-        let a = p.sign("DescribeRecordList", r#"{"Domain":"example.com"}"#, 1_705_305_600);
-        let b = p.sign("DescribeRecordList", r#"{"Domain":"example.com"}"#, 1_705_305_600);
+        let a = p.sign(
+            "DescribeRecordList",
+            r#"{"Domain":"example.com"}"#,
+            1_705_305_600,
+        );
+        let b = p.sign(
+            "DescribeRecordList",
+            r#"{"Domain":"example.com"}"#,
+            1_705_305_600,
+        );
         assert_eq!(a, b, "same inputs should produce identical output");
     }
 
@@ -145,7 +153,10 @@ mod tests {
         let sig_a = a.rsplit("Signature=").next().unwrap();
         let sig_b = b.rsplit("Signature=").next().unwrap();
 
-        assert_ne!(sig_a, sig_b, "different actions should produce different signatures");
+        assert_ne!(
+            sig_a, sig_b,
+            "different actions should produce different signatures"
+        );
     }
 
     // ---- 不同 payload 产生不同签名 ----
@@ -159,7 +170,10 @@ mod tests {
         let sig_a = a.rsplit("Signature=").next().unwrap();
         let sig_b = b.rsplit("Signature=").next().unwrap();
 
-        assert_ne!(sig_a, sig_b, "different payloads should produce different signatures");
+        assert_ne!(
+            sig_a, sig_b,
+            "different payloads should produce different signatures"
+        );
     }
 
     // ---- 不同 secret_key 产生不同签名 ----
@@ -175,7 +189,10 @@ mod tests {
         let sig_a = a.rsplit("Signature=").next().unwrap();
         let sig_b = b.rsplit("Signature=").next().unwrap();
 
-        assert_ne!(sig_a, sig_b, "different secret keys should produce different signatures");
+        assert_ne!(
+            sig_a, sig_b,
+            "different secret keys should produce different signatures"
+        );
     }
 
     // ---- 日期从 timestamp 派生 ----

@@ -79,7 +79,9 @@ impl ProviderErrorMapper for DnspodProvider {
             // ============ 记录已存在 ============
             Some("InvalidParameter.DomainRecordExist") => ProviderError::RecordExists {
                 provider: self.provider_name().to_string(),
-                record_name: context.record_name.unwrap_or_default(),
+                record_name: context
+                    .record_name
+                    .unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -87,7 +89,7 @@ impl ProviderErrorMapper for DnspodProvider {
             Some("ResourceNotFound.NoDataOfDomain" | "InvalidParameterValue.DomainNotExists") => {
                 ProviderError::DomainNotFound {
                     provider: self.provider_name().to_string(),
-                    domain: context.domain.unwrap_or_default(),
+                    domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                     raw_message: Some(raw.message),
                 }
             }
@@ -102,7 +104,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 | "InvalidParameter.DomainNotAllowedLock",
             ) => ProviderError::DomainLocked {
                 provider: self.provider_name().to_string(),
-                domain: context.domain.unwrap_or_default(),
+                domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 

@@ -25,7 +25,9 @@ impl ProviderErrorMapper for AliyunProvider {
             // ============ 记录已存在 ============
             Some("DomainRecordDuplicate" | "DomainRecordConflict") => ProviderError::RecordExists {
                 provider: self.provider_name().to_string(),
-                record_name: context.record_name.unwrap_or_default(),
+                record_name: context
+                    .record_name
+                    .unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -37,7 +39,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 | "PdnsRecord.NotExists",
             ) => ProviderError::RecordNotFound {
                 provider: self.provider_name().to_string(),
-                record_id: context.record_id.unwrap_or_default(),
+                record_id: context.record_id.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -45,7 +47,7 @@ impl ProviderErrorMapper for AliyunProvider {
             Some("InvalidDomainName.NoExist" | "DomainNotFound" | "PdnsZone.NotExists") => {
                 ProviderError::DomainNotFound {
                     provider: self.provider_name().to_string(),
-                    domain: context.domain.unwrap_or_default(),
+                    domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                     raw_message: Some(raw.message),
                 }
             }
@@ -83,7 +85,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 | "RecordFobidden.BlackHole",
             ) => ProviderError::DomainLocked {
                 provider: self.provider_name().to_string(),
-                domain: context.domain.unwrap_or_default(),
+                domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 

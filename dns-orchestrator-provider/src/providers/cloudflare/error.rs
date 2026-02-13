@@ -61,7 +61,9 @@ impl ProviderErrorMapper for CloudflareProvider {
             Some("81053" | "81054" | "81055" | "81056" | "81057" | "81058") => {
                 ProviderError::RecordExists {
                     provider: self.provider_name().to_string(),
-                    record_name: context.record_name.unwrap_or_default(),
+                    record_name: context
+                        .record_name
+                        .unwrap_or_else(|| "<unknown>".to_string()),
                     raw_message: Some(raw.message),
                 }
             }
@@ -70,7 +72,7 @@ impl ProviderErrorMapper for CloudflareProvider {
             // 81044: Record does not exist
             Some("81044") => ProviderError::RecordNotFound {
                 provider: self.provider_name().to_string(),
-                record_id: context.record_id.unwrap_or_default(),
+                record_id: context.record_id.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -86,7 +88,7 @@ impl ProviderErrorMapper for CloudflareProvider {
             // 7003: Could not route to /path. perhaps your object identifier is invalid?
             Some("7000" | "7003") => ProviderError::DomainNotFound {
                 provider: self.provider_name().to_string(),
-                domain: context.domain.unwrap_or_default(),
+                domain: context.domain.unwrap_or_else(|| "<unknown>".to_string()),
                 raw_message: Some(raw.message),
             },
 
@@ -376,7 +378,7 @@ mod tests {
         );
         match err {
             ProviderError::RecordExists { record_name, .. } => {
-                assert_eq!(record_name, "");
+                assert_eq!(record_name, "<unknown>");
             }
             other => panic!("expected RecordExists, got {other:?}"),
         }
@@ -391,7 +393,7 @@ mod tests {
         );
         match err {
             ProviderError::RecordNotFound { record_id, .. } => {
-                assert_eq!(record_id, "");
+                assert_eq!(record_id, "<unknown>");
             }
             other => panic!("expected RecordNotFound, got {other:?}"),
         }
@@ -403,7 +405,7 @@ mod tests {
         let err = p.map_error(RawApiError::with_code("7000", "no route"), ctx());
         match err {
             ProviderError::DomainNotFound { domain, .. } => {
-                assert_eq!(domain, "");
+                assert_eq!(domain, "<unknown>");
             }
             other => panic!("expected DomainNotFound, got {other:?}"),
         }
