@@ -1,4 +1,4 @@
-//! 华为云 DnsProvider trait 实现
+//! 华为云 `DnsProvider` trait 实现
 
 use async_trait::async_trait;
 use serde::Serialize;
@@ -38,7 +38,7 @@ impl HuaweicloudProvider {
         }
     }
 
-    /// 解析华为云记录为 RecordData
+    /// 解析华为云记录为 `RecordData`
     /// 华为云格式：MX/SRV/CAA 的所有字段都编码在 records 字符串中
     fn parse_record_data(record_type: &str, record: &str) -> Result<RecordData> {
         match record_type {
@@ -133,7 +133,7 @@ impl HuaweicloudProvider {
         }
     }
 
-    /// 将 RecordData 转换为华为云 API 格式（records 字符串）
+    /// 将 `RecordData` 转换为华为云 API 格式（records 字符串）
     fn record_data_to_record_string(data: &RecordData) -> String {
         match data {
             RecordData::A { address } => address.clone(),
@@ -238,7 +238,7 @@ impl DnsProvider for HuaweicloudProvider {
         ))
     }
 
-    /// 使用 ShowPublicZone API 直接获取域名信息
+    /// 使用 `ShowPublicZone` API 直接获取域名信息
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         let path = format!("/v2/zones/{domain_id}");
         let ctx = ErrorContext {

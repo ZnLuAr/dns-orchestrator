@@ -1,4 +1,4 @@
-//! 腾讯云 DNSPod Provider
+//! 腾讯云 `DNSPod` Provider
 
 mod error;
 mod http;
@@ -18,10 +18,10 @@ pub(crate) use types::{
 pub(crate) const DNSPOD_API_HOST: &str = "dnspod.tencentcloudapi.com";
 pub(crate) const DNSPOD_SERVICE: &str = "dnspod";
 pub(crate) const DNSPOD_VERSION: &str = "2021-03-23";
-/// DNSPod API 单页最大记录数
+/// `DNSPod` API 单页最大记录数
 pub(crate) const MAX_PAGE_SIZE: u32 = 100;
 
-/// 腾讯云 DNSPod Provider
+/// 腾讯云 `DNSPod` Provider
 pub struct DnspodProvider {
     pub(crate) client: Client,
     pub(crate) secret_id: String,
@@ -29,7 +29,7 @@ pub struct DnspodProvider {
     pub(crate) max_retries: u32,
 }
 
-/// DNSPod Provider Builder
+/// `DNSPod` Provider Builder
 pub struct DnspodProviderBuilder {
     secret_id: String,
     secret_key: String,

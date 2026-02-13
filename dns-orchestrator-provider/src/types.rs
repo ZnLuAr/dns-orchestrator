@@ -444,7 +444,7 @@ pub enum ProviderCredentials {
 }
 
 impl ProviderCredentials {
-    /// 从 HashMap 转换（兼容旧格式存储）
+    /// 从 `HashMap` 转换（兼容旧格式存储）
     pub fn from_map(
         provider: &ProviderType,
         map: &std::collections::HashMap<String, String>,
@@ -495,14 +495,13 @@ impl ProviderCredentials {
                 field: "provider".to_string(),
                 label: "Provider".to_string(),
                 reason: format!(
-                    "Provider '{}' is not supported or its feature is not enabled.",
-                    provider
+                    "Provider '{provider}' is not supported or its feature is not enabled."
                 ),
             }),
         }
     }
 
-    /// 从 HashMap 中获取必需字段，校验非空
+    /// 从 `HashMap` 中获取必需字段，校验非空
     fn get_required_field(
         provider: &ProviderType,
         map: &std::collections::HashMap<String, String>,

@@ -1,11 +1,11 @@
-//! DNSPod 错误映射
+//! `DNSPod` 错误映射
 
 use crate::error::ProviderError;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 
 use super::DnspodProvider;
 
-/// DNSPod 错误码映射
+/// `DNSPod` 错误码映射
 /// 参考: <https://cloud.tencent.com/document/api/1427/56192>
 impl ProviderErrorMapper for DnspodProvider {
     fn provider_name(&self) -> &'static str {

@@ -1,4 +1,4 @@
-//! 阿里云 DnsProvider trait 实现
+//! 阿里云 `DnsProvider` trait 实现
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -31,12 +31,12 @@ impl AliyunProvider {
         }
     }
 
-    /// 将阿里云的 Unix 毫秒时间戳转换为 DateTime<Utc>
+    /// 将阿里云的 Unix 毫秒时间戳转换为 `DateTime`<Utc>
     pub(crate) fn timestamp_to_datetime(timestamp: Option<i64>) -> Option<DateTime<chrono::Utc>> {
         timestamp.and_then(DateTime::from_timestamp_millis)
     }
 
-    /// 解析阿里云记录为 RecordData
+    /// 解析阿里云记录为 `RecordData`
     fn parse_record_data(
         record_type: &str,
         value: &str,
@@ -121,7 +121,7 @@ impl AliyunProvider {
         }
     }
 
-    /// 将 RecordData 转换为阿里云 API 格式 (value, priority)
+    /// 将 `RecordData` 转换为阿里云 API 格式 (value, priority)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
         match data {
             RecordData::A { address } => (address.clone(), None),
@@ -249,7 +249,7 @@ impl DnsProvider for AliyunProvider {
         ))
     }
 
-    /// ErrorRequireCheck: 使用 DescribeDomainInfo API 直接获取域名信息
+    /// `ErrorRequireCheck`: 使用 `DescribeDomainInfo` API 直接获取域名信息
     /// 注意：阿里云 API 需要域名名称作为参数
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         #[derive(Serialize)]

@@ -1,4 +1,4 @@
-//! Cloudflare DnsProvider trait 实现
+//! Cloudflare `DnsProvider` trait 实现
 
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -18,7 +18,7 @@ use super::{
 };
 
 impl CloudflareProvider {
-    /// 将 Cloudflare zone 转换为 ProviderDomain
+    /// 将 Cloudflare zone 转换为 `ProviderDomain`
     /// Cloudflare 状态：active, pending, initializing, moved
     pub(crate) fn zone_to_domain(zone: CloudflareZone) -> ProviderDomain {
         let status = match zone.status.as_str() {
@@ -66,7 +66,7 @@ impl CloudflareProvider {
         })
     }
 
-    /// 解析 Cloudflare 记录为 RecordData
+    /// 解析 Cloudflare 记录为 `RecordData`
     fn parse_record_data(&self, cf_record: &CloudflareDnsRecord) -> Result<RecordData> {
         match cf_record.record_type.as_str() {
             "A" => Ok(RecordData::A {
@@ -192,7 +192,7 @@ impl CloudflareProvider {
         }
     }
 
-    /// 将 RecordData 转换为 Cloudflare API 请求体
+    /// 将 `RecordData` 转换为 Cloudflare API 请求体
     fn build_create_body(
         &self,
         full_name: &str,

@@ -1,7 +1,7 @@
 //! 通用 HTTP 客户端工具
 //!
 //! 提供可复用的 HTTP 请求处理逻辑，减少各 Provider 的重复代码。
-//! 各 Provider 保留完全的签名灵活性，自己构造 RequestBuilder。
+//! 各 Provider 保留完全的签名灵活性，自己构造 `RequestBuilder`。
 //!
 //! # 设计原则
 //! - **不强制统一签名逻辑** - 各 provider 的签名算法差异太大
@@ -37,7 +37,7 @@ impl HttpUtils {
         method_name: &str,
         url_or_action: &str,
     ) -> Result<(u16, String), ProviderError> {
-        log::debug!("[{}] {} {}", provider_name, method_name, url_or_action);
+        log::debug!("[{provider_name}] {method_name} {url_or_action}");
 
         // 发送请求
         let response = request_builder
@@ -49,7 +49,7 @@ impl HttpUtils {
             })?;
 
         let status_code = response.status().as_u16();
-        log::debug!("[{}] Response Status: {}", provider_name, status_code);
+        log::debug!("[{provider_name}] Response Status: {status_code}");
 
         // 读取响应体
         let response_text = response
@@ -60,7 +60,7 @@ impl HttpUtils {
                 detail: format!("读取响应失败: {e}"),
             })?;
 
-        log::debug!("[{}] Response Body: {}", provider_name, response_text);
+        log::debug!("[{provider_name}] Response Body: {response_text}");
 
         Ok((status_code, response_text))
     }
@@ -82,8 +82,8 @@ impl HttpUtils {
         T: DeserializeOwned,
     {
         serde_json::from_str(response_text).map_err(|e| {
-            log::error!("[{}] JSON 解析失败: {}", provider_name, e);
-            log::error!("[{}] 原始响应: {}", provider_name, response_text);
+            log::error!("[{provider_name}] JSON 解析失败: {e}");
+            log::error!("[{provider_name}] 原始响应: {response_text}");
             ProviderError::ParseError {
                 provider: provider_name.to_string(),
                 detail: e.to_string(),
@@ -150,19 +150,16 @@ impl HttpUtils {
 
         for attempt in 0..=max_retries {
             // 克隆请求（RequestBuilder 只能使用一次）
-            let req = match request_builder.try_clone() {
-                Some(r) => r,
-                None => {
-                    // 无法克隆（通常是 body stream 导致），回退到不重试
-                    log::warn!("[{}] 无法克隆请求，禁用重试", provider_name);
-                    return Self::execute_request(
-                        request_builder,
-                        provider_name,
-                        method_name,
-                        url_or_action,
-                    )
-                    .await;
-                }
+            let req = if let Some(r) = request_builder.try_clone() { r } else {
+                // 无法克隆（通常是 body stream 导致），回退到不重试
+                log::warn!("[{provider_name}] 无法克隆请求，禁用重试");
+                return Self::execute_request(
+                    request_builder,
+                    provider_name,
+                    method_name,
+                    url_or_action,
+                )
+                .await;
             };
 
             match Self::execute_request(req, provider_name, method_name, url_or_action).await {

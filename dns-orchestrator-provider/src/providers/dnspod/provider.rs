@@ -1,4 +1,4 @@
-//! DNSPod DnsProvider trait 实现
+//! `DNSPod` `DnsProvider` trait 实现
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use super::{
 };
 
 impl DnspodProvider {
-    /// 将 DNSPod 域名状态转换为内部状态
+    /// 将 `DNSPod` 域名状态转换为内部状态
     pub(crate) fn convert_domain_status(status: &str, dns_status: &str) -> DomainStatus {
         match (status, dns_status) {
             ("ENABLE" | "enable", "") => DomainStatus::Active,
@@ -29,7 +29,7 @@ impl DnspodProvider {
         }
     }
 
-    /// 解析 DNSPod 记录为 RecordData（使用 mx 字段作为 priority）
+    /// 解析 `DNSPod` 记录为 RecordData（使用 mx 字段作为 priority）
     fn parse_record_data(record_type: &str, value: &str, mx: Option<u16>) -> Result<RecordData> {
         match record_type {
             "A" => Ok(RecordData::A {
@@ -110,7 +110,7 @@ impl DnspodProvider {
         }
     }
 
-    /// 将 RecordData 转换为 DNSPod API 格式 (value, mx)
+    /// 将 `RecordData` 转换为 `DNSPod` API 格式 (value, mx)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
         match data {
             RecordData::A { address } => (address.clone(), None),
@@ -242,7 +242,7 @@ impl DnsProvider for DnspodProvider {
         ))
     }
 
-    /// 使用 DescribeDomain API 直接获取域名信息
+    /// 使用 `DescribeDomain` API 直接获取域名信息
     /// 注意：DNSPod API 需要域名名称，如果传入的是数字 ID 则 fallback 到列表查找
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         // 如果 domain_id 包含 '.'，认为是域名名称，直接调用 API

@@ -1,13 +1,13 @@
 //! 日期时间序列化/反序列化工具
 //!
 //! 提供自定义 Serde 序列化/反序列化支持：
-//! - 序列化: DateTime<Utc> -> RFC3339 字符串
-//! - 反序列化: RFC3339 字符串 或 Unix 时间戳 -> DateTime<Utc>
+//! - 序列化: `DateTime`<Utc> -> RFC3339 字符串
+//! - 反序列化: RFC3339 字符串 或 Unix 时间戳 -> `DateTime`<Utc>
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serializer};
 
-/// 序列化 Option<DateTime<Utc>> 为 Option<RFC3339 字符串>
+/// 序列化 Option<`DateTime`<Utc>> 为 Option<RFC3339 字符串>
 pub fn serialize<S>(dt: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -36,7 +36,7 @@ where
     match Option::<OptionalTimestamp>::deserialize(deserializer)? {
         Some(OptionalTimestamp::String(s)) => DateTime::parse_from_rfc3339(&s)
             .map(|dt| Some(dt.with_timezone(&Utc)))
-            .map_err(|e| Error::custom(format!("Invalid RFC3339 timestamp: {}", e))),
+            .map_err(|e| Error::custom(format!("Invalid RFC3339 timestamp: {e}"))),
         Some(OptionalTimestamp::I64(ts)) => parse_unix_timestamp(ts)
             .map(Some)
             .ok_or_else(|| Error::custom("Invalid Unix timestamp")),

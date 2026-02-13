@@ -7,8 +7,8 @@
 //! - **认证错误 (7)**：APIGW.0301, APIGW.0101, APIGW.0303, APIGW.0305, DNS.0005, DNS.0013, DNS.0040
 //! - **权限拒绝 (4)**：APIGW.0302, APIGW.0306, DNS.0030, DNS.1802
 //! - **配额超限 (8)**：DNS.0403, DNS.0404, DNS.0405, DNS.0408, DNS.0409, APIGW.0308, DNS.0021, DNS.2002
-//! - **记录操作 (4)**：DNS.0312, DNS.0335, DNS.0016 (RecordExists), DNS.0313, DNS.0004 (RecordNotFound)
-//! - **域名操作 (6)**：DNS.0302, DNS.0301, DNS.1206 (DomainNotFound), DNS.0213, DNS.0214, DNS.0209 (DomainLocked)
+//! - **记录操作 (4)**：DNS.0312, DNS.0335, DNS.0016 (`RecordExists`), DNS.0313, DNS.0004 (`RecordNotFound`)
+//! - **域名操作 (6)**：DNS.0302, DNS.0301, DNS.1206 (`DomainNotFound`), DNS.0213, DNS.0214, DNS.0209 (`DomainLocked`)
 //! - **参数错误 (多种)**：DNS.0303(ttl), DNS.0307(type), DNS.0308(value), DNS.0304(name) 等
 //! - **网络错误 (5)**：APIGW.0201, DNS.0012, DNS.0015, DNS.0022, DNS.0036
 //!

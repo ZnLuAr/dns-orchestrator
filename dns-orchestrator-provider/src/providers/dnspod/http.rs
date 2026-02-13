@@ -1,4 +1,4 @@
-//! DNSPod HTTP 请求方法（重构版：使用通用 HTTP 工具）
+//! `DNSPod` HTTP 请求方法（重构版：使用通用 HTTP 工具）
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ impl DnspodProvider {
             request,
             self.provider_name(),
             "POST",
-            &format!("Action: {}", action),
+            &format!("Action: {action}"),
             self.max_retries,
         )
         .await?;

@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 use dns_orchestrator_core::error::{CoreError, CoreResult};
-use dns_orchestrator_core::traits::{CredentialStore, CredentialsMap, LegacyCredentialsMap};
+use dns_orchestrator_core::traits::{CredentialStore, CredentialsMap};
 
 /// 存储格式检测枚举（用于双格式支持）
 #[derive(Deserialize)]

@@ -52,7 +52,7 @@ impl AliyunProvider {
             request,
             self.provider_name(),
             "POST",
-            &format!("{} (Action: {})", url, action),
+            &format!("{url} (Action: {action})"),
             self.max_retries,
         )
         .await?;

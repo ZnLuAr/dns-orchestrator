@@ -1,13 +1,13 @@
 //! DNS Provider abstraction library for multiple cloud platforms
 //!
 //! This library provides a unified interface for managing DNS records across
-//! different cloud providers including Cloudflare, Aliyun, DNSPod, and Huaweicloud.
+//! different cloud providers including Cloudflare, Aliyun, `DNSPod`, and Huaweicloud.
 //!
 //! # Features
 //!
 //! - `cloudflare` - Enable Cloudflare provider
 //! - `aliyun` - Enable Aliyun DNS provider
-//! - `dnspod` - Enable Tencent Cloud DNSPod provider
+//! - `dnspod` - Enable Tencent Cloud `DNSPod` provider
 //! - `huaweicloud` - Enable Huawei Cloud DNS provider
 //! - `all-providers` - Enable all providers
 //! - `native-tls` - Use native TLS backend (default)

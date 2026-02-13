@@ -1,4 +1,4 @@
-//! DNSPod TC3-HMAC-SHA256 签名
+//! `DNSPod` TC3-HMAC-SHA256 签名
 
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};

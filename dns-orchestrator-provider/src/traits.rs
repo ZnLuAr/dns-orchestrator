@@ -132,12 +132,12 @@ pub trait DnsProvider: Send + Sync {
     ///
     /// # TODO - 实现计划
     /// - [ ] Cloudflare: 使用 `POST /zones/{zone_id}/dns_records/batch` API
-    ///       文档: https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/batch/
+    ///       文档: <https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/batch>/
     ///       预期性能: 10,000 条记录快 850 倍
-    /// - [ ] DNSPod: 使用 `CreateRecordBatch` API（异步任务）
-    ///       文档: https://cloud.tencent.com/document/product/1427/56194
+    /// - [ ] `DNSPod`: 使用 `CreateRecordBatch` API（异步任务）
+    ///       文档: <https://cloud.tencent.com/document/product/1427/56194>
     /// - [ ] Aliyun: 调研批量 API 支持
-    ///       文档: https://help.aliyun.com/zh/dns/pubz-batch-operation/
+    ///       文档: <https://help.aliyun.com/zh/dns/pubz-batch-operation>/
     /// - [ ] Huaweicloud: 调研批量 API 支持
     ///
     /// # 未来优化
@@ -156,10 +156,10 @@ pub trait DnsProvider: Send + Sync {
     ///
     /// # TODO - 实现计划
     /// - [ ] Cloudflare: 使用批量 API
-    /// - [ ] DNSPod: 使用 `ModifyRecordBatch` API
+    /// - [ ] `DNSPod`: 使用 `ModifyRecordBatch` API
     /// - [ ] Aliyun: 调研批量 API 支持
     /// - [ ] Huaweicloud: 使用 `BatchUpdateRecordSetWithLine` API
-    ///       文档: https://support.huaweicloud.com/api-dns/BatchUpdateRecordSetWithLine.html
+    ///       文档: <https://support.huaweicloud.com/api-dns/BatchUpdateRecordSetWithLine.html>
     async fn batch_update_records(
         &self,
         _updates: &[BatchUpdateItem],
@@ -174,7 +174,7 @@ pub trait DnsProvider: Send + Sync {
     ///
     /// # TODO - 实现计划
     /// - [ ] Cloudflare: 使用批量 API
-    /// - [ ] DNSPod: 使用批量删除 API
+    /// - [ ] `DNSPod`: 使用批量删除 API
     /// - [ ] Aliyun: 调研批量 API 支持
     /// - [ ] Huaweicloud: 调研批量 API 支持
     async fn batch_delete_records(

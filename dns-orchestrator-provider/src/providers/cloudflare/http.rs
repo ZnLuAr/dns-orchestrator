@@ -166,7 +166,7 @@ impl CloudflareProvider {
         self.handle_cf_response_paginated(&response_text, ctx)
     }
 
-    /// 执行 GET 请求 (带自定义 URL，用于 list_records)
+    /// 执行 GET 请求 (带自定义 URL，用于 `list_records`)
     pub(crate) async fn get_records(
         &self,
         url: &str,
