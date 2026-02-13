@@ -109,7 +109,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -151,7 +151,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # Linux 构建
   release-linux:
@@ -185,7 +185,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -239,7 +239,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # MacOS 构建
   release-macos:
@@ -310,7 +310,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -361,7 +361,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # Android 构建
   release-android:
@@ -397,7 +397,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -477,7 +477,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4

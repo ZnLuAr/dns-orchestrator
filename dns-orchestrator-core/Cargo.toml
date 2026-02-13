@@ -14,29 +14,29 @@ rustls = ["dep:rustls", "dep:tokio-rustls", "dep:rustls-pki-types", "dep:webpki-
 
 [dependencies]
 # DNS Provider 抽象库
-dns-orchestrator-provider = { path = "../dns-orchestrator-provider", default-features = false, features = ["all-providers"] }
+dns-orchestrator-provider = { workspace = true, features = ["all-providers"] }
 
 # 核心依赖
-async-trait = "0.1"
-thiserror = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+async-trait.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 # 异步运行时
-tokio = { version = "1", features = ["sync"] }
-futures = "0.3"
+tokio = { workspace = true, features = ["sync"] }
+futures.workspace = true
 
 # 工具类
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-log = "0.4"
+uuid.workspace = true
+chrono.workspace = true
+log.workspace = true
 
 # 加密 (导入导出)
 aes-gcm = "0.10"
 pbkdf2 = { version = "0.12", features = ["simple"] }
-sha2 = "0.10"
+sha2.workspace = true
 base64 = "0.22"
-hex = "0.4"
+hex.workspace = true
 rand = "0.9"
 
 # Toolbox: WHOIS
@@ -47,7 +47,7 @@ regex = "1"
 hickory-resolver = { version = "0.25", features = ["dnssec-ring"] }
 
 # Toolbox: IP 查询
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
+reqwest.workspace = true
 
 # SSL 检查 (feature-gated)
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
@@ -58,22 +58,5 @@ webpki-roots = { version = "1", optional = true }
 x509-parser = { version = "0.18", optional = true }
 url = "2.5.7"
 
-# Clippy 配置
-[lints.rust]
-unsafe_code = "forbid"
-unused_imports = "warn"
-unused_variables = "warn"
-dead_code = "warn"
-
-[lints.clippy]
-all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-nursery = { level = "allow", priority = -1 }
-module_name_repetitions = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-must_use_candidate = "allow"
-too_many_lines = "allow"
-unwrap_used = "warn"
-expect_used = "warn"
-panic = "warn"
+[lints]
+workspace = true

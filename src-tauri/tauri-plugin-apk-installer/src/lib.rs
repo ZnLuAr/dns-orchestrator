@@ -2,9 +2,11 @@
 //!
 //! 用于在 Android 上安装 APK 文件，使用 FileProvider 正确处理 URI 转换。
 
+#[cfg(mobile)]
+use tauri::Manager;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Manager, Runtime,
+    Runtime,
 };
 
 mod commands;
@@ -18,6 +20,7 @@ pub use models::*;
 /// 插件错误类型
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[cfg(mobile)]
     #[error("Plugin invoke error: {0}")]
     PluginInvoke(#[from] tauri::plugin::mobile::PluginInvokeError),
 
@@ -56,11 +59,11 @@ impl<R: Runtime, T: Manager<R>> ApkInstallerExt<R> for T {
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("apk-installer")
         .invoke_handler(tauri::generate_handler![commands::install_apk])
-        .setup(|app, api| {
+        .setup(|_app, _api| {
             #[cfg(mobile)]
             {
-                let installer = mobile::ApkInstaller::new(app, api)?;
-                app.manage(installer);
+                let installer = mobile::ApkInstaller::new(_app, _api)?;
+                _app.manage(installer);
             }
             Ok(())
         })
