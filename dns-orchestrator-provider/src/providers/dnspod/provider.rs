@@ -23,8 +23,7 @@ impl DnspodProvider {
         match (status, dns_status) {
             ("ENABLE" | "enable", "") => DomainStatus::Active,
             ("PAUSE" | "pause", _) => DomainStatus::Paused,
-            ("ENABLE" | "enable", "DNSERROR") => DomainStatus::Error,
-            ("SPAM" | "spam", _) => DomainStatus::Error,
+            ("ENABLE" | "enable", "DNSERROR") | ("SPAM" | "spam", _) => DomainStatus::Error,
             _ => DomainStatus::Unknown,
         }
     }
@@ -113,8 +112,7 @@ impl DnspodProvider {
     /// 将 `RecordData` 转换为 `DNSPod` API 格式 (value, mx)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
         match data {
-            RecordData::A { address } => (address.clone(), None),
-            RecordData::AAAA { address } => (address.clone(), None),
+            RecordData::A { address } | RecordData::AAAA { address } => (address.clone(), None),
             RecordData::CNAME { target } => (target.clone(), None),
             RecordData::MX { priority, exchange } => (exchange.clone(), Some(*priority)),
             RecordData::TXT { text } => (text.clone(), None),

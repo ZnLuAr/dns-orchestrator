@@ -40,7 +40,7 @@ where
         Some(OptionalTimestamp::I64(ts)) => parse_unix_timestamp(ts)
             .map(Some)
             .ok_or_else(|| Error::custom("Invalid Unix timestamp")),
-        Some(OptionalTimestamp::U64(ts)) => parse_unix_timestamp(ts as i64)
+        Some(OptionalTimestamp::U64(ts)) => parse_unix_timestamp(ts.cast_signed())
             .map(Some)
             .ok_or_else(|| Error::custom("Invalid Unix timestamp")),
         None => Ok(None),

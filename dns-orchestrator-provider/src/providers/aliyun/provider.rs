@@ -124,8 +124,7 @@ impl AliyunProvider {
     /// 将 `RecordData` 转换为阿里云 API 格式 (value, priority)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
         match data {
-            RecordData::A { address } => (address.clone(), None),
-            RecordData::AAAA { address } => (address.clone(), None),
+            RecordData::A { address } | RecordData::AAAA { address } => (address.clone(), None),
             RecordData::CNAME { target } => (target.clone(), None),
             RecordData::MX { priority, exchange } => (exchange.clone(), Some(*priority)),
             RecordData::TXT { text } => (text.clone(), None),

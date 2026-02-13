@@ -22,6 +22,12 @@ pub const CURRENT_FILE_VERSION: u32 = 2;
 /// 获取当前版本的迭代次数（编译时计算）
 ///
 /// 从 `CURRENT_FILE_VERSION` 自动派生，确保加密和解密使用相同参数
+///
+/// # Panics
+/// Panics at compile time if `CURRENT_FILE_VERSION` does not map to a known iteration count.
+/// This is intentional: the const fn is evaluated at compile time, so an invalid version
+/// will cause a build failure rather than a runtime error.
+#[allow(clippy::panic)]
 pub const fn get_current_iterations() -> u32 {
     match get_pbkdf2_iterations(CURRENT_FILE_VERSION) {
         Some(iterations) => iterations,

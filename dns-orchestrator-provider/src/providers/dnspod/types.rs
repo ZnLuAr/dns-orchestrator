@@ -16,9 +16,6 @@ pub struct TencentResponseInner<T> {
     pub data: Option<T>,
     #[serde(rename = "Error")]
     pub error: Option<TencentError>,
-    #[serde(rename = "RequestId")]
-    #[allow(dead_code)]
-    pub request_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,8 +119,4 @@ pub struct CreateRecordResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ModifyRecordResponse {
-    #[serde(rename = "RecordId")]
-    #[allow(dead_code)]
-    pub record_id: u64,
-}
+pub struct ModifyRecordResponse {}

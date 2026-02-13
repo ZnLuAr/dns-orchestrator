@@ -1,5 +1,7 @@
 //! 华为云 `DnsProvider` trait 实现
 
+use std::fmt::Write;
+
 use async_trait::async_trait;
 use serde::Serialize;
 
@@ -136,8 +138,7 @@ impl HuaweicloudProvider {
     /// 将 `RecordData` 转换为华为云 API 格式（records 字符串）
     fn record_data_to_record_string(data: &RecordData) -> String {
         match data {
-            RecordData::A { address } => address.clone(),
-            RecordData::AAAA { address } => address.clone(),
+            RecordData::A { address } | RecordData::AAAA { address } => address.clone(),
             RecordData::CNAME { target } => target.clone(),
             RecordData::MX { priority, exchange } => format!("{priority} {exchange}"),
             RecordData::TXT { text } => text.clone(),
@@ -273,13 +274,13 @@ impl DnsProvider for HuaweicloudProvider {
         if let Some(ref keyword) = params.keyword
             && !keyword.is_empty()
         {
-            query.push_str(&format!("&name={}", urlencoding::encode(keyword)));
+            let _ = write!(query, "&name={}", urlencoding::encode(keyword));
         }
 
         // 添加记录类型过滤
         if let Some(ref record_type) = params.record_type {
             let type_str = record_type_to_string(record_type);
-            query.push_str(&format!("&type={}", urlencoding::encode(type_str)));
+            let _ = write!(query, "&type={}", urlencoding::encode(type_str));
         }
 
         let path = format!("/v2/zones/{domain_id}/recordsets");
@@ -334,6 +335,15 @@ impl DnsProvider for HuaweicloudProvider {
     }
 
     async fn create_record(&self, req: &CreateDnsRecordRequest) -> Result<DnsRecord> {
+        #[derive(Serialize)]
+        struct CreateRecordSetRequest {
+            name: String,
+            #[serde(rename = "type")]
+            record_type: String,
+            records: Vec<String>,
+            ttl: u32,
+        }
+
         // 获取域名信息
         let domain_info = self.get_domain(&req.domain_id).await?;
 
@@ -343,15 +353,6 @@ impl DnsProvider for HuaweicloudProvider {
         // 构造记录值
         let record_value = Self::record_data_to_record_string(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
-
-        #[derive(Serialize)]
-        struct CreateRecordSetRequest {
-            name: String,
-            #[serde(rename = "type")]
-            record_type: String,
-            records: Vec<String>,
-            ttl: u32,
-        }
 
         let api_req = CreateRecordSetRequest {
             name: full_name,
@@ -386,6 +387,15 @@ impl DnsProvider for HuaweicloudProvider {
         record_id: &str,
         req: &UpdateDnsRecordRequest,
     ) -> Result<DnsRecord> {
+        #[derive(Serialize)]
+        struct UpdateRecordSetRequest {
+            name: String,
+            #[serde(rename = "type")]
+            record_type: String,
+            records: Vec<String>,
+            ttl: u32,
+        }
+
         // 获取域名信息
         let domain_info = self.get_domain(&req.domain_id).await?;
 
@@ -395,15 +405,6 @@ impl DnsProvider for HuaweicloudProvider {
         // 构造记录值
         let record_value = Self::record_data_to_record_string(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
-
-        #[derive(Serialize)]
-        struct UpdateRecordSetRequest {
-            name: String,
-            #[serde(rename = "type")]
-            record_type: String,
-            records: Vec<String>,
-            ttl: u32,
-        }
 
         let api_req = UpdateRecordSetRequest {
             name: full_name,

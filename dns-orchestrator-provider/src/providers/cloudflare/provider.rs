@@ -1,5 +1,7 @@
 //! Cloudflare `DnsProvider` trait 实现
 
+use std::fmt::Write;
+
 use async_trait::async_trait;
 use serde::Deserialize;
 
@@ -194,7 +196,6 @@ impl CloudflareProvider {
 
     /// 将 `RecordData` 转换为 Cloudflare API 请求体
     fn build_create_body(
-        &self,
         full_name: &str,
         ttl: u32,
         data: &RecordData,
@@ -367,13 +368,13 @@ impl DnsProvider for CloudflareProvider {
         if let Some(ref keyword) = params.keyword
             && !keyword.is_empty()
         {
-            url.push_str(&format!("&name.contains={}", urlencoding::encode(keyword)));
+            let _ = write!(url, "&name.contains={}", urlencoding::encode(keyword));
         }
 
         // 添加记录类型过滤
         if let Some(ref record_type) = params.record_type {
             let type_str = crate::providers::common::record_type_to_string(record_type);
-            url.push_str(&format!("&type={}", urlencoding::encode(type_str)));
+            let _ = write!(url, "&type={}", urlencoding::encode(type_str));
         }
 
         let (cf_records, total_count) = self.get_records(&url, ctx).await?;
@@ -405,7 +406,7 @@ impl DnsProvider for CloudflareProvider {
         let zone_name = zone.name;
 
         let full_name = relative_to_full_name(&req.name, &zone_name);
-        let body = self.build_create_body(&full_name, req.ttl, &req.data, req.proxied);
+        let body = Self::build_create_body(&full_name, req.ttl, &req.data, req.proxied);
 
         let cf_record: CloudflareDnsRecord = self
             .post_json(&format!("/zones/{}/dns_records", req.domain_id), body, ctx)
@@ -432,7 +433,7 @@ impl DnsProvider for CloudflareProvider {
         let zone_name = zone.name;
 
         let full_name = relative_to_full_name(&req.name, &zone_name);
-        let body = self.build_create_body(&full_name, req.ttl, &req.data, req.proxied);
+        let body = Self::build_create_body(&full_name, req.ttl, &req.data, req.proxied);
 
         let cf_record: CloudflareDnsRecord = self
             .patch_json(

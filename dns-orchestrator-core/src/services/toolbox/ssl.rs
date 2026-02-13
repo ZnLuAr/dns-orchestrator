@@ -24,6 +24,12 @@ const TLS_TIMEOUT: Duration = Duration::from_secs(5);
 const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// 初始化 rustls CryptoProvider（仅初始化一次）
+///
+/// # Panics
+/// Panics if the default crypto provider cannot be installed. This is a fatal
+/// initialization error - TLS operations cannot function without a crypto provider,
+/// so there is no reasonable way to recover.
+#[allow(clippy::panic)]
 fn ensure_crypto_provider() {
     use std::sync::Once;
     static INIT: Once = Once::new();

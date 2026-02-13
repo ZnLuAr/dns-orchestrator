@@ -47,6 +47,7 @@ fn get_digest_type_name(digest_type: u8) -> String {
 }
 
 /// 从 RRSIG/SIG 记录提取签名信息
+#[allow(clippy::too_many_arguments)]
 fn extract_signature_record(
     type_covered: RecordType,
     algorithm: u8,
@@ -91,8 +92,6 @@ fn extract_signature_record(
 
 /// DNSSEC 验证
 pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<DnssecResult> {
-    let start_time = Instant::now();
-
     // Get system default DNS server addresses
     fn get_system_dns() -> String {
         let config = ResolverConfig::default();
@@ -107,6 +106,8 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<
             servers.join(", ")
         }
     }
+
+    let start_time = Instant::now();
 
     // 根据 nameserver 参数决定使用自定义还是系统默认
     let effective_ns = nameserver.filter(|s| !s.is_empty());
@@ -143,7 +144,6 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<
     let mut ds_records = Vec::new();
     let mut rrsig_records = Vec::new();
     let mut dnssec_enabled = false;
-    let mut validation_status = "indeterminate".to_string();
 
     // Query DNSKEY records
     if let Ok(response) = resolver.lookup(domain, RecordType::DNSKEY).await {
@@ -152,6 +152,8 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<
             // Try to parse DNSKEY from RData
             match record.data() {
                 RData::DNSSEC(DNSSECRData::DNSKEY(dnskey)) => {
+                    use base64::{engine::general_purpose::STANDARD, Engine};
+
                     // Extract flags
                     let flags = dnskey.flags();
 
@@ -162,7 +164,6 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<
 
                     // Extract public key bytes and encode as Base64
                     let public_key_bytes = public_key.public_bytes();
-                    use base64::{engine::general_purpose::STANDARD, Engine};
                     let public_key_b64 = STANDARD.encode(public_key_bytes);
 
                     // Calculate key tag
@@ -279,34 +280,36 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> CoreResult<
     // 注意：由于启用了 ResolverOpts.validate = true，hickory-resolver 会自动验证 DNSSEC
     // 如果验证失败（bogus 签名），查询会返回 SERVFAIL 错误
     // 因此，能成功查询到 DNSSEC 记录说明验证通过或未启用 DNSSEC
-    if dnssec_enabled {
+    let validation_status = if dnssec_enabled {
         if !dnskey_records.is_empty() && !ds_records.is_empty() {
             // 有完整的 DNSSEC 记录，且查询成功（验证通过）
-            validation_status = "secure".to_string();
             log::debug!(
                 "DNSSEC validation for {}: Found DNSKEY ({}) and DS ({}) records, validation passed",
                 domain,
                 dnskey_records.len(),
                 ds_records.len()
             );
+            "secure".to_string()
         } else if !dnskey_records.is_empty() || !ds_records.is_empty() {
             // 只有部分 DNSSEC 记录
-            validation_status = "indeterminate".to_string();
             log::debug!(
                 "DNSSEC validation for {}: Partial DNSSEC records (DNSKEY: {}, DS: {})",
                 domain,
                 dnskey_records.len(),
                 ds_records.len()
             );
+            "indeterminate".to_string()
         } else {
-            validation_status = "insecure".to_string();
             log::debug!("DNSSEC validation for {domain}: No DNSSEC records found");
+            "insecure".to_string()
         }
     } else {
-        validation_status = "insecure".to_string();
         log::debug!("DNSSEC validation for {domain}: DNSSEC not enabled");
-    }
+        "insecure".to_string()
+    };
 
+    // u128 -> u64: elapsed millis for a DNSSEC check will never exceed u64::MAX
+    #[allow(clippy::cast_possible_truncation)]
     let response_time_ms = start_time.elapsed().as_millis() as u64;
 
     Ok(DnssecResult {

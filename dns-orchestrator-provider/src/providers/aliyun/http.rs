@@ -58,7 +58,7 @@ impl AliyunProvider {
         .await?;
 
         // 5. 先检查是否有错误响应
-        if let Ok(error_response) = serde_json::from_str::<AliyunResponse<()>>(&response_text)
+        if let Ok(error_response) = serde_json::from_str::<AliyunResponse>(&response_text)
             && let (Some(code), Some(message)) = (error_response.code, error_response.message)
         {
             log::error!("API 错误: {code} - {message}");

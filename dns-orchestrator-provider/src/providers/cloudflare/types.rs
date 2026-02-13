@@ -14,17 +14,12 @@ pub struct CloudflareResponse<T> {
 
 #[derive(Debug, Deserialize)]
 pub struct CloudflareError {
-    #[allow(dead_code)]
     pub code: i32,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CloudflareResultInfo {
-    #[allow(dead_code)]
-    pub page: u32,
-    #[allow(dead_code)]
-    pub per_page: u32,
     pub total_count: u32,
 }
 

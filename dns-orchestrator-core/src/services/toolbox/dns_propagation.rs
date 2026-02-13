@@ -134,11 +134,16 @@ fn calculate_consistency(results: &[DnsPropagationServerResult]) -> (f32, Vec<St
 
     let total = successful_results.len();
     let max_count = value_counts.values().max().copied().unwrap_or(0);
-    let consistency = (max_count as f32 / total as f32) * 100.0;
+    // usize -> f64: these are small counts of DNS server results (typically < 20),
+    // well within f64's precise integer range (up to 2^52)
+    #[allow(clippy::cast_precision_loss)]
+    let consistency = (max_count as f64 / total as f64) * 100.0;
 
     let unique_values: Vec<_> = value_counts.keys().cloned().collect();
 
-    (consistency, unique_values)
+    #[allow(clippy::cast_possible_truncation)]
+    // f64 -> f32: consistency is a percentage (0.0..=100.0), well within f32 range
+    (consistency as f32, unique_values)
 }
 
 /// DNS 传播检查
@@ -162,6 +167,8 @@ pub async fn dns_propagation_check(
                     dns_lookup(&domain, &record_type, Some(&server.ip)),
                 )
                 .await;
+                // u128 -> u64: elapsed millis for a DNS query will never exceed u64::MAX
+                #[allow(clippy::cast_possible_truncation)]
                 let elapsed = query_start.elapsed().as_millis() as u64;
 
                 match result {
@@ -196,6 +203,8 @@ pub async fn dns_propagation_check(
     // 计算一致性
     let (consistency_percentage, unique_values) = calculate_consistency(&results);
 
+    // u128 -> u64: elapsed millis for DNS propagation check will never exceed u64::MAX
+    #[allow(clippy::cast_possible_truncation)]
     let total_time_ms = start_time.elapsed().as_millis() as u64;
 
     Ok(DnsPropagationResult {

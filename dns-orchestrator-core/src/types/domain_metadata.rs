@@ -147,13 +147,13 @@ impl DomainMetadataUpdate {
             metadata.is_favorite = is_favorite;
         }
         if let Some(ref tags) = self.tags {
-            metadata.tags = tags.clone();
+            metadata.tags.clone_from(tags);
         }
         if let Some(ref color) = self.color {
-            metadata.color = color.clone();
+            metadata.color.clone_from(color);
         }
         if let Some(ref note) = self.note {
-            metadata.note = note.clone();
+            metadata.note.clone_from(note);
         }
         metadata.touch();
     }

@@ -204,11 +204,10 @@ impl RecordData {
     pub fn display_value(&self) -> String {
         match self {
             Self::A { address } | Self::AAAA { address } => address.clone(),
-            Self::CNAME { target } => target.clone(),
+            Self::CNAME { target } | Self::SRV { target, .. } => target.clone(),
             Self::MX { exchange, .. } => exchange.clone(),
             Self::TXT { text } => text.clone(),
             Self::NS { nameserver } => nameserver.clone(),
-            Self::SRV { target, .. } => target.clone(),
             Self::CAA { value, .. } => value.clone(),
         }
     }

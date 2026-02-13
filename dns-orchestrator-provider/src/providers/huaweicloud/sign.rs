@@ -1,5 +1,7 @@
 //! 华为云 SDK-HMAC-SHA256 签名
 
+use std::fmt::Write;
+
 use sha2::{Digest, Sha256};
 
 use crate::providers::common::hmac_sha256;
@@ -40,8 +42,10 @@ impl HuaweicloudProvider {
 
         let canonical_headers: String = sorted_headers
             .iter()
-            .map(|(k, v)| format!("{}:{}\n", k.to_lowercase(), v.trim()))
-            .collect();
+            .fold(String::new(), |mut acc, (k, v)| {
+                let _ = writeln!(acc, "{}:{}", k.to_lowercase(), v.trim());
+                acc
+            });
 
         let signed_headers: String = sorted_headers
             .iter()

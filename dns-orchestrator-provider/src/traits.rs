@@ -53,14 +53,6 @@ pub(crate) trait ProviderErrorMapper {
     /// 将原始 API 错误映射到统一错误类型
     fn map_error(&self, raw: RawApiError, context: ErrorContext) -> ProviderError;
 
-    /// 快捷方法：网络错误
-    fn network_error(&self, detail: impl ToString) -> ProviderError {
-        ProviderError::NetworkError {
-            provider: self.provider_name().to_string(),
-            detail: detail.to_string(),
-        }
-    }
-
     /// 快捷方法：解析错误
     fn parse_error(&self, detail: impl ToString) -> ProviderError {
         ProviderError::ParseError {

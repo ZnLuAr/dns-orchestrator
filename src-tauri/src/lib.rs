@@ -397,6 +397,7 @@ pub fn run() {
         updater::install_apk,
     ]);
 
+    #[allow(clippy::expect_used)]
     builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

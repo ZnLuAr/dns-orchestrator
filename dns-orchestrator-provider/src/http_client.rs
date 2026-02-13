@@ -91,24 +91,6 @@ impl HttpUtils {
         })
     }
 
-    /// 组合：执行请求并解析 JSON
-    ///
-    /// 最常用的场景：发送请求 -> 获取响应 -> 解析 JSON
-    pub async fn execute_and_parse_json<T>(
-        request_builder: RequestBuilder,
-        provider_name: &str,
-        method_name: &str,
-        url_or_action: &str,
-    ) -> Result<T, ProviderError>
-    where
-        T: DeserializeOwned,
-    {
-        let (_status, text) =
-            Self::execute_request(request_builder, provider_name, method_name, url_or_action)
-                .await?;
-        Self::parse_json(&text, provider_name)
-    }
-
     /// 执行 HTTP 请求并返回响应文本（带重试）
     ///
     /// 自动重试网络错误，使用指数退避策略。
@@ -150,7 +132,7 @@ impl HttpUtils {
 
         for attempt in 0..=max_retries {
             // 克隆请求（RequestBuilder 只能使用一次）
-            let req = if let Some(r) = request_builder.try_clone() { r } else {
+            let Some(req) = request_builder.try_clone() else {
                 // 无法克隆（通常是 body stream 导致），回退到不重试
                 log::warn!("[{provider_name}] 无法克隆请求，禁用重试");
                 return Self::execute_request(
@@ -176,13 +158,15 @@ impl HttpUtils {
                     );
                     tokio::time::sleep(delay).await;
                     last_error = Some(e);
-                    continue;
                 }
                 Err(e) => return Err(e),
             }
         }
 
-        Err(last_error.unwrap())
+        Err(last_error.unwrap_or_else(|| ProviderError::NetworkError {
+            provider: provider_name.to_string(),
+            detail: "所有重试均失败，但未捕获到错误".to_string(),
+        }))
     }
 }
 

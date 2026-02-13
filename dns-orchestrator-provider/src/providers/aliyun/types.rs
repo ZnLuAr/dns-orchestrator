@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fmt::Write;
 
 use crate::error::{ProviderError, Result};
 
@@ -17,7 +18,7 @@ pub fn url_encode(s: &str) -> String {
             }
             _ => {
                 for byte in c.to_string().as_bytes() {
-                    result.push_str(&format!("%{byte:02X}"));
+                    let _ = write!(result, "%{byte:02X}");
                 }
             }
         }
@@ -83,10 +84,7 @@ pub fn serialize_to_query_string<T: Serialize>(params: &T) -> Result<String> {
 // ============ 阿里云 API 响应结构 ============
 
 #[derive(Debug, Deserialize)]
-pub struct AliyunResponse<T> {
-    #[serde(flatten)]
-    #[allow(dead_code)]
-    pub data: Option<T>,
+pub struct AliyunResponse {
     #[serde(rename = "Code")]
     pub code: Option<String>,
     #[serde(rename = "Message")]
@@ -111,8 +109,6 @@ pub struct DomainsWrapper {
 
 #[derive(Debug, Deserialize)]
 pub struct AliyunDomain {
-    #[serde(rename = "DomainId")]
-    pub domain_id: Option<String>,
     #[serde(rename = "DomainName")]
     pub domain_name: String,
     #[serde(rename = "DomainStatus")]
@@ -124,8 +120,6 @@ pub struct AliyunDomain {
 /// `ErrorRequireCheck`: `DescribeDomainInfo` API 响应结构，需验证字段映射是否正确
 #[derive(Debug, Deserialize)]
 pub struct DescribeDomainInfoResponse {
-    #[serde(rename = "DomainId")]
-    pub domain_id: Option<String>,
     #[serde(rename = "DomainName")]
     pub domain_name: String,
     #[serde(rename = "DomainStatus")]
@@ -177,15 +171,7 @@ pub struct AddDomainRecordResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpdateDomainRecordResponse {
-    #[serde(rename = "RecordId")]
-    #[allow(dead_code)]
-    pub record_id: String,
-}
+pub struct UpdateDomainRecordResponse {}
 
 #[derive(Debug, Deserialize)]
-pub struct DeleteDomainRecordResponse {
-    #[serde(rename = "RecordId")]
-    #[allow(dead_code)]
-    pub record_id: Option<String>,
-}
+pub struct DeleteDomainRecordResponse {}

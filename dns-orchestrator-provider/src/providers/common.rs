@@ -7,7 +7,6 @@ use hmac::{Hmac, Mac};
 use reqwest::Client;
 use sha2::Sha256;
 
-use crate::error::{ProviderError, Result};
 use crate::types::DnsRecordType;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -26,35 +25,20 @@ static SHARED_HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 pub fn create_http_client() -> Client {
     SHARED_HTTP_CLIENT
         .get_or_init(|| {
+            // Client::builder() only fails if TLS backend cannot initialize,
+            // which is a fatal configuration error — silently falling back
+            // to a default client with no timeouts would be worse.
+            #[allow(clippy::expect_used)]
             Client::builder()
                 .connect_timeout(Duration::from_secs(DEFAULT_CONNECT_TIMEOUT_SECS))
                 .timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS))
                 .build()
-                .expect("Failed to create HTTP client")
+                .expect("Failed to create HTTP client: TLS backend unavailable")
         })
         .clone()
 }
 
 // ============ 记录类型转换 ============
-
-/// 将字符串转换为 `DnsRecordType`
-pub fn parse_record_type(record_type: &str, provider: &str) -> Result<DnsRecordType> {
-    match record_type.to_uppercase().as_str() {
-        "A" => Ok(DnsRecordType::A),
-        "AAAA" => Ok(DnsRecordType::Aaaa),
-        "CNAME" => Ok(DnsRecordType::Cname),
-        "MX" => Ok(DnsRecordType::Mx),
-        "TXT" => Ok(DnsRecordType::Txt),
-        "NS" => Ok(DnsRecordType::Ns),
-        "SRV" => Ok(DnsRecordType::Srv),
-        "CAA" => Ok(DnsRecordType::Caa),
-        _ => Err(ProviderError::InvalidParameter {
-            provider: provider.to_string(),
-            param: "record_type".to_string(),
-            detail: format!("不支持的记录类型: {record_type}"),
-        }),
-    }
-}
 
 /// 将 `DnsRecordType` 转换为大写字符串
 pub fn record_type_to_string(record_type: &DnsRecordType) -> &'static str {
@@ -74,7 +58,9 @@ pub fn record_type_to_string(record_type: &DnsRecordType) -> &'static str {
 
 /// HMAC-SHA256 计算（供 aliyun/dnspod/huaweicloud 使用）
 pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
+    // HMAC-SHA256 accepts keys of any size, so new_from_slice never fails
+    #[allow(clippy::expect_used)]
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC-SHA256 accepts keys of any size");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }

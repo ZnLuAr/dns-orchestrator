@@ -21,6 +21,7 @@ fn convert_account(core_account: dns_orchestrator_core::types::Account) -> Accou
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn convert_account_status(
     status: dns_orchestrator_core::types::AccountStatus,
 ) -> crate::types::AccountStatus {
@@ -229,6 +230,7 @@ pub async fn import_accounts(
 
 /// 检查账户恢复是否完成
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
 pub fn is_restore_completed(state: State<'_, AppState>) -> bool {
     state
         .restore_completed

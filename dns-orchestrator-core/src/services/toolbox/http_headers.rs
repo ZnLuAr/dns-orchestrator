@@ -1,5 +1,6 @@
 //! HTTP 头检查模块
 
+use std::fmt::Write;
 use std::time::Instant;
 
 use log::debug;
@@ -124,23 +125,23 @@ pub async fn http_header_check(
             } else {
                 host.to_string()
             };
-            raw_request.push_str(&format!("Host: {host_header}\r\n"));
+            let _ = write!(raw_request, "Host: {host_header}\r\n");
         }
     }
 
     // 添加自定义请求头
     for header in &request.custom_headers {
         if !header.name.is_empty() && !header.value.is_empty() {
-            raw_request.push_str(&format!("{}: {}\r\n", header.name, header.value));
+            let _ = write!(raw_request, "{}: {}\r\n", header.name, header.value);
         }
     }
 
     // 添加 Content-Type 和请求体
     if let Some(body) = &request.body {
         if let Some(content_type) = &request.content_type {
-            raw_request.push_str(&format!("Content-Type: {content_type}\r\n"));
+            let _ = write!(raw_request, "Content-Type: {content_type}\r\n");
         }
-        raw_request.push_str(&format!("Content-Length: {}\r\n", body.len()));
+        let _ = write!(raw_request, "Content-Length: {}\r\n", body.len());
         raw_request.push_str("\r\n");
         raw_request.push_str(body);
     } else {
@@ -150,7 +151,7 @@ pub async fn http_header_check(
     // 构建原始响应报文
     let mut raw_response = format!("HTTP/1.1 {status_code} {status_text}\r\n");
     for header in &headers {
-        raw_response.push_str(&format!("{}: {}\r\n", header.name, header.value));
+        let _ = write!(raw_response, "{}: {}\r\n", header.name, header.value);
     }
     raw_response.push_str("\r\n");
     raw_response.push_str(&body);
@@ -163,11 +164,15 @@ pub async fn http_header_check(
         elapsed
     );
 
+    // u128 -> u64: elapsed millis for an HTTP request will never exceed u64::MAX
+    #[allow(clippy::cast_possible_truncation)]
+    let response_time_ms = elapsed.as_millis() as u64;
+
     Ok(HttpHeaderCheckResult {
         url,
         status_code,
         status_text,
-        response_time_ms: elapsed.as_millis() as u64,
+        response_time_ms,
         headers,
         security_analysis,
         content_length,

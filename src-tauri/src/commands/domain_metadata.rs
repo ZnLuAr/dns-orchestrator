@@ -292,6 +292,7 @@ pub struct DomainMetadataUpdate {
     pub color: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[allow(clippy::option_option)]
     pub note: Option<Option<String>>,
 }
 
