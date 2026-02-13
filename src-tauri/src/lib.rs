@@ -149,7 +149,7 @@ pub fn run() {
 
             // 1. 备份凭证（迁移前）
             let backup_result = async {
-                let raw_json = state.ctx.credential_store.load_raw_json().await?;
+                let raw_json = state.ctx.credential_store().load_raw_json().await?;
 
                 let data_dir = app_handle.path().app_data_dir().map_err(|e| {
                     dns_orchestrator_core::error::CoreError::StorageError(format!(
@@ -191,8 +191,8 @@ pub fn run() {
 
             // 2. 创建迁移服务
             let migration_service = MigrationService::new(
-                Arc::clone(&state.ctx.credential_store),
-                Arc::clone(&state.ctx.account_repository),
+                Arc::clone(state.ctx.credential_store()),
+                Arc::clone(state.ctx.account_repository()),
             );
 
             // 3. 执行迁移

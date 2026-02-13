@@ -33,15 +33,12 @@ use crate::types::AccountStatus;
 /// 服务上下文 - 持有所有依赖
 ///
 /// 平台层需要创建此上下文，并注入平台特定的存储实现。
+/// 字段通过 getter 方法访问，确保外部 crate 不能绕过服务层直接操作存储。
 pub struct ServiceContext {
-    /// 凭证存储
-    pub credential_store: Arc<dyn CredentialStore>,
-    /// 账户持久化仓库
-    pub account_repository: Arc<dyn AccountRepository>,
-    /// Provider 注册表
-    pub provider_registry: Arc<dyn ProviderRegistry>,
-    /// 域名元数据仓库
-    pub domain_metadata_repository: Arc<dyn DomainMetadataRepository>,
+    pub(crate) credential_store: Arc<dyn CredentialStore>,
+    pub(crate) account_repository: Arc<dyn AccountRepository>,
+    pub(crate) provider_registry: Arc<dyn ProviderRegistry>,
+    pub(crate) domain_metadata_repository: Arc<dyn DomainMetadataRepository>,
 }
 
 impl ServiceContext {
@@ -59,6 +56,26 @@ impl ServiceContext {
             provider_registry,
             domain_metadata_repository,
         }
+    }
+
+    /// 获取凭证存储的引用
+    pub fn credential_store(&self) -> &Arc<dyn CredentialStore> {
+        &self.credential_store
+    }
+
+    /// 获取账户仓库的引用
+    pub fn account_repository(&self) -> &Arc<dyn AccountRepository> {
+        &self.account_repository
+    }
+
+    /// 获取 Provider 注册表的引用
+    pub fn provider_registry(&self) -> &Arc<dyn ProviderRegistry> {
+        &self.provider_registry
+    }
+
+    /// 获取域名元数据仓库的引用
+    pub fn domain_metadata_repository(&self) -> &Arc<dyn DomainMetadataRepository> {
+        &self.domain_metadata_repository
     }
 
     /// 获取 Provider 实例
