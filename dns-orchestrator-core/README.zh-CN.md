@@ -1,49 +1,49 @@
 # dns-orchestrator-core
 
-Platform-agnostic core business logic library for DNS Orchestrator.
+DNS Orchestrator 的平台无关核心业务逻辑库。
 
-[简体中文](./README.zh-CN.md) | English
+简体中文 | [English](./README.md)
 
-## Features
+## 功能特性
 
-- **Unified Account Service** - Single `AccountService` for account CRUD, credential validation/storage, provider registration, and startup restore
-- **Trait-Based Storage Abstraction** - Inject platform-specific implementations via `AccountRepository`, `CredentialStore`, `ProviderRegistry`, and `DomainMetadataRepository`
-- **DNS Record Management** - List, create, update, delete, and batch delete DNS records through a unified service API
-- **Domain Metadata Layer** - Favorites, tags, color, and note metadata with single/batch operations
-- **Encrypted Import/Export** - `.dnso` account backup/import with optional AES-256-GCM encryption
-- **Credential Migration Support** - Legacy credential format migration to typed `ProviderCredentials`
+- **统一账户服务** - 使用单一 `AccountService` 处理账户 CRUD、凭证校验/存储、Provider 注册和启动恢复
+- **基于 Trait 的存储抽象** - 通过 `AccountRepository`、`CredentialStore`、`ProviderRegistry`、`DomainMetadataRepository` 注入平台实现
+- **DNS 记录管理** - 统一服务 API 支持 DNS 记录列表、创建、更新、删除与批量删除
+- **域名元数据层** - 支持收藏、标签、颜色、备注及单条/批量操作
+- **加密导入导出** - 支持 `.dnso` 账号备份/导入，可选 AES-256-GCM 加密
+- **凭证迁移支持** - 支持旧凭证格式迁移到类型安全的 `ProviderCredentials`
 
-## Core Services
+## 核心服务
 
-| Service | Description |
-|---------|-------------|
-| `AccountService` | Account lifecycle, credential operations, provider registration, startup restore |
-| `DnsService` | DNS record list/create/update/delete and batch delete |
-| `DomainService` | Domain listing and metadata merge |
-| `DomainMetadataService` | Favorites/tags/color/note metadata operations |
-| `ImportExportService` | Account export/import and encrypted preview flow |
-| `MigrationService` | Legacy credential format migration |
-| `ProviderMetadataService` | Supported provider metadata listing |
+| 服务 | 说明 |
+|------|------|
+| `AccountService` | 账户生命周期、凭证操作、Provider 注册、启动恢复 |
+| `DnsService` | DNS 记录列表/创建/更新/删除与批量删除 |
+| `DomainService` | 域名列表与元数据合并 |
+| `DomainMetadataService` | 收藏/标签/颜色/备注元数据管理 |
+| `ImportExportService` | 账户导入导出与加密预览流程 |
+| `MigrationService` | 旧凭证格式迁移 |
+| `ProviderMetadataService` | 支持的 Provider 元数据查询 |
 
-## Quick Start
+## 快速开始
 
-### Install
+### 安装
 
 ```toml
 [dependencies]
 dns-orchestrator-core = "0.1"
 ```
 
-### Implement Storage Traits
+### 实现存储 Trait
 
-Platform layer must implement:
+平台层需要实现：
 
 - `AccountRepository`
 - `CredentialStore`
 - `DomainMetadataRepository`
-- `ProviderRegistry` (or use built-in `InMemoryProviderRegistry`)
+- `ProviderRegistry`（或直接使用内置 `InMemoryProviderRegistry`）
 
-### Initialize Context and Services
+### 初始化 Context 与 Services
 
 ```rust
 use std::sync::Arc;
@@ -76,7 +76,7 @@ let migration_service = MigrationService::new(
 let provider_metadata_service = ProviderMetadataService::new();
 ```
 
-### Startup Sequence
+### 启动流程
 
 ```rust
 let migration = migration_service.migrate_if_needed().await?;
@@ -86,17 +86,17 @@ println!("migration: {:?}", migration);
 println!("restored: {}, errors: {}", restore.success_count, restore.error_count);
 ```
 
-## Architecture
+## 架构
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│ Platform Layer (Tauri / Actix-Web / custom backend)      │
-│ Implements storage traits and wires dependencies          │
+│ 平台层 (Tauri / Actix-Web / 自定义后端)                  │
+│ 实现存储 trait 并组装依赖                                 │
 └────────────────────────────┬──────────────────────────────┘
                              │ ServiceContext
 ┌────────────────────────────▼──────────────────────────────┐
 │ dns-orchestrator-core                                    │
-│ - AccountService (unified lifecycle + credential logic)  │
+│ - AccountService（统一生命周期与凭证逻辑）               │
 │ - DnsService / DomainService / DomainMetadataService     │
 │ - ImportExportService / MigrationService                 │
 └────────────────────────────┬──────────────────────────────┘
@@ -107,27 +107,27 @@ println!("restored: {}, errors: {}", restore.success_count, restore.error_count)
 └───────────────────────────────────────────────────────────┘
 ```
 
-Detailed architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+详细架构说明见：[docs/ARCHITECTURE.zh-CN.md](./docs/ARCHITECTURE.zh-CN.md)
 
-## Import/Export Encryption
+## 导入导出加密
 
-Encrypted export uses:
+加密导出使用：
 
 - `AES-256-GCM`
 - `PBKDF2-HMAC-SHA256`
-- 16-byte random salt + 12-byte random nonce
-- Version-based PBKDF2 iterations (`v1=100_000`, `v2=600_000`)
+- 16 字节随机 salt + 12 字节随机 nonce
+- 按文件版本选择 PBKDF2 迭代次数（`v1=100_000`，`v2=600_000`）
 
-Version constants are defined in `src/crypto/versions.rs`.
+版本常量定义在 `src/crypto/versions.rs`。
 
-## Development
+## 开发
 
 ```bash
-# From repository root
+# 在仓库根目录执行
 cargo check -p dns-orchestrator-core
 cargo test -p dns-orchestrator-core
 ```
 
-## License
+## 许可证
 
 MIT

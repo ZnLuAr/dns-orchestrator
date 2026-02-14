@@ -1,39 +1,39 @@
 # dns-orchestrator-provider
 
-Unified DNS provider abstraction library for managing DNS records across multiple cloud platforms.
+用于统一管理多云 DNS 记录的 Provider 抽象库。
 
-[简体中文](./README.zh-CN.md) | English
+简体中文 | [English](./README.md)
 
-## Features
+## 功能特性
 
-- **Unified Provider Trait** - Single `DnsProvider` interface for all supported providers
-- **Full DNS Record Lifecycle** - Create, read, update, delete, and batch operations for common record types
-- **Type-Safe Credentials** - `ProviderCredentials` enum prevents provider/credential mismatch
-- **Consistent Error Model** - Standardized `ProviderError` variants across providers
-- **Retry on Transient Failures** - Automatic retry with exponential backoff for network/timeout/rate-limit errors
-- **Feature-Flag Driven** - Enable only required providers and TLS backend
+- **统一 Provider Trait** - 所有厂商通过同一个 `DnsProvider` 接口访问
+- **完整 DNS 生命周期** - 支持常见记录类型的增删改查与批量操作
+- **类型安全凭证** - `ProviderCredentials` 枚举避免凭证与厂商错配
+- **统一错误模型** - 使用标准化 `ProviderError` 变体
+- **瞬态失败自动重试** - 对网络/超时/限流错误使用指数退避重试
+- **Feature Flag 控制编译** - 按需启用 Provider 与 TLS 后端
 
-## Supported Providers
+## 支持的 Provider
 
-| Provider | Feature Flag | Auth Method | Credential Fields |
-|----------|--------------|-------------|-------------------|
+| Provider | Feature Flag | 认证方式 | 凭证字段 |
+|----------|--------------|----------|----------|
 | Cloudflare | `cloudflare` | Bearer Token | `api_token` |
-| Aliyun DNS | `aliyun` | ACS3-HMAC-SHA256 | `access_key_id`, `access_key_secret` |
+| 阿里云 DNS | `aliyun` | ACS3-HMAC-SHA256 | `access_key_id`, `access_key_secret` |
 | DNSPod | `dnspod` | TC3-HMAC-SHA256 | `secret_id`, `secret_key` |
-| Huawei Cloud DNS | `huaweicloud` | AK/SK Signing | `access_key_id`, `secret_access_key` |
+| 华为云 DNS | `huaweicloud` | AK/SK Signing | `access_key_id`, `secret_access_key` |
 
-## Quick Start
+## 快速开始
 
-### Install
+### 安装
 
-Enable all providers (default):
+启用全部 Provider（默认）：
 
 ```toml
 [dependencies]
 dns-orchestrator-provider = { version = "0.1", features = ["all-providers"] }
 ```
 
-Enable only selected providers:
+按需启用 Provider：
 
 ```toml
 [dependencies]
@@ -42,22 +42,22 @@ dns-orchestrator-provider = { version = "0.1", default-features = false, feature
 
 ### Feature Flags
 
-Provider flags:
+Provider 相关：
 
-- `all-providers` (default)
+- `all-providers`（默认）
 - `cloudflare`
 - `aliyun`
 - `dnspod`
 - `huaweicloud`
 
-TLS backend flags:
+TLS 后端：
 
-- `native-tls` (default)
+- `native-tls`（默认）
 - `rustls`
 
-## Usage
+## 使用示例
 
-### Create Provider and Query Data
+### 创建 Provider 并查询数据
 
 ```rust,no_run
 use dns_orchestrator_provider::{create_provider, PaginationParams, ProviderCredentials};
@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Create Record
+### 创建记录
 
 ```rust,no_run
 # use dns_orchestrator_provider::{create_provider, CreateDnsRecordRequest, ProviderCredentials, RecordData};
@@ -101,7 +101,7 @@ println!("created: {}", record.id);
 # }
 ```
 
-### Batch Delete
+### 批量删除
 
 ```rust,no_run
 # use dns_orchestrator_provider::{create_provider, ProviderCredentials};
@@ -122,43 +122,43 @@ for failure in &result.failures {
 # }
 ```
 
-## Error Handling
+## 错误处理
 
-All operations return `Result<T, ProviderError>`.
+所有接口返回 `Result<T, ProviderError>`。
 
-Common categories:
+常见类别：
 
-- Authentication: `InvalidCredentials`
-- Resource conflicts/missing: `RecordExists`, `RecordNotFound`, `DomainNotFound`
-- Validation/permission: `InvalidParameter`, `PermissionDenied`, `DomainLocked`
-- Capacity/limits: `QuotaExceeded`, `RateLimited`
-- Infrastructure: `NetworkError`, `Timeout`, `ParseError`, `SerializationError`
+- 认证类：`InvalidCredentials`
+- 资源冲突/不存在：`RecordExists`、`RecordNotFound`、`DomainNotFound`
+- 参数/权限：`InvalidParameter`、`PermissionDenied`、`DomainLocked`
+- 配额/限流：`QuotaExceeded`、`RateLimited`
+- 基础设施：`NetworkError`、`Timeout`、`ParseError`、`SerializationError`
 
-Transient failures (`NetworkError`, `Timeout`, `RateLimited`) are retryable.
+瞬态失败（`NetworkError`、`Timeout`、`RateLimited`）可重试。
 
-## Architecture
+## 架构
 
 ```
 Consumer (core/tauri/web)
   -> create_provider(credentials)
   -> Arc<dyn DnsProvider>
-  -> provider-specific implementation (Cloudflare/Aliyun/DNSPod/Huawei)
-  -> shared HTTP utility + unified error mapping
+  -> 具体 provider 实现 (Cloudflare/Aliyun/DNSPod/Huawei)
+  -> 共享 HTTP 工具 + 统一错误映射
 ```
 
-Detailed docs:
+详细文档：
 
-- [Architecture](./docs/ARCHITECTURE.md)
-- [Testing Guide](./docs/TESTING.md)
+- [架构说明](./docs/ARCHITECTURE.zh-CN.md)
+- [测试指南](./docs/TESTING.zh-CN.md)
 
-## Development
+## 开发
 
 ```bash
-# From repository root
+# 在仓库根目录执行
 cargo check -p dns-orchestrator-provider
 cargo test -p dns-orchestrator-provider
 ```
 
-## License
+## 许可证
 
 MIT
