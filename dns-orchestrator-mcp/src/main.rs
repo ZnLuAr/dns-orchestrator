@@ -1,26 +1,60 @@
-//! MCP Server entry point for DNS Orchestrator (Read-Only)
+//! MCP Server entry point for DNS Orchestrator.
 //!
-//! Starts the MCP server with stdio transport, sharing credentials with the desktop app.
-//!
-//! # Read-Only Mode
-//!
-//! The MCP server operates in read-only mode - it can read accounts and domains
-//! from the desktop app's storage, but cannot modify them. This ensures the
-//! desktop app remains the single source of truth for data management.
+//! Starts the MCP server with stdio transport, sharing the desktop app's
+//! `SQLite` database and system keyring for credentials.
 
-mod adapters;
 mod schemas;
 mod server;
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use adapters::{KeyringCredentialStore, NoOpDomainMetadataRepository, TauriStoreAccountRepository};
-use dns_orchestrator_core::services::{AccountService, DomainMetadataService, ServiceContext};
-use dns_orchestrator_core::traits::{AccountRepository, InMemoryProviderRegistry};
+use dns_orchestrator_app::adapters::{KeyringCredentialStore, SqliteStore};
+use dns_orchestrator_app::{AppStateBuilder, NoopStartupHooks};
 use rmcp::ServiceExt;
 use server::DnsOrchestratorMcp;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+const PRIMARY_APP_DIR_NAME: &str = "net.esaps.dns-orchestrator";
+const LEGACY_APP_DIR_NAME: &str = "com.apts-1547.dns-orchestrator";
+const DB_FILE_NAME: &str = "data.db";
+
+/// Detect the Tauri desktop app's data directory.
+///
+/// Checks platform-specific locations for the `SQLite` database file,
+/// preferring the primary app identifier over the legacy one.
+fn resolve_app_data_dir() -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(data_dir) = dirs::data_dir() {
+        candidates.push(data_dir.join(PRIMARY_APP_DIR_NAME));
+        candidates.push(data_dir.join(LEGACY_APP_DIR_NAME));
+    }
+
+    if let Some(data_local_dir) = dirs::data_local_dir() {
+        candidates.push(data_local_dir.join(PRIMARY_APP_DIR_NAME));
+        candidates.push(data_local_dir.join(LEGACY_APP_DIR_NAME));
+    }
+
+    candidates.dedup();
+
+    // Prefer a directory that already has data.db
+    for candidate in &candidates {
+        if candidate.join(DB_FILE_NAME).exists() {
+            tracing::info!("Detected app data directory: {:?}", candidate);
+            return Some(candidate.clone());
+        }
+    }
+
+    // Fall back to primary path (SqliteStore will create the DB)
+    if let Some(default) = candidates.into_iter().next() {
+        tracing::warn!("No existing database found, defaulting to {:?}", default);
+        return Some(default);
+    }
+
+    None
+}
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -35,79 +69,56 @@ async fn main() -> ExitCode {
         .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 
-    tracing::info!("Starting DNS Orchestrator MCP Server (read-only mode)");
-    tracing::info!("MCP server shares data with desktop app but will not modify it");
+    tracing::info!("Starting DNS Orchestrator MCP Server");
 
-    // Create adapters
-    let store = KeyringCredentialStore::new();
-    let credential_store = {
-        tracing::info!("Credential store initialized");
-        Arc::new(store)
+    // Resolve database path (shared with desktop app)
+    let Some(data_dir) = resolve_app_data_dir() else {
+        tracing::error!("Failed to determine app data directory");
+        return ExitCode::FAILURE;
     };
+    let db_path = data_dir.join(DB_FILE_NAME);
 
-    let account_repository = Arc::new(TauriStoreAccountRepository::new());
-    let provider_registry = Arc::new(InMemoryProviderRegistry::new());
-    let domain_metadata_repository = Arc::new(NoOpDomainMetadataRepository::new());
-
-    // Create service context
-    let ctx = Arc::new(ServiceContext::new(
-        credential_store.clone(),
-        account_repository.clone(),
-        provider_registry.clone(),
-        domain_metadata_repository.clone(),
-    ));
-
-    // Create account service
-    let account_service = Arc::new(AccountService::new(Arc::clone(&ctx)));
-
-    // Restore accounts (bootstrap providers from stored credentials)
-    tracing::info!("Restoring accounts from stored credentials...");
-    let restore_result = match account_service.restore_accounts().await {
-        Ok(result) => {
-            tracing::info!(
-                "Account restoration complete: {} succeeded, {} failed",
-                result.success_count,
-                result.error_count
-            );
-            result
-        }
+    // Create adapters (same pattern as Tauri desktop)
+    let sqlite_store = match SqliteStore::new(&db_path, None).await {
+        Ok(store) => Arc::new(store),
         Err(e) => {
-            tracing::error!("Failed to restore accounts: {}", e);
-            // Continue anyway - toolbox tools still work
-            dns_orchestrator_core::services::RestoreResult {
-                success_count: 0,
-                error_count: 0,
-            }
+            tracing::error!("Failed to initialize SQLite store: {}", e);
+            return ExitCode::FAILURE;
         }
     };
 
-    // Check if all accounts failed (exit only if there were accounts and all failed)
-    let accounts = match account_repository.find_all().await {
-        Ok(accts) => accts,
+    let credential_store = Arc::new(KeyringCredentialStore::new());
+
+    // Build AppState via AppStateBuilder
+    let app_state = match AppStateBuilder::new()
+        .credential_store(credential_store)
+        .account_repository(sqlite_store.clone())
+        .domain_metadata_repository(sqlite_store)
+        .build()
+    {
+        Ok(state) => state,
         Err(e) => {
-            tracing::error!("Failed to load accounts: {}", e);
-            Vec::new()
+            tracing::error!("Failed to build app state: {}", e);
+            return ExitCode::FAILURE;
         }
     };
-    if !accounts.is_empty() && restore_result.success_count == 0 {
-        tracing::error!(
-            "All {} account(s) failed to restore. Check credentials and try again.",
-            accounts.len()
-        );
-        // Don't exit - toolbox tools still work without accounts
-        tracing::warn!("MCP server will continue with toolbox-only functionality");
+
+    // Run startup (migration + account restore)
+    if let Err(e) = app_state.run_startup(&NoopStartupHooks).await {
+        tracing::error!("Startup failed: {}", e);
+        // Continue anyway - toolbox tools still work
     }
 
-    // Create domain metadata service
-    let domain_metadata_service = Arc::new(DomainMetadataService::new(domain_metadata_repository));
+    // Create MCP server from AppState
+    let mcp_server = DnsOrchestratorMcp::new(
+        &app_state.ctx,
+        Arc::clone(&app_state.account_service),
+        Arc::clone(&app_state.domain_metadata_service),
+    );
 
-    // Create MCP server
-    let mcp_server = DnsOrchestratorMcp::new(&ctx, account_service, domain_metadata_service);
-
-    tracing::info!("MCP server initialized with 8 tools");
+    tracing::info!("MCP server initialized");
 
     // Start serving via stdio
-    tracing::info!("Starting MCP server on stdio transport");
     let service = match mcp_server.serve(rmcp::transport::stdio()).await {
         Ok(s) => s,
         Err(e) => {
@@ -116,7 +127,6 @@ async fn main() -> ExitCode {
         }
     };
 
-    // Wait for the server to complete
     if let Err(e) = service.waiting().await {
         tracing::error!("MCP server error: {}", e);
         return ExitCode::FAILURE;

@@ -1,6 +1,6 @@
-//! MCP Server implementation for DNS Orchestrator
+//! MCP Server implementation for DNS Orchestrator.
 //!
-//! Exposes 8 read-only tools for AI agents to interact with DNS management functionality.
+//! Exposes 8 tools for AI agents to interact with DNS management functionality.
 
 use async_trait::async_trait;
 use rmcp::{
@@ -131,14 +131,14 @@ fn sanitize_internal_error(error: impl std::fmt::Display, context: &str) -> McpE
     )
 }
 
-fn map_toolbox_error(context: &str, error: ToolboxError) -> McpError {
+fn map_toolbox_error(context: &str, error: &ToolboxError) -> McpError {
     tracing::warn!("{} error: {}", context, error);
     McpError::internal_error(error.to_string(), None)
 }
 
 /// MCP Server for DNS Orchestrator.
 ///
-/// Provides AI agents with read-only access to DNS management functionality
+/// Provides AI agents with access to DNS management functionality
 /// through the Model Context Protocol.
 #[derive(Clone)]
 pub struct DnsOrchestratorMcp {
@@ -299,7 +299,7 @@ impl DnsOrchestratorMcp {
         )
         .await
         .map_err(|_| McpError::internal_error("DNS lookup timeout".to_string(), None))?
-        .map_err(|e| map_toolbox_error("DNS lookup", e))?;
+        .map_err(|e| map_toolbox_error("DNS lookup", &e))?;
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| sanitize_internal_error(e, "Serialize DNS lookup result"))?;
@@ -321,7 +321,7 @@ impl DnsOrchestratorMcp {
         )
         .await
         .map_err(|_| McpError::internal_error("WHOIS lookup timeout".to_string(), None))?
-        .map_err(|e| map_toolbox_error("WHOIS lookup", e))?;
+        .map_err(|e| map_toolbox_error("WHOIS lookup", &e))?;
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| sanitize_internal_error(e, "Serialize WHOIS result"))?;
@@ -343,7 +343,7 @@ impl DnsOrchestratorMcp {
         )
         .await
         .map_err(|_| McpError::internal_error("IP lookup timeout".to_string(), None))?
-        .map_err(|e| map_toolbox_error("IP lookup", e))?;
+        .map_err(|e| map_toolbox_error("IP lookup", &e))?;
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| sanitize_internal_error(e, "Serialize IP lookup result"))?;
@@ -364,7 +364,7 @@ impl DnsOrchestratorMcp {
         )
         .await
         .map_err(|_| McpError::internal_error("DNS propagation check timeout".to_string(), None))?
-        .map_err(|e| map_toolbox_error("DNS propagation check", e))?;
+        .map_err(|e| map_toolbox_error("DNS propagation check", &e))?;
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| sanitize_internal_error(e, "Serialize DNS propagation result"))?;
@@ -385,7 +385,7 @@ impl DnsOrchestratorMcp {
         )
         .await
         .map_err(|_| McpError::internal_error("DNSSEC check timeout".to_string(), None))?
-        .map_err(|e| map_toolbox_error("DNSSEC check", e))?;
+        .map_err(|e| map_toolbox_error("DNSSEC check", &e))?;
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| sanitize_internal_error(e, "Serialize DNSSEC result"))?;
@@ -402,9 +402,8 @@ impl ServerHandler for DnsOrchestratorMcp {
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation::from_build_env(),
             instructions: Some(
-                "DNS Orchestrator MCP Server - Read-only access to DNS accounts and records across multiple providers \
+                "DNS Orchestrator MCP Server - Access DNS accounts and records across multiple providers \
                  (Cloudflare, Aliyun, DNSPod, Huaweicloud). \
-                 To modify DNS records, the user must manually open the DNS Orchestrator desktop application. \
                  Use list_accounts to see available accounts, list_domains to see domains, \
                  and list_records to view DNS records. \
                  Network diagnostic tools (dns_lookup, whois_lookup, ip_lookup, dns_propagation_check, dnssec_check) \
@@ -438,7 +437,81 @@ mod tests {
     };
     use tokio::sync::{Mutex, RwLock};
 
-    use crate::adapters::NoOpDomainMetadataRepository;
+    use crate::schemas::{
+        DnsLookupParams, DnsPropagationCheckParams, DnssecCheckParams, IpLookupParams,
+        ListAccountsParams, ListDomainsParams, ListRecordsParams, WhoisLookupParams,
+    };
+
+    /// Test-only no-op domain metadata repository.
+    struct NoOpDomainMetadataRepository;
+
+    #[async_trait]
+    impl DomainMetadataRepository for NoOpDomainMetadataRepository {
+        async fn find_by_key(
+            &self,
+            _key: &dns_orchestrator_core::types::DomainMetadataKey,
+        ) -> CoreResult<Option<dns_orchestrator_core::types::DomainMetadata>> {
+            Ok(None)
+        }
+        async fn find_by_keys(
+            &self,
+            _keys: &[dns_orchestrator_core::types::DomainMetadataKey],
+        ) -> CoreResult<
+            HashMap<
+                dns_orchestrator_core::types::DomainMetadataKey,
+                dns_orchestrator_core::types::DomainMetadata,
+            >,
+        > {
+            Ok(HashMap::new())
+        }
+        async fn save(
+            &self,
+            _key: &dns_orchestrator_core::types::DomainMetadataKey,
+            _metadata: &dns_orchestrator_core::types::DomainMetadata,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+        async fn batch_save(
+            &self,
+            _entries: &[(
+                dns_orchestrator_core::types::DomainMetadataKey,
+                dns_orchestrator_core::types::DomainMetadata,
+            )],
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+        async fn update(
+            &self,
+            _key: &dns_orchestrator_core::types::DomainMetadataKey,
+            _update: &dns_orchestrator_core::types::DomainMetadataUpdate,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+        async fn delete(
+            &self,
+            _key: &dns_orchestrator_core::types::DomainMetadataKey,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+        async fn delete_by_account(&self, _account_id: &str) -> CoreResult<()> {
+            Ok(())
+        }
+        async fn find_favorites_by_account(
+            &self,
+            _account_id: &str,
+        ) -> CoreResult<Vec<dns_orchestrator_core::types::DomainMetadataKey>> {
+            Ok(Vec::new())
+        }
+        async fn find_by_tag(
+            &self,
+            _tag: &str,
+        ) -> CoreResult<Vec<dns_orchestrator_core::types::DomainMetadataKey>> {
+            Ok(Vec::new())
+        }
+        async fn list_all_tags(&self) -> CoreResult<Vec<String>> {
+            Ok(Vec::new())
+        }
+    }
 
     struct TestCredentialStore;
 
@@ -558,22 +631,22 @@ mod tests {
 
     #[derive(Default)]
     struct MockDnsProvider {
-        last_domain_params: Mutex<Option<PaginationParams>>,
-        last_records_domain_id: Mutex<Option<String>>,
-        last_record_params: Mutex<Option<RecordQueryParams>>,
+        domain_params: Mutex<Option<PaginationParams>>,
+        records_domain_id: Mutex<Option<String>>,
+        record_params: Mutex<Option<RecordQueryParams>>,
     }
 
     impl MockDnsProvider {
-        async fn last_domain_params(&self) -> Option<PaginationParams> {
-            self.last_domain_params.lock().await.clone()
+        async fn domain_params(&self) -> Option<PaginationParams> {
+            self.domain_params.lock().await.clone()
         }
 
-        async fn last_records_domain_id(&self) -> Option<String> {
-            self.last_records_domain_id.lock().await.clone()
+        async fn records_domain_id(&self) -> Option<String> {
+            self.records_domain_id.lock().await.clone()
         }
 
-        async fn last_record_params(&self) -> Option<RecordQueryParams> {
-            self.last_record_params.lock().await.clone()
+        async fn record_params(&self) -> Option<RecordQueryParams> {
+            self.record_params.lock().await.clone()
         }
     }
 
@@ -605,7 +678,7 @@ mod tests {
             &self,
             params: &PaginationParams,
         ) -> dns_orchestrator_provider::Result<PaginatedResponse<ProviderDomain>> {
-            *self.last_domain_params.lock().await = Some(params.clone());
+            *self.domain_params.lock().await = Some(params.clone());
 
             Ok(PaginatedResponse::new(
                 vec![ProviderDomain {
@@ -639,8 +712,8 @@ mod tests {
             domain_id: &str,
             params: &RecordQueryParams,
         ) -> dns_orchestrator_provider::Result<PaginatedResponse<DnsRecord>> {
-            *self.last_records_domain_id.lock().await = Some(domain_id.to_string());
-            *self.last_record_params.lock().await = Some(params.clone());
+            *self.records_domain_id.lock().await = Some(domain_id.to_string());
+            *self.record_params.lock().await = Some(params.clone());
 
             Ok(PaginatedResponse::new(
                 vec![DnsRecord {
@@ -894,7 +967,7 @@ mod tests {
         }
 
         let domain_metadata_repository: Arc<dyn DomainMetadataRepository> =
-            Arc::new(NoOpDomainMetadataRepository::new());
+            Arc::new(NoOpDomainMetadataRepository);
 
         let ctx = Arc::new(ServiceContext::new(
             credential_store,
@@ -981,7 +1054,7 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let params = provider.last_domain_params().await.unwrap();
+        let params = provider.domain_params().await.unwrap();
         assert_eq!(params.page, 2);
         assert_eq!(params.page_size, 100);
     }
@@ -1014,11 +1087,11 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(
-            provider.last_records_domain_id().await,
+            provider.records_domain_id().await,
             Some("dom-1".to_string())
         );
 
-        let params = provider.last_record_params().await.unwrap();
+        let params = provider.record_params().await.unwrap();
         assert_eq!(params.page_size, 100);
         assert_eq!(params.keyword, Some("www".to_string()));
         assert_eq!(params.record_type, Some(ProviderDnsRecordType::Mx));
@@ -1052,7 +1125,7 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let params = provider.last_record_params().await.unwrap();
+        let params = provider.record_params().await.unwrap();
         assert!(params.record_type.is_none());
     }
 
@@ -1215,6 +1288,6 @@ mod tests {
         assert_eq!(info.protocol_version, ProtocolVersion::LATEST);
         let instructions = info.instructions.unwrap_or_default();
         assert!(instructions.contains("list_accounts"));
-        assert!(instructions.contains("Toolbox tools"));
+        assert!(instructions.contains("Network diagnostic tools"));
     }
 }

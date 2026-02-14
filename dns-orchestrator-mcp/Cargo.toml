@@ -16,38 +16,27 @@ rust-version = "1.89"
 
 [dependencies]
 # DNS Orchestrator crates
-dns-orchestrator-core = { path = "../dns-orchestrator-core", default-features = false, features = [
-    "rustls",
-] }
-dns-orchestrator-provider = { path = "../dns-orchestrator-provider", default-features = false, features = [
-    "all-providers",
-    "rustls",
-] }
-dns-orchestrator-toolbox = { path = "../dns-orchestrator-toolbox" }
+dns-orchestrator-core = { workspace = true, features = ["rustls"] }
+dns-orchestrator-provider = { workspace = true, features = ["all-providers", "rustls"] }
+dns-orchestrator-toolbox.workspace = true
+dns-orchestrator-app = { workspace = true, features = ["keyring-store", "sqlite-store"] }
 
 # MCP SDK
 rmcp = { version = "0.15", features = ["server", "transport-io"] }
 
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 schemars = "1.0"
 
 # Async trait
-async-trait = "0.1"
-
-# Keyring for credential storage (shared with desktop)
-keyring = { version = "3", features = [
-    "apple-native",        # macOS/iOS
-    "windows-native",      # Windows
-    "sync-secret-service",
-    "crypto-rust",         # Linux/FreeBSD/OpenBSD (DBus Secret Service)
-] }
+async-trait.workspace = true
 
 # Logging
+log.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
