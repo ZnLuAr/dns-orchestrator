@@ -6,10 +6,11 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use dns_orchestrator_provider::{create_provider, DnsProvider, ProviderCredentials};
+use dns_orchestrator_provider::{create_provider, DnsProvider, ProviderCredentials, ProviderType};
 
 use crate::error::{CoreError, CoreResult};
-use crate::traits::{AccountRepository, CredentialStore, CredentialsMap, ProviderRegistry};
+use crate::services::ServiceContext;
+use crate::traits::CredentialsMap;
 use crate::types::{
     Account, AccountStatus, BatchDeleteFailure, BatchDeleteResult, CreateAccountRequest,
     UpdateAccountRequest,
@@ -26,36 +27,26 @@ pub struct RestoreResult {
 
 /// 统一账户服务
 pub struct AccountService {
-    account_repository: Arc<dyn AccountRepository>,
-    credential_store: Arc<dyn CredentialStore>,
-    provider_registry: Arc<dyn ProviderRegistry>,
+    ctx: Arc<ServiceContext>,
 }
 
 impl AccountService {
     /// 创建账户服务实例
     #[must_use]
-    pub fn new(
-        account_repository: Arc<dyn AccountRepository>,
-        credential_store: Arc<dyn CredentialStore>,
-        provider_registry: Arc<dyn ProviderRegistry>,
-    ) -> Self {
-        Self {
-            account_repository,
-            credential_store,
-            provider_registry,
-        }
+    pub fn new(ctx: Arc<ServiceContext>) -> Self {
+        Self { ctx }
     }
 
     // ===== CRUD 操作 =====
 
     /// 列出所有账户
     pub async fn list_accounts(&self) -> CoreResult<Vec<Account>> {
-        self.account_repository.find_all().await
+        self.ctx.account_repository().find_all().await
     }
 
     /// 根据 ID 获取账户
     pub async fn get_account(&self, account_id: &str) -> CoreResult<Option<Account>> {
-        self.account_repository.find_by_id(account_id).await
+        self.ctx.account_repository().find_by_id(account_id).await
     }
 
     /// 更新账户状态
@@ -65,7 +56,8 @@ impl AccountService {
         status: AccountStatus,
         error: Option<String>,
     ) -> CoreResult<()> {
-        self.account_repository
+        self.ctx
+            .account_repository()
             .update_status(account_id, status, error)
             .await
     }
@@ -107,7 +99,43 @@ impl AccountService {
         };
 
         // 6. 保存元数据，失败时 cleanup
-        if let Err(e) = self.account_repository.save(&account).await {
+        if let Err(e) = self.ctx.account_repository().save(&account).await {
+            log::error!("Failed to save account metadata, cleaning up: {e}");
+            if let Err(cleanup_err) = self.delete_credentials(&account_id).await {
+                log::warn!("Cleanup: failed to delete credentials for {account_id}: {cleanup_err}");
+            }
+            self.unregister_provider(&account_id).await;
+            return Err(e);
+        }
+
+        Ok(account)
+    }
+
+    /// 从导入数据创建账户（不验证凭证）
+    pub async fn create_account_from_import(
+        &self,
+        name: String,
+        provider_type: ProviderType,
+        credentials: ProviderCredentials,
+    ) -> CoreResult<Account> {
+        let provider = create_provider(credentials.clone())?;
+        let account_id = uuid::Uuid::new_v4().to_string();
+        let now = Utc::now();
+
+        self.save_credentials(&account_id, &credentials).await?;
+        self.register_provider(account_id.clone(), provider).await;
+
+        let account = Account {
+            id: account_id.clone(),
+            name,
+            provider: provider_type,
+            created_at: now,
+            updated_at: now,
+            status: Some(AccountStatus::Active),
+            error: None,
+        };
+
+        if let Err(e) = self.ctx.account_repository().save(&account).await {
             log::error!("Failed to save account metadata, cleaning up: {e}");
             if let Err(cleanup_err) = self.delete_credentials(&account_id).await {
                 log::warn!("Cleanup: failed to delete credentials for {account_id}: {cleanup_err}");
@@ -126,25 +154,31 @@ impl AccountService {
     pub async fn update_account(&self, request: UpdateAccountRequest) -> CoreResult<Account> {
         // 1. 获取现有账户
         let mut account = self
-            .account_repository
+            .ctx
+            .account_repository()
             .find_by_id(&request.id)
             .await?
             .ok_or_else(|| CoreError::AccountNotFound(request.id.clone()))?;
 
         // 2. 如果提供了新凭证，验证并更新
-        if let Some(ref new_credentials) = request.credentials {
+        let old_credentials = if let Some(ref new_credentials) = request.credentials {
             let new_provider = self.validate_and_create_provider(new_credentials).await?;
+
+            // 备份旧凭证用于回滚
+            let old_creds = self.load_credentials(&request.id).await.ok();
 
             log::info!("Updating credentials for account: {}", request.id);
             self.save_credentials(&request.id, new_credentials).await?;
-
             self.register_provider(request.id.clone(), new_provider)
                 .await;
-            self.unregister_provider(&request.id).await;
 
             account.status = Some(AccountStatus::Active);
             account.error = None;
-        }
+
+            old_creds
+        } else {
+            None
+        };
 
         // 3. 更新名称（如果提供）
         if let Some(new_name) = request.name {
@@ -154,8 +188,24 @@ impl AccountService {
         // 4. 更新时间戳
         account.updated_at = Utc::now();
 
-        // 5. 保存更新后的账户
-        self.account_repository.save(&account).await?;
+        // 5. 保存更新后的账户，失败时回滚凭证
+        if let Err(e) = self.ctx.account_repository().save(&account).await {
+            if let Some(old_creds) = old_credentials {
+                log::warn!("Rolling back credentials for account: {}", request.id);
+                if let Err(rollback_err) = self.save_credentials(&request.id, &old_creds).await {
+                    log::error!(
+                        "Failed to rollback credentials for {}: {rollback_err}",
+                        request.id
+                    );
+                }
+                // 回滚 provider
+                if let Ok(old_provider) = create_provider(old_creds) {
+                    self.register_provider(request.id.clone(), old_provider)
+                        .await;
+                }
+            }
+            return Err(e);
+        }
 
         Ok(account)
     }
@@ -165,13 +215,14 @@ impl AccountService {
     /// 流程：先删除元数据，再清理内存和凭证（避免出现"幽灵账户"）
     pub async fn delete_account(&self, account_id: &str) -> CoreResult<()> {
         // 1. 检查账户存在
-        self.account_repository
+        self.ctx
+            .account_repository()
             .find_by_id(account_id)
             .await?
             .ok_or_else(|| CoreError::AccountNotFound(account_id.to_string()))?;
 
         // 2. 先删除账号元数据
-        self.account_repository.delete(account_id).await?;
+        self.ctx.account_repository().delete(account_id).await?;
 
         // 3. 注销 provider
         self.unregister_provider(account_id).await;
@@ -179,6 +230,16 @@ impl AccountService {
         // 4. 删除凭证
         if let Err(e) = self.delete_credentials(account_id).await {
             log::warn!("Failed to delete credentials for {account_id}: {e}");
+        }
+
+        // 5. 清理域名元数据
+        if let Err(e) = self
+            .ctx
+            .domain_metadata_repository()
+            .delete_by_account(account_id)
+            .await
+        {
+            log::warn!("Failed to delete domain metadata for {account_id}: {e}");
         }
 
         Ok(())
@@ -236,36 +297,48 @@ impl AccountService {
         account_id: &str,
         credentials: &ProviderCredentials,
     ) -> CoreResult<()> {
-        self.credential_store.set(account_id, credentials).await
+        self.ctx
+            .credential_store()
+            .set(account_id, credentials)
+            .await
     }
 
     /// 加载凭证
     pub async fn load_credentials(&self, account_id: &str) -> CoreResult<ProviderCredentials> {
-        self.credential_store.get(account_id).await?.ok_or_else(|| {
-            CoreError::CredentialError(format!("No credentials found for account: {account_id}"))
-        })
+        self.ctx
+            .credential_store()
+            .get(account_id)
+            .await?
+            .ok_or_else(|| {
+                CoreError::CredentialError(format!(
+                    "No credentials found for account: {account_id}"
+                ))
+            })
     }
 
     /// 删除凭证
     pub async fn delete_credentials(&self, account_id: &str) -> CoreResult<()> {
-        self.credential_store.remove(account_id).await
+        self.ctx.credential_store().remove(account_id).await
     }
 
     /// 加载所有凭证
     pub async fn load_all_credentials(&self) -> CoreResult<CredentialsMap> {
-        self.credential_store.load_all().await
+        self.ctx.credential_store().load_all().await
     }
 
     // ===== Provider 注册 =====
 
     /// 注册 Provider 到 Registry
     pub async fn register_provider(&self, account_id: String, provider: Arc<dyn DnsProvider>) {
-        self.provider_registry.register(account_id, provider).await;
+        self.ctx
+            .provider_registry()
+            .register(account_id, provider)
+            .await;
     }
 
     /// 注销 Provider
     pub async fn unregister_provider(&self, account_id: &str) {
-        self.provider_registry.unregister(account_id).await;
+        self.ctx.provider_registry().unregister(account_id).await;
     }
 
     // ===== 启动恢复 =====

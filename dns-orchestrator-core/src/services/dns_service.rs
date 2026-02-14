@@ -119,15 +119,18 @@ impl DnsService {
 
         let results = futures::future::join_all(delete_futures).await;
 
+        let mut account_marked_invalid = false;
         for result in results {
             match result {
                 Ok(_) => success_count += 1,
                 Err((record_id, e)) => {
-                    // 检查是否是凭证失效
-                    if let ProviderError::InvalidCredentials { .. } = &e {
-                        self.ctx
-                            .mark_account_invalid(account_id, "凭证已失效")
-                            .await;
+                    if !account_marked_invalid {
+                        if let ProviderError::InvalidCredentials { .. } = &e {
+                            self.ctx
+                                .mark_account_invalid(account_id, "凭证已失效")
+                                .await;
+                            account_marked_invalid = true;
+                        }
                     }
                     failures.push(BatchDeleteFailure {
                         record_id,

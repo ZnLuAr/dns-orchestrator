@@ -9,13 +9,17 @@ use crate::types::{AppDomain, DomainMetadataKey, PaginatedResponse, PaginationPa
 /// 域名管理服务
 pub struct DomainService {
     ctx: Arc<ServiceContext>,
+    metadata_service: Arc<DomainMetadataService>,
 }
 
 impl DomainService {
     /// 创建域名服务实例
     #[must_use]
-    pub fn new(ctx: Arc<ServiceContext>) -> Self {
-        Self { ctx }
+    pub fn new(ctx: Arc<ServiceContext>, metadata_service: Arc<DomainMetadataService>) -> Self {
+        Self {
+            ctx,
+            metadata_service,
+        }
     }
 
     /// 列出账号下的所有域名（分页）
@@ -46,10 +50,7 @@ impl DomainService {
                     .map(|d| (d.account_id.clone(), d.id.clone()))
                     .collect();
 
-                let metadata_service =
-                    DomainMetadataService::new(Arc::clone(&self.ctx.domain_metadata_repository));
-
-                if let Ok(metadata_map) = metadata_service.get_metadata_batch(keys).await {
+                if let Ok(metadata_map) = self.metadata_service.get_metadata_batch(keys).await {
                     for domain in &mut domains {
                         let key =
                             DomainMetadataKey::new(domain.account_id.clone(), domain.id.clone());

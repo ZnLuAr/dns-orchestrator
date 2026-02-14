@@ -18,4 +18,4 @@ pub mod utils;
 // Re-export 常用类型
 pub use error::{CoreError, CoreResult};
 pub use services::ServiceContext;
-pub use traits::{AccountRepository, CredentialStore, ProviderRegistry};
+pub use traits::{AccountRepository, CredentialStore, DomainMetadataRepository, ProviderRegistry};

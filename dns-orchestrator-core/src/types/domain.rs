@@ -42,11 +42,4 @@ impl AppDomain {
             metadata: None,
         }
     }
-
-    /// 附加元数据（供 `DomainService` 使用）
-    #[must_use]
-    pub fn with_metadata(mut self, metadata: Option<DomainMetadata>) -> Self {
-        self.metadata = metadata;
-        self
-    }
 }

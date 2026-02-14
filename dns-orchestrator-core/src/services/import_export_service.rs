@@ -3,27 +3,27 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use dns_orchestrator_provider::{create_provider, ProviderCredentials};
+use dns_orchestrator_provider::ProviderCredentials;
 
 use crate::crypto;
 use crate::error::{CoreError, CoreResult};
-use crate::services::ServiceContext;
+use crate::services::account_service::AccountService;
 use crate::types::{
-    Account, AccountStatus, ExportAccountsRequest, ExportAccountsResponse, ExportFile,
-    ExportFileHeader, ExportedAccount, ImportAccountsRequest, ImportFailure, ImportPreview,
-    ImportPreviewAccount, ImportResult,
+    Account, ExportAccountsRequest, ExportAccountsResponse, ExportFile, ExportFileHeader,
+    ExportedAccount, ImportAccountsRequest, ImportFailure, ImportPreview, ImportPreviewAccount,
+    ImportResult,
 };
 
 /// 账户导入导出服务
 pub struct ImportExportService {
-    ctx: Arc<ServiceContext>,
+    account_service: Arc<AccountService>,
 }
 
 impl ImportExportService {
     /// 创建导入导出服务实例
     #[must_use]
-    pub fn new(ctx: Arc<ServiceContext>) -> Self {
-        Self { ctx }
+    pub fn new(account_service: Arc<AccountService>) -> Self {
+        Self { account_service }
     }
 
     /// 解析并解密导出文件，返回账户列表
@@ -106,7 +106,7 @@ impl ImportExportService {
         app_version: &str,
     ) -> CoreResult<ExportAccountsResponse> {
         // 1. 获取选中账号的元数据
-        let all_accounts = self.ctx.account_repository.find_all().await?;
+        let all_accounts = self.account_service.list_accounts().await?;
         let selected_accounts: Vec<&Account> = all_accounts
             .iter()
             .filter(|a| request.account_ids.contains(&a.id))
@@ -119,8 +119,11 @@ impl ImportExportService {
         // 2. 加载凭证并构建导出数据
         let mut exported_accounts = Vec::new();
         for account in selected_accounts {
-            let Some(credentials) = self.ctx.credential_store.get(&account.id).await? else {
-                log::warn!("No credentials found for account: {}", account.id);
+            let Ok(credentials) = self.account_service.load_credentials(&account.id).await else {
+                log::warn!(
+                    "Failed to load credentials for account {}, skipping export",
+                    account.id
+                );
                 continue;
             };
 
@@ -215,7 +218,7 @@ impl ImportExportService {
         };
 
         // 3. 检查与现有账号的冲突
-        let existing_accounts = self.ctx.account_repository.find_all().await?;
+        let existing_accounts = self.account_service.list_accounts().await?;
         let existing_names: HashSet<_> =
             existing_accounts.iter().map(|a| a.name.as_str()).collect();
 
@@ -250,10 +253,8 @@ impl ImportExportService {
         // 2. 逐个导入账号
         let mut success_count = 0;
         let mut failures = Vec::new();
-        let now = chrono::Utc::now();
 
         for exported in accounts {
-            // 2.1 转换凭证并创建 provider 实例
             let credentials =
                 match ProviderCredentials::from_map(&exported.provider, &exported.credentials) {
                     Ok(c) => c,
@@ -265,65 +266,18 @@ impl ImportExportService {
                         continue;
                     }
                 };
-            let provider = match create_provider(credentials.clone()) {
-                Ok(p) => p,
-                Err(e) => {
-                    failures.push(ImportFailure {
-                        name: exported.name.clone(),
-                        reason: format!("创建 Provider 失败: {e}"),
-                    });
-                    continue;
-                }
-            };
 
-            // 2.2 生成新的账号 ID
-            let account_id = uuid::Uuid::new_v4().to_string();
-
-            // 2.3 保存凭证
-            if let Err(e) = self
-                .ctx
-                .credential_store
-                .set(&account_id, &credentials)
+            match self
+                .account_service
+                .create_account_from_import(exported.name.clone(), exported.provider, credentials)
                 .await
             {
-                failures.push(ImportFailure {
-                    name: exported.name.clone(),
-                    reason: format!("保存凭证失败: {e}"),
-                });
-                continue;
-            }
-
-            // 2.4 注册 provider
-            self.ctx
-                .provider_registry
-                .register(account_id.clone(), provider)
-                .await;
-
-            // 2.5 创建账号元数据
-            let account = Account {
-                id: account_id.clone(),
-                name: exported.name.clone(),
-                provider: exported.provider,
-                created_at: now,
-                updated_at: now,
-                status: Some(AccountStatus::Active),
-                error: None,
-            };
-
-            // 2.6 保存到仓库，失败时 cleanup
-            if let Err(e) = self.ctx.account_repository.save(&account).await {
-                // Cleanup: 删除凭证和注销 provider
-                let _ = self.ctx.credential_store.remove(&account_id).await;
-                self.ctx.provider_registry.unregister(&account_id).await;
-
-                failures.push(ImportFailure {
+                Ok(_) => success_count += 1,
+                Err(e) => failures.push(ImportFailure {
                     name: exported.name,
-                    reason: format!("保存账户失败: {e}"),
-                });
-                continue;
+                    reason: e.to_string(),
+                }),
             }
-
-            success_count += 1;
         }
 
         Ok(ImportResult {

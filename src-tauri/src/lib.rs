@@ -61,18 +61,15 @@ impl AppState {
         ));
 
         // 创建统一账户服务
-        let account_service = Arc::new(AccountService::new(
-            account_repository,
-            credential_store,
-            provider_registry,
-        ));
+        let account_service = Arc::new(AccountService::new(Arc::clone(&ctx)));
         let provider_metadata_service = ProviderMetadataService::new();
 
         // 创建其他服务
-        let import_export_service = ImportExportService::new(Arc::clone(&ctx));
-        let domain_service = DomainService::new(Arc::clone(&ctx));
+        let import_export_service = ImportExportService::new(Arc::clone(&account_service));
         let domain_metadata_service =
             Arc::new(DomainMetadataService::new(domain_metadata_repository));
+        let domain_service =
+            DomainService::new(Arc::clone(&ctx), Arc::clone(&domain_metadata_service));
         let dns_service = DnsService::new(Arc::clone(&ctx));
 
         Self {
