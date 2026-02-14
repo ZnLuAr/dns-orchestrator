@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TUI 处于开发阶段，许多模块尚未接入
+
 //! DNS Orchestrator TUI
 //!
 //! ## 架构
