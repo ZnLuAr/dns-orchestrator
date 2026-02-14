@@ -25,6 +25,40 @@ struct TauriStartupHooks {
     app_handle: tauri::AppHandle,
 }
 
+/// Write credential JSON to a timestamped backup file in `data_dir`.
+///
+/// Returns the backup file path on success, or `None` on failure.
+/// Extracted from `TauriStartupHooks` for testability.
+fn backup_credentials_to_dir(data_dir: &std::path::Path, raw_json: &str) -> Option<String> {
+    if let Err(e) = std::fs::create_dir_all(data_dir) {
+        log::warn!("Failed to create data dir for backup: {e}");
+        return None;
+    }
+
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let backup_path = data_dir.join(format!("credentials.backup.{timestamp}.json"));
+
+    if let Err(e) = std::fs::write(&backup_path, raw_json.as_bytes()) {
+        log::warn!("Failed to write backup: {e}");
+        return None;
+    }
+
+    let path_str = backup_path.display().to_string();
+    log::info!("凭证已备份到: {path_str}");
+    Some(path_str)
+}
+
+/// Delete a backup file by path.
+///
+/// Extracted from `TauriStartupHooks` for testability.
+fn cleanup_backup_file(backup_path: &str) {
+    if let Err(e) = std::fs::remove_file(backup_path) {
+        log::warn!("删除备份文件失败: {e}");
+    } else {
+        log::info!("已删除备份文件");
+    }
+}
+
 /// Migrate accounts and domain metadata from tauri-plugin-store JSON files to `SqliteStore`.
 ///
 /// Runs once on first upgrade. Detects old JSON files, imports data into `SQLite`,
@@ -155,30 +189,11 @@ impl StartupHooks for TauriStartupHooks {
             }
         };
 
-        if let Err(e) = std::fs::create_dir_all(&data_dir) {
-            log::warn!("Failed to create data dir for backup: {e}");
-            return None;
-        }
-
-        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-        let backup_path = data_dir.join(format!("credentials.backup.{timestamp}.json"));
-
-        if let Err(e) = std::fs::write(&backup_path, raw_json.as_bytes()) {
-            log::warn!("Failed to write backup: {e}");
-            return None;
-        }
-
-        let path_str = backup_path.display().to_string();
-        log::info!("凭证已备份到: {path_str}");
-        Some(path_str)
+        backup_credentials_to_dir(&data_dir, raw_json)
     }
 
     async fn cleanup_backup(&self, backup_info: &str) {
-        if let Err(e) = std::fs::remove_file(backup_info) {
-            log::warn!("删除备份文件失败: {e}");
-        } else {
-            log::info!("已删除备份文件");
-        }
+        cleanup_backup_file(backup_info);
     }
 
     async fn preserve_backup(&self, backup_info: &str, error: &str) {
@@ -373,4 +388,46 @@ pub fn run() {
     builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backup_credentials_to_dir_writes_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path().join("app_data");
+        // data_dir doesn't exist yet — function should create it
+        let raw_json = r#"{"key":"secret"}"#;
+
+        let result = backup_credentials_to_dir(&data_dir, raw_json);
+        assert!(result.is_some());
+
+        let path_str = result.unwrap();
+        let content = std::fs::read_to_string(&path_str).unwrap();
+        assert_eq!(content, raw_json);
+    }
+
+    #[test]
+    fn test_cleanup_backup_file_removes_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = tmp.path().join("backup.json");
+        std::fs::write(&file_path, "data").unwrap();
+        assert!(file_path.exists());
+
+        cleanup_backup_file(&file_path.display().to_string());
+        assert!(!file_path.exists());
+    }
+
+    #[test]
+    fn test_backup_credentials_creates_parent_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let nested = tmp.path().join("a").join("b").join("c");
+        assert!(!nested.exists());
+
+        let result = backup_credentials_to_dir(&nested, "{}");
+        assert!(result.is_some());
+        assert!(nested.exists());
+    }
 }

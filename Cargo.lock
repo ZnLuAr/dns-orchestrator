@@ -1830,6 +1830,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -1904,6 +1905,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-stronghold",
  "tauri-plugin-updater",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "urlencoding",

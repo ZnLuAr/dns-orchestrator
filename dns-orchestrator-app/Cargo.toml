@@ -46,5 +46,9 @@ sea-orm-migration = { workspace = true, optional = true, features = [
     "runtime-tokio-rustls",
 ] }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+tempfile = "3"
+
 [lints]
 workspace = true

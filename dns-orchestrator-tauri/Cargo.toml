@@ -65,5 +65,10 @@ tauri-plugin-apk-installer.workspace = true
 reqwest = { workspace = true, features = ["rustls-tls", "stream"] }
 minisign-verify = "0.2"
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+tempfile = "3"
+serde_json = { workspace = true }
+
 [lints]
 workspace = true
