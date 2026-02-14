@@ -15,12 +15,36 @@ publish = false
 [features]
 default = ["rustls"]
 rustls = ["dns-orchestrator-core/rustls"]
+keyring-store = ["dep:keyring"]
+sqlite-store = ["dep:sea-orm", "dep:sea-orm-migration"]
 
 [dependencies]
 dns-orchestrator-core = { workspace = true }
 async-trait.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+# Optional: keyring-based credential store (desktop only)
+keyring = { version = "3", optional = true, features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
+
+# Optional: SQLite-based unified store (MCP/TUI/CLI)
+sea-orm = { workspace = true, optional = true, features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+sea-orm-migration = { workspace = true, optional = true, features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+] }
 
 [lints]
 workspace = true

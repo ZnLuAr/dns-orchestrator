@@ -11,12 +11,137 @@ use commands::{account, dns, domain, domain_metadata, toolbox};
 use tauri::Manager;
 use tauri_plugin_log::{Target, TargetKind};
 
-use adapters::{TauriAccountRepository, TauriCredentialStore, TauriDomainMetadataRepository};
+#[cfg(not(target_os = "android"))]
+use adapters::SqliteStore;
+use adapters::TauriCredentialStore;
+#[cfg(target_os = "android")]
+use adapters::{TauriAccountRepository, TauriDomainMetadataRepository};
 use dns_orchestrator_app::{AppState, AppStateBuilder, StartupHooks};
+#[cfg(not(target_os = "android"))]
+use tauri_plugin_store::StoreExt;
 
 /// Tauri-specific startup hooks for credential backup.
 struct TauriStartupHooks {
     app_handle: tauri::AppHandle,
+}
+
+/// Migrate accounts and domain metadata from tauri-plugin-store JSON files to `SqliteStore`.
+///
+/// Runs once on first upgrade. Detects old JSON files, imports data into `SQLite`,
+/// then renames them to `.migrated` so the migration never runs again.
+#[cfg(not(target_os = "android"))]
+async fn migrate_json_to_sqlite(app_handle: &tauri::AppHandle, sqlite_store: &SqliteStore) {
+    use dns_orchestrator_core::traits::{AccountRepository, DomainMetadataRepository};
+    use dns_orchestrator_core::types::{Account, DomainMetadata, DomainMetadataKey};
+    use std::collections::HashMap;
+
+    let data_dir = match app_handle.path().app_data_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::warn!("Failed to get app data dir for migration: {e}");
+            return;
+        }
+    };
+
+    // --- accounts.json ---
+    let accounts_json = data_dir.join("accounts.json");
+    if accounts_json.exists() {
+        let accounts_migrated = match app_handle.store("accounts.json") {
+            Ok(store) => {
+                if let Some(value) = store.get("accounts") {
+                    match serde_json::from_value::<Vec<Account>>(value.clone()) {
+                        Ok(accounts) if !accounts.is_empty() => {
+                            match sqlite_store.save_all(&accounts).await {
+                                Ok(()) => {
+                                    log::info!(
+                                        "Migrated {} accounts from JSON to SQLite",
+                                        accounts.len()
+                                    );
+                                    true
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to migrate accounts to SQLite: {e}");
+                                    false
+                                }
+                            }
+                        }
+                        Ok(_) => true, // 空数组，无需迁移
+                        Err(e) => {
+                            log::warn!("Failed to parse accounts.json: {e}");
+                            false
+                        }
+                    }
+                } else {
+                    true // 无数据，无需迁移
+                }
+            }
+            Err(_) => true, // store 打开失败，跳过
+        };
+
+        if accounts_migrated {
+            let migrated_path = data_dir.join("accounts.json.migrated");
+            if let Err(e) = std::fs::rename(&accounts_json, &migrated_path) {
+                log::warn!("Failed to rename accounts.json: {e}");
+            }
+        }
+    }
+
+    // --- domain_metadata.json ---
+    let metadata_json = data_dir.join("domain_metadata.json");
+    if metadata_json.exists() {
+        let metadata_migrated = match app_handle.store("domain_metadata.json") {
+            Ok(store) => {
+                if let Some(value) = store.get("metadata") {
+                    match serde_json::from_value::<HashMap<String, DomainMetadata>>(value.clone()) {
+                        Ok(metadata_map) if !metadata_map.is_empty() => {
+                            let entries: Vec<(DomainMetadataKey, DomainMetadata)> = metadata_map
+                                .into_iter()
+                                .filter_map(|(storage_key, metadata)| {
+                                    DomainMetadataKey::from_storage_key(&storage_key)
+                                        .map(|key| (key, metadata))
+                                })
+                                .collect();
+
+                            if entries.is_empty() {
+                                true
+                            } else {
+                                match sqlite_store.batch_save(&entries).await {
+                                    Ok(()) => {
+                                        log::info!(
+                                            "Migrated {} domain metadata entries from JSON to SQLite",
+                                            entries.len()
+                                        );
+                                        true
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "Failed to migrate domain metadata to SQLite: {e}"
+                                        );
+                                        false
+                                    }
+                                }
+                            }
+                        }
+                        Ok(_) => true, // 空 map，无需迁移
+                        Err(e) => {
+                            log::warn!("Failed to parse domain_metadata.json: {e}");
+                            false
+                        }
+                    }
+                } else {
+                    true // 无数据，无需迁移
+                }
+            }
+            Err(_) => true, // store 打开失败，跳过
+        };
+
+        if metadata_migrated {
+            let migrated_path = data_dir.join("domain_metadata.json.migrated");
+            if let Err(e) = std::fs::rename(&metadata_json, &migrated_path) {
+                log::warn!("Failed to rename domain_metadata.json: {e}");
+            }
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -116,26 +241,52 @@ pub fn run() {
     let builder = builder.setup(|app| {
         let app_handle = app.handle().clone();
 
-        // 创建平台适配器
+        // ============ 桌面端：Keyring + SqliteStore ============
         #[cfg(not(target_os = "android"))]
-        let credential_store = Arc::new(TauriCredentialStore::new());
+        {
+            let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+            let db_path = data_dir.join("data.db");
 
+            // SqliteStore 不传密码（桌面端凭证走 Keyring）
+            let sqlite_store =
+                tauri::async_runtime::block_on(async { SqliteStore::new(&db_path, None).await })
+                    .map_err(|e| e.to_string())?;
+            let sqlite_store = Arc::new(sqlite_store);
+
+            let credential_store = Arc::new(TauriCredentialStore::new());
+
+            let state = AppStateBuilder::new()
+                .credential_store(credential_store)
+                .account_repository(sqlite_store.clone())
+                .domain_metadata_repository(sqlite_store.clone())
+                .build()
+                .map_err(|e| e.to_string())?;
+
+            app.manage(state);
+
+            // JSON → SQLite 数据迁移（首次升级时执行）
+            tauri::async_runtime::block_on(async {
+                migrate_json_to_sqlite(&app_handle, &sqlite_store).await;
+            });
+        }
+
+        // ============ Android 端：tauri-plugin-store ============
         #[cfg(target_os = "android")]
-        let credential_store = Arc::new(TauriCredentialStore::new(app_handle.clone()));
+        {
+            let credential_store = Arc::new(TauriCredentialStore::new(app_handle.clone()));
+            let account_repository = Arc::new(TauriAccountRepository::new(app_handle.clone()));
+            let domain_metadata_repository =
+                Arc::new(TauriDomainMetadataRepository::new(app_handle.clone()));
 
-        let account_repository = Arc::new(TauriAccountRepository::new(app_handle.clone()));
-        let domain_metadata_repository =
-            Arc::new(TauriDomainMetadataRepository::new(app_handle.clone()));
+            let state = AppStateBuilder::new()
+                .credential_store(credential_store)
+                .account_repository(account_repository)
+                .domain_metadata_repository(domain_metadata_repository)
+                .build()
+                .map_err(|e| e.to_string())?;
 
-        // 通过 AppStateBuilder 构建 AppState
-        let state = AppStateBuilder::new()
-            .credential_store(credential_store)
-            .account_repository(account_repository)
-            .domain_metadata_repository(domain_metadata_repository)
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        app.manage(state);
+            app.manage(state);
+        }
 
         // 执行凭证迁移（v1.7.0 - 阻塞操作，确保迁移完成后再恢复账户）
         let hooks = TauriStartupHooks {

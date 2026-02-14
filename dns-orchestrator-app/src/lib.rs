@@ -1,7 +1,10 @@
 //! Platform-agnostic application bootstrap for DNS Orchestrator.
 //!
 //! Provides `AppState` (service container), `AppStateBuilder` (adapter injection),
-//! and `StartupHooks` (platform-specific startup callbacks).
+//! `StartupHooks` (platform-specific startup callbacks), and generic file-based
+//! storage adapters for non-Tauri frontends.
+
+pub mod adapters;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
