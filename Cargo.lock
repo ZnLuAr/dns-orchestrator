@@ -1894,7 +1894,6 @@ dependencies = [
 name = "dns-orchestrator-mcp"
 version = "0.0.1"
 dependencies = [
- "anyhow",
  "async-trait",
  "chrono",
  "dirs 6.0.0",

@@ -124,7 +124,7 @@ impl ToolboxGateway for DefaultToolboxGateway {
 ///
 /// Logs the full error to stderr but returns a generic message to the client.
 fn sanitize_internal_error(error: impl std::fmt::Display, context: &str) -> McpError {
-    tracing::error!("{} error: {}", context, error);
+    log::error!("{context} error: {error}");
     McpError::internal_error(
         format!("{context} failed - check server logs for details"),
         None,
@@ -132,7 +132,7 @@ fn sanitize_internal_error(error: impl std::fmt::Display, context: &str) -> McpE
 }
 
 fn map_toolbox_error(context: &str, error: &ToolboxError) -> McpError {
-    tracing::warn!("{} error: {}", context, error);
+    log::warn!("{context} error: {error}");
     McpError::internal_error(error.to_string(), None)
 }
 
