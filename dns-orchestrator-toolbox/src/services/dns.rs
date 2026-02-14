@@ -4,9 +4,9 @@ use std::net::IpAddr;
 
 use futures::future::join_all;
 use hickory_resolver::{
+    TokioResolver,
     config::{NameServerConfigGroup, ResolverConfig, ResolverOpts},
     name_server::TokioConnectionProvider,
-    TokioResolver,
 };
 
 use crate::error::{ToolboxError, ToolboxResult};
@@ -227,30 +227,30 @@ async fn lookup_cname(resolver: &TokioResolver, domain: &str, records: &mut Vec<
 }
 
 async fn lookup_soa(resolver: &TokioResolver, domain: &str, records: &mut Vec<DnsLookupRecord>) {
-    if let Ok(response) = resolver.soa_lookup(domain).await {
-        if let Some(soa) = response.iter().next() {
-            let value = format!(
-                "{} {} {} {} {} {} {}",
-                soa.mname().to_string().trim_end_matches('.'),
-                soa.rname().to_string().trim_end_matches('.'),
-                soa.serial(),
-                soa.refresh(),
-                soa.retry(),
-                soa.expire(),
-                soa.minimum()
-            );
-            records.push(DnsLookupRecord {
-                record_type: "SOA".to_string(),
-                name: domain.to_string(),
-                value,
-                ttl: response
-                    .as_lookup()
-                    .record_iter()
-                    .next()
-                    .map_or(0, hickory_resolver::proto::rr::Record::ttl),
-                priority: None,
-            });
-        }
+    if let Ok(response) = resolver.soa_lookup(domain).await
+        && let Some(soa) = response.iter().next()
+    {
+        let value = format!(
+            "{} {} {} {} {} {} {}",
+            soa.mname().to_string().trim_end_matches('.'),
+            soa.rname().to_string().trim_end_matches('.'),
+            soa.serial(),
+            soa.refresh(),
+            soa.retry(),
+            soa.expire(),
+            soa.minimum()
+        );
+        records.push(DnsLookupRecord {
+            record_type: "SOA".to_string(),
+            name: domain.to_string(),
+            value,
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map_or(0, hickory_resolver::proto::rr::Record::ttl),
+            priority: None,
+        });
     }
 }
 

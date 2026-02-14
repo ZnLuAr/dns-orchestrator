@@ -71,14 +71,13 @@ fn parse_whois_response(domain: &str, raw: &str) -> WhoisResult {
 /// Try multiple regex patterns and return the first match.
 fn extract_field(text: &str, patterns: &[&str]) -> Option<String> {
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            if let Some(caps) = re.captures(text) {
-                if let Some(m) = caps.get(1) {
-                    let value = m.as_str().trim().to_string();
-                    if !value.is_empty() {
-                        return Some(value);
-                    }
-                }
+        if let Ok(re) = Regex::new(pattern)
+            && let Some(caps) = re.captures(text)
+            && let Some(m) = caps.get(1)
+        {
+            let value = m.as_str().trim().to_string();
+            if !value.is_empty() {
+                return Some(value);
             }
         }
     }

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use futures::future::join_all;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 use crate::error::ToolboxResult;
 use crate::types::{DnsPropagationResult, DnsPropagationServer, DnsPropagationServerResult};

@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{debug, error, trace, warn};
+use log::{debug, trace, warn};
 use rustls::crypto::CryptoProvider;
 use rustls::{ClientConfig, RootCertStore};
 use rustls_pki_types::{CertificateDer, ServerName};
@@ -25,23 +25,12 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// Initialize the rustls `CryptoProvider` (once).
 ///
-/// # Panics
-/// Panics if the default crypto provider cannot be installed. This is a fatal
-/// initialization error - TLS operations cannot function without a crypto provider,
-/// so there is no reasonable way to recover.
-#[allow(clippy::panic)]
+/// If a provider is already installed (by another part of the application),
+/// this is a no-op — `install_default` returns `Err` only to indicate that
+/// a provider was already set, which is perfectly fine.
 fn ensure_crypto_provider() {
-    use std::sync::Once;
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        if let Err(e) = CryptoProvider::install_default(rustls::crypto::ring::default_provider()) {
-            error!(
-                "FATAL: Failed to install rustls crypto provider: {e:?}. \
-                 This is a critical initialization error. The application cannot continue."
-            );
-            panic!("Failed to install default rustls crypto provider: {e:?}");
-        }
-    });
+    // Ignore the error: Err means a provider is already installed.
+    let _ = CryptoProvider::install_default(rustls::crypto::ring::default_provider());
 }
 
 /// Check whether a plain HTTP connection is available (async).
@@ -368,10 +357,10 @@ fn check_domain_match(query: &str, cn: Option<&str>, san: &[String]) -> bool {
     let query_lower = query.to_lowercase();
 
     // Check CN
-    if let Some(cn) = cn {
-        if matches_domain(&query_lower, &cn.to_lowercase()) {
-            return true;
-        }
+    if let Some(cn) = cn
+        && matches_domain(&query_lower, &cn.to_lowercase())
+    {
+        return true;
     }
 
     // Check SANs

@@ -115,15 +115,15 @@ pub async fn http_header_check(
     let mut raw_request = format!("{} {} HTTP/1.1\r\n", method.as_str(), url);
 
     // Parse Host from URL
-    if let Ok(parsed_url) = Url::parse(&url) {
-        if let Some(host) = parsed_url.host_str() {
-            let host_header = if let Some(port) = parsed_url.port() {
-                format!("{host}:{port}")
-            } else {
-                host.to_string()
-            };
-            let _ = write!(raw_request, "Host: {host_header}\r\n");
-        }
+    if let Ok(parsed_url) = Url::parse(&url)
+        && let Some(host) = parsed_url.host_str()
+    {
+        let host_header = if let Some(port) = parsed_url.port() {
+            format!("{host}:{port}")
+        } else {
+            host.to_string()
+        };
+        let _ = write!(raw_request, "Host: {host_header}\r\n");
     }
 
     // Append custom headers to raw request

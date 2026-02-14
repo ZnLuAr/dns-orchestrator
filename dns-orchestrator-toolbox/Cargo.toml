@@ -1,7 +1,7 @@
 [package]
 name = "dns-orchestrator-toolbox"
-version = "0.1.0"
-edition = "2021"
+version = "0.1.1"
+edition = "2024"
 license = "MIT"
 description = "Network diagnostic toolbox: WHOIS, DNS lookup, IP geolocation, SSL certificate check, HTTP headers, DNSSEC validation"
 authors = ["AptS-1547 <apts-1547@esaps.net>"]

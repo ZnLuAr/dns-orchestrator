@@ -4,13 +4,13 @@ use std::net::IpAddr;
 use std::time::Instant;
 
 use hickory_resolver::{
+    TokioResolver,
     config::{NameServerConfigGroup, ResolverConfig, ResolverOpts},
     name_server::TokioConnectionProvider,
     proto::{
-        dnssec::{rdata::DNSSECRData, PublicKey},
-        rr::{record_data::RData, RecordType},
+        dnssec::{PublicKey, rdata::DNSSECRData},
+        rr::{RecordType, record_data::RData},
     },
-    TokioResolver,
 };
 
 use crate::error::{ToolboxError, ToolboxResult};
@@ -59,7 +59,7 @@ fn extract_signature_record(
     signer_name: &str,
     signature_bytes: &[u8],
 ) -> RrsigRecord {
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use chrono::{DateTime, Utc};
 
     // Format timestamps
@@ -152,7 +152,7 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
             // Try to parse DNSKEY from RData
             match record.data() {
                 RData::DNSSEC(DNSSECRData::DNSKEY(dnskey)) => {
-                    use base64::{engine::general_purpose::STANDARD, Engine};
+                    use base64::{Engine, engine::general_purpose::STANDARD};
 
                     // Extract flags
                     let flags = dnskey.flags();

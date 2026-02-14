@@ -1,9 +1,9 @@
 //! IP geolocation lookup module.
 
 use hickory_resolver::{
+    TokioResolver,
     config::{ResolverConfig, ResolverOpts},
     name_server::TokioConnectionProvider,
-    TokioResolver,
 };
 use serde::Deserialize;
 
