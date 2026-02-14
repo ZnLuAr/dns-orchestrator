@@ -799,9 +799,13 @@ mod tests {
     fn credentials_cloudflare_roundtrip() {
         let map: HashMap<String, String> =
             [("apiToken".to_string(), "my-token".to_string())].into();
-        let cred = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map).unwrap();
+        let res = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map);
+        assert!(res.is_ok(), "expected Ok(..), got {res:?}");
+        let Ok(cred) = res else {
+            return;
+        };
         let back = cred.to_map();
-        assert_eq!(back.get("apiToken").unwrap(), "my-token");
+        assert_eq!(back.get("apiToken").map(String::as_str), Some("my-token"));
         assert_eq!(cred.provider_type(), ProviderType::Cloudflare);
     }
 
@@ -812,10 +816,17 @@ mod tests {
             ("accessKeySecret".to_string(), "secret456".to_string()),
         ]
         .into();
-        let cred = ProviderCredentials::from_map(&ProviderType::Aliyun, &map).unwrap();
+        let res = ProviderCredentials::from_map(&ProviderType::Aliyun, &map);
+        assert!(res.is_ok(), "expected Ok(..), got {res:?}");
+        let Ok(cred) = res else {
+            return;
+        };
         let back = cred.to_map();
-        assert_eq!(back.get("accessKeyId").unwrap(), "id123");
-        assert_eq!(back.get("accessKeySecret").unwrap(), "secret456");
+        assert_eq!(back.get("accessKeyId").map(String::as_str), Some("id123"));
+        assert_eq!(
+            back.get("accessKeySecret").map(String::as_str),
+            Some("secret456")
+        );
     }
 
     #[test]
@@ -825,10 +836,14 @@ mod tests {
             ("secretKey".to_string(), "skey".to_string()),
         ]
         .into();
-        let cred = ProviderCredentials::from_map(&ProviderType::Dnspod, &map).unwrap();
+        let res = ProviderCredentials::from_map(&ProviderType::Dnspod, &map);
+        assert!(res.is_ok(), "expected Ok(..), got {res:?}");
+        let Ok(cred) = res else {
+            return;
+        };
         let back = cred.to_map();
-        assert_eq!(back.get("secretId").unwrap(), "sid");
-        assert_eq!(back.get("secretKey").unwrap(), "skey");
+        assert_eq!(back.get("secretId").map(String::as_str), Some("sid"));
+        assert_eq!(back.get("secretKey").map(String::as_str), Some("skey"));
     }
 
     #[test]
@@ -838,27 +853,34 @@ mod tests {
             ("secretAccessKey".to_string(), "sk".to_string()),
         ]
         .into();
-        let cred = ProviderCredentials::from_map(&ProviderType::Huaweicloud, &map).unwrap();
+        let res = ProviderCredentials::from_map(&ProviderType::Huaweicloud, &map);
+        assert!(res.is_ok(), "expected Ok(..), got {res:?}");
+        let Ok(cred) = res else {
+            return;
+        };
         let back = cred.to_map();
-        assert_eq!(back.get("accessKeyId").unwrap(), "ak");
-        assert_eq!(back.get("secretAccessKey").unwrap(), "sk");
+        assert_eq!(back.get("accessKeyId").map(String::as_str), Some("ak"));
+        assert_eq!(back.get("secretAccessKey").map(String::as_str), Some("sk"));
     }
 
     #[test]
     fn credentials_missing_field() {
         let map: HashMap<String, String> = HashMap::new();
-        let err = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map).unwrap_err();
-        assert!(matches!(
-            err,
-            CredentialValidationError::MissingField { .. }
-        ));
+        let res = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map);
+        assert!(
+            matches!(&res, Err(CredentialValidationError::MissingField { .. })),
+            "unexpected result: {res:?}"
+        );
     }
 
     #[test]
     fn credentials_empty_field() {
         let map: HashMap<String, String> = [("apiToken".to_string(), "  ".to_string())].into();
-        let err = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map).unwrap_err();
-        assert!(matches!(err, CredentialValidationError::EmptyField { .. }));
+        let res = ProviderCredentials::from_map(&ProviderType::Cloudflare, &map);
+        assert!(
+            matches!(&res, Err(CredentialValidationError::EmptyField { .. })),
+            "unexpected result: {res:?}"
+        );
     }
 
     // ============ PaginatedResponse 分页计算测试 ============
@@ -894,13 +916,24 @@ mod tests {
     #[test]
     fn dns_record_type_serialize() {
         let a = DnsRecordType::A;
-        let json = serde_json::to_string(&a).unwrap();
+        let json_res = serde_json::to_string(&a);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
         assert_eq!(json, "\"A\"");
     }
 
     #[test]
     fn dns_record_type_deserialize() {
-        let a: DnsRecordType = serde_json::from_str("\"AAAA\"").unwrap();
+        let a_res: serde_json::Result<DnsRecordType> = serde_json::from_str("\"AAAA\"");
+        assert!(a_res.is_ok(), "serde_json::from_str failed: {a_res:?}");
+        let Ok(a) = a_res else {
+            return;
+        };
         assert_eq!(a, DnsRecordType::Aaaa);
     }
 
@@ -917,8 +950,23 @@ mod tests {
             DnsRecordType::Caa,
         ];
         for t in types {
-            let json = serde_json::to_string(&t).unwrap();
-            let back: DnsRecordType = serde_json::from_str(&json).unwrap();
+            let json_res = serde_json::to_string(&t);
+            assert!(
+                json_res.is_ok(),
+                "serde_json::to_string failed: {json_res:?}"
+            );
+            let Ok(json) = json_res else {
+                return;
+            };
+
+            let back_res: serde_json::Result<DnsRecordType> = serde_json::from_str(&json);
+            assert!(
+                back_res.is_ok(),
+                "serde_json::from_str failed: {back_res:?}"
+            );
+            let Ok(back) = back_res else {
+                return;
+            };
             assert_eq!(back, t);
         }
     }
@@ -933,8 +981,23 @@ mod tests {
             port: 443,
             target: "example.com".to_string(),
         };
-        let json = serde_json::to_string(&data).unwrap();
-        let back: RecordData = serde_json::from_str(&json).unwrap();
+        let json_res = serde_json::to_string(&data);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
+
+        let back_res: serde_json::Result<RecordData> = serde_json::from_str(&json);
+        assert!(
+            back_res.is_ok(),
+            "serde_json::from_str failed: {back_res:?}"
+        );
+        let Ok(back) = back_res else {
+            return;
+        };
         assert_eq!(back, data);
     }
 
@@ -945,8 +1008,23 @@ mod tests {
             tag: "issue".to_string(),
             value: "letsencrypt.org".to_string(),
         };
-        let json = serde_json::to_string(&data).unwrap();
-        let back: RecordData = serde_json::from_str(&json).unwrap();
+        let json_res = serde_json::to_string(&data);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
+
+        let back_res: serde_json::Result<RecordData> = serde_json::from_str(&json);
+        assert!(
+            back_res.is_ok(),
+            "serde_json::from_str failed: {back_res:?}"
+        );
+        let Ok(back) = back_res else {
+            return;
+        };
         assert_eq!(back, data);
     }
 

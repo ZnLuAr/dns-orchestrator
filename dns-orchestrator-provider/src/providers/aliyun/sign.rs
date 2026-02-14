@@ -61,10 +61,13 @@ mod tests {
     }
 
     /// 辅助函数: 从签名输出中提取 Signature= 部分的值
-    fn extract_signature(auth: &str) -> &str {
-        auth.split("Signature=")
-            .nth(1)
-            .expect("missing Signature= in output")
+    fn extract_signature(auth: &str) -> Option<&str> {
+        auth.split("Signature=").nth(1)
+    }
+
+    /// 辅助函数: 从签名输出中提取 `key=` 后、逗号前的值。
+    fn extract_csv_field<'a>(auth: &'a str, key: &str) -> Option<&'a str> {
+        auth.split(key).nth(1).and_then(|s| s.split(',').next())
     }
 
     // ============ 签名格式测试 ============
@@ -98,11 +101,14 @@ mod tests {
         let provider = make_provider(key_id, "some-secret");
         let result = provider.sign("DescribeDomains", "", "2024-01-01T00:00:00Z", "nonce-1");
 
-        let credential = result
-            .split("Credential=")
-            .nth(1)
-            .and_then(|s| s.split(',').next())
-            .expect("failed to extract Credential value");
+        let credential_opt = extract_csv_field(&result, "Credential=");
+        assert!(
+            credential_opt.is_some(),
+            "failed to extract Credential value: {result}"
+        );
+        let Some(credential) = credential_opt else {
+            return;
+        };
 
         assert_eq!(credential, key_id, "Credential should equal access_key_id");
     }
@@ -112,11 +118,14 @@ mod tests {
         let provider = make_provider("key-id", "key-secret");
         let result = provider.sign("DescribeDomains", "", "2024-01-01T00:00:00Z", "nonce-1");
 
-        let signed_headers = result
-            .split("SignedHeaders=")
-            .nth(1)
-            .and_then(|s| s.split(',').next())
-            .expect("failed to extract SignedHeaders value");
+        let signed_headers_opt = extract_csv_field(&result, "SignedHeaders=");
+        assert!(
+            signed_headers_opt.is_some(),
+            "failed to extract SignedHeaders value: {result}"
+        );
+        let Some(signed_headers) = signed_headers_opt else {
+            return;
+        };
 
         let expected_headers = [
             "host",
@@ -175,11 +184,26 @@ mod tests {
             "nonce-1",
         );
 
-        let sig_a = extract_signature(&result_a);
-        let sig_b = extract_signature(&result_b);
+        let sig_describe_domains_opt = extract_signature(&result_a);
+        assert!(
+            sig_describe_domains_opt.is_some(),
+            "missing Signature= in output: {result_a}"
+        );
+        let Some(sig_describe_domains) = sig_describe_domains_opt else {
+            return;
+        };
+
+        let sig_describe_domain_records_opt = extract_signature(&result_b);
+        assert!(
+            sig_describe_domain_records_opt.is_some(),
+            "missing Signature= in output: {result_b}"
+        );
+        let Some(sig_describe_domain_records) = sig_describe_domain_records_opt else {
+            return;
+        };
 
         assert_ne!(
-            sig_a, sig_b,
+            sig_describe_domains, sig_describe_domain_records,
             "different actions should produce different signatures"
         );
     }
@@ -192,11 +216,26 @@ mod tests {
         let result_a = provider_a.sign("DescribeDomains", "", "2024-01-01T00:00:00Z", "nonce-1");
         let result_b = provider_b.sign("DescribeDomains", "", "2024-01-01T00:00:00Z", "nonce-1");
 
-        let sig_a = extract_signature(&result_a);
-        let sig_b = extract_signature(&result_b);
+        let sig_secret_one_opt = extract_signature(&result_a);
+        assert!(
+            sig_secret_one_opt.is_some(),
+            "missing Signature= in output: {result_a}"
+        );
+        let Some(sig_secret_one) = sig_secret_one_opt else {
+            return;
+        };
+
+        let sig_secret_two_opt = extract_signature(&result_b);
+        assert!(
+            sig_secret_two_opt.is_some(),
+            "missing Signature= in output: {result_b}"
+        );
+        let Some(sig_secret_two) = sig_secret_two_opt else {
+            return;
+        };
 
         assert_ne!(
-            sig_a, sig_b,
+            sig_secret_one, sig_secret_two,
             "different secrets should produce different signatures"
         );
     }
@@ -215,7 +254,14 @@ mod tests {
         assert!(result.starts_with("ACS3-HMAC-SHA256 "));
 
         // 提取并验证 Signature 是有效的 hex 字符串 (SHA256 HMAC = 64 hex chars)
-        let signature = extract_signature(&result);
+        let signature_opt = extract_signature(&result);
+        assert!(
+            signature_opt.is_some(),
+            "missing Signature= in output: {result}"
+        );
+        let Some(signature) = signature_opt else {
+            return;
+        };
         assert_eq!(
             signature.len(),
             64,

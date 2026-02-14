@@ -62,6 +62,22 @@ mod tests {
         DnspodProvider::new("test_secret_id".to_string(), "test_secret_key".to_string())
     }
 
+    fn extract_credential(auth: &str) -> Option<&str> {
+        auth.split("Credential=")
+            .nth(1)
+            .and_then(|s| s.split(',').next())
+    }
+
+    fn extract_signed_headers(auth: &str) -> Option<&str> {
+        auth.split("SignedHeaders=")
+            .nth(1)
+            .and_then(|s| s.split(',').next())
+    }
+
+    fn extract_signature(auth: &str) -> Option<&str> {
+        auth.split("Signature=").nth(1)
+    }
+
     // ---- 输出格式 ----
 
     #[test]
@@ -93,10 +109,14 @@ mod tests {
         // timestamp 1705305600 = 2024-01-15 08:00:00 UTC
         let result = provider().sign("DescribeRecordList", "{}", 1_705_305_600);
 
-        // 提取 Credential 部分
-        let credential_start = result.find("Credential=").unwrap() + "Credential=".len();
-        let credential_end = result[credential_start..].find(',').unwrap() + credential_start;
-        let credential = &result[credential_start..credential_end];
+        let credential_opt = extract_credential(&result);
+        assert!(
+            credential_opt.is_some(),
+            "failed to extract Credential: {result}"
+        );
+        let Some(credential) = credential_opt else {
+            return;
+        };
 
         assert!(
             credential.starts_with("test_secret_id/"),
@@ -114,9 +134,14 @@ mod tests {
     fn sign_signed_headers_correct() {
         let result = provider().sign("DescribeRecordList", "{}", 1_705_305_600);
 
-        let sh_start = result.find("SignedHeaders=").unwrap() + "SignedHeaders=".len();
-        let sh_end = result[sh_start..].find(',').unwrap() + sh_start;
-        let signed_headers = &result[sh_start..sh_end];
+        let signed_headers_opt = extract_signed_headers(&result);
+        assert!(
+            signed_headers_opt.is_some(),
+            "failed to extract SignedHeaders: {result}"
+        );
+        let Some(signed_headers) = signed_headers_opt else {
+            return;
+        };
 
         assert_eq!(
             signed_headers, "content-type;host;x-tc-action",
@@ -150,11 +175,26 @@ mod tests {
         let a = p.sign("DescribeRecordList", "{}", 1_705_305_600);
         let b = p.sign("CreateRecord", "{}", 1_705_305_600);
 
-        let sig_a = a.rsplit("Signature=").next().unwrap();
-        let sig_b = b.rsplit("Signature=").next().unwrap();
+        let sig_describe_record_list_opt = extract_signature(&a);
+        assert!(
+            sig_describe_record_list_opt.is_some(),
+            "failed to extract Signature: {a}"
+        );
+        let Some(sig_describe_record_list) = sig_describe_record_list_opt else {
+            return;
+        };
+
+        let sig_create_record_opt = extract_signature(&b);
+        assert!(
+            sig_create_record_opt.is_some(),
+            "failed to extract Signature: {b}"
+        );
+        let Some(sig_create_record) = sig_create_record_opt else {
+            return;
+        };
 
         assert_ne!(
-            sig_a, sig_b,
+            sig_describe_record_list, sig_create_record,
             "different actions should produce different signatures"
         );
     }
@@ -167,11 +207,26 @@ mod tests {
         let a = p.sign("DescribeRecordList", r#"{"Domain":"a.com"}"#, 1_705_305_600);
         let b = p.sign("DescribeRecordList", r#"{"Domain":"b.com"}"#, 1_705_305_600);
 
-        let sig_a = a.rsplit("Signature=").next().unwrap();
-        let sig_b = b.rsplit("Signature=").next().unwrap();
+        let sig_first_payload_opt = extract_signature(&a);
+        assert!(
+            sig_first_payload_opt.is_some(),
+            "failed to extract Signature: {a}"
+        );
+        let Some(sig_first_payload) = sig_first_payload_opt else {
+            return;
+        };
+
+        let sig_second_payload_opt = extract_signature(&b);
+        assert!(
+            sig_second_payload_opt.is_some(),
+            "failed to extract Signature: {b}"
+        );
+        let Some(sig_second_payload) = sig_second_payload_opt else {
+            return;
+        };
 
         assert_ne!(
-            sig_a, sig_b,
+            sig_first_payload, sig_second_payload,
             "different payloads should produce different signatures"
         );
     }
@@ -186,11 +241,26 @@ mod tests {
         let a = p1.sign("DescribeRecordList", "{}", 1_705_305_600);
         let b = p2.sign("DescribeRecordList", "{}", 1_705_305_600);
 
-        let sig_a = a.rsplit("Signature=").next().unwrap();
-        let sig_b = b.rsplit("Signature=").next().unwrap();
+        let sig_key_alpha_opt = extract_signature(&a);
+        assert!(
+            sig_key_alpha_opt.is_some(),
+            "failed to extract Signature: {a}"
+        );
+        let Some(sig_key_alpha) = sig_key_alpha_opt else {
+            return;
+        };
+
+        let sig_key_beta_opt = extract_signature(&b);
+        assert!(
+            sig_key_beta_opt.is_some(),
+            "failed to extract Signature: {b}"
+        );
+        let Some(sig_key_beta) = sig_key_beta_opt else {
+            return;
+        };
 
         assert_ne!(
-            sig_a, sig_b,
+            sig_key_alpha, sig_key_beta,
             "different secret keys should produce different signatures"
         );
     }
@@ -209,17 +279,32 @@ mod tests {
         let result_evening = p.sign("DescribeRecordList", "{}", ts_evening);
 
         // 提取 Credential 中的日期部分
-        let extract_date = |s: &str| -> String {
-            let start = s.find("Credential=").unwrap() + "Credential=".len();
-            let end = s[start..].find(',').unwrap() + start;
-            let credential = &s[start..end];
+        let extract_date = |s: &str| -> Option<String> {
+            let credential = extract_credential(s)?;
             // 格式: secret_id/YYYY-MM-DD/dnspod/tc3_request
-            let parts: Vec<&str> = credential.split('/').collect();
-            parts[1].to_string()
+            credential
+                .split('/')
+                .nth(1)
+                .map(std::string::ToString::to_string)
         };
 
-        let date_morning = extract_date(&result_morning);
-        let date_evening = extract_date(&result_evening);
+        let date_morning_opt = extract_date(&result_morning);
+        assert!(
+            date_morning_opt.is_some(),
+            "failed to extract date from Credential: {result_morning}"
+        );
+        let Some(date_morning) = date_morning_opt else {
+            return;
+        };
+
+        let date_evening_opt = extract_date(&result_evening);
+        assert!(
+            date_evening_opt.is_some(),
+            "failed to extract date from Credential: {result_evening}"
+        );
+        let Some(date_evening) = date_evening_opt else {
+            return;
+        };
 
         assert_eq!(
             date_morning, date_evening,
@@ -230,7 +315,14 @@ mod tests {
         // 不同天的时间戳 (2024-01-16 UTC)
         let ts_next_day = 1_705_392_000; // 2024-01-16 08:00:00 UTC
         let result_next_day = p.sign("DescribeRecordList", "{}", ts_next_day);
-        let date_next_day = extract_date(&result_next_day);
+        let date_next_day_opt = extract_date(&result_next_day);
+        assert!(
+            date_next_day_opt.is_some(),
+            "failed to extract date from Credential: {result_next_day}"
+        );
+        let Some(date_next_day) = date_next_day_opt else {
+            return;
+        };
 
         assert_ne!(
             date_morning, date_next_day,

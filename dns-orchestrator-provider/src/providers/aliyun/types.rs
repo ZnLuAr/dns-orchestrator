@@ -212,8 +212,8 @@ mod tests {
         let val = json!({"a": "1", "b": "2"});
         let mut map = BTreeMap::new();
         flatten_value("", &val, &mut map);
-        assert_eq!(map.get("a").unwrap(), "1");
-        assert_eq!(map.get("b").unwrap(), "2");
+        assert_eq!(map.get("a").map(String::as_str), Some("1"));
+        assert_eq!(map.get("b").map(String::as_str), Some("2"));
         assert_eq!(map.len(), 2);
     }
 
@@ -222,7 +222,7 @@ mod tests {
         let val = json!({"a": {"b": "1"}});
         let mut map = BTreeMap::new();
         flatten_value("", &val, &mut map);
-        assert_eq!(map.get("a.b").unwrap(), "1");
+        assert_eq!(map.get("a.b").map(String::as_str), Some("1"));
         assert_eq!(map.len(), 1);
     }
 
@@ -231,8 +231,8 @@ mod tests {
         let val = json!({"a": [10, 20]});
         let mut map = BTreeMap::new();
         flatten_value("", &val, &mut map);
-        assert_eq!(map.get("a.1").unwrap(), "10");
-        assert_eq!(map.get("a.2").unwrap(), "20");
+        assert_eq!(map.get("a.1").map(String::as_str), Some("10"));
+        assert_eq!(map.get("a.2").map(String::as_str), Some("20"));
         assert_eq!(map.len(), 2);
     }
 
@@ -241,8 +241,8 @@ mod tests {
         let val = json!({"flag": true, "count": 42});
         let mut map = BTreeMap::new();
         flatten_value("", &val, &mut map);
-        assert_eq!(map.get("flag").unwrap(), "true");
-        assert_eq!(map.get("count").unwrap(), "42");
+        assert_eq!(map.get("flag").map(String::as_str), Some("true"));
+        assert_eq!(map.get("count").map(String::as_str), Some("42"));
     }
 
     #[test]

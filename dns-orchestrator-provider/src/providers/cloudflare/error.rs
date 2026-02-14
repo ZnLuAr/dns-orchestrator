@@ -168,20 +168,20 @@ mod tests {
             RawApiError::with_code("1004", "DNS validation error"),
             ctx(),
         );
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "general"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "general"
+        ));
     }
 
     #[test]
     fn invalid_param_9000_name() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("9000", "invalid name"), ctx());
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "name"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "name"
+        ));
     }
 
     #[test]
@@ -191,10 +191,10 @@ mod tests {
             RawApiError::with_code("9005", "invalid A record content"),
             ctx(),
         );
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "value"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "value"
+        ));
     }
 
     #[test]
@@ -204,10 +204,10 @@ mod tests {
             RawApiError::with_code("9006", "invalid AAAA record content"),
             ctx(),
         );
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "value"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "value"
+        ));
     }
 
     #[test]
@@ -217,30 +217,30 @@ mod tests {
             RawApiError::with_code("9009", "MX content must be hostname"),
             ctx(),
         );
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "value"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "value"
+        ));
     }
 
     #[test]
     fn invalid_param_9021_ttl() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("9021", "invalid TTL"), ctx());
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "ttl"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "ttl"
+        ));
     }
 
     #[test]
     fn invalid_param_9041_proxied() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("9041", "cannot be proxied"), ctx());
-        match err {
-            ProviderError::InvalidParameter { param, .. } => assert_eq!(param, "proxied"),
-            other => panic!("expected InvalidParameter, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidParameter { param, .. } if param == "proxied"
+        ));
     }
 
     // ---- Record exists ----
@@ -252,12 +252,10 @@ mod tests {
             RawApiError::with_code("81057", "record already exists"),
             ctx_with_record(),
         );
-        match err {
-            ProviderError::RecordExists { record_name, .. } => {
-                assert_eq!(record_name, "www");
-            }
-            other => panic!("expected RecordExists, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordExists { record_name, .. } if record_name == "www"
+        ));
     }
 
     #[test]
@@ -279,12 +277,10 @@ mod tests {
             RawApiError::with_code("81044", "record does not exist"),
             ctx_with_record(),
         );
-        match err {
-            ProviderError::RecordNotFound { record_id, .. } => {
-                assert_eq!(record_id, "rec-123");
-            }
-            other => panic!("expected RecordNotFound, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordNotFound { record_id, .. } if record_id == "rec-123"
+        ));
     }
 
     // ---- Quota exceeded ----
@@ -308,12 +304,10 @@ mod tests {
             RawApiError::with_code("7000", "no route"),
             ctx_with_record(),
         );
-        match err {
-            ProviderError::DomainNotFound { domain, .. } => {
-                assert_eq!(domain, "example.com");
-            }
-            other => panic!("expected DomainNotFound, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::DomainNotFound { domain, .. } if domain == "example.com"
+        ));
     }
 
     #[test]
@@ -335,17 +329,11 @@ mod tests {
             RawApiError::with_code("99999", "something unexpected"),
             ctx(),
         );
-        match err {
-            ProviderError::Unknown {
-                raw_code,
-                raw_message,
-                ..
-            } => {
-                assert_eq!(raw_code.as_deref(), Some("99999"));
-                assert_eq!(raw_message, "something unexpected");
-            }
-            other => panic!("expected Unknown, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::Unknown { raw_code, raw_message, .. }
+                if raw_code.as_deref() == Some("99999") && raw_message == "something unexpected"
+        ));
     }
 
     // ---- Fallback: no code (None) ----
@@ -354,17 +342,11 @@ mod tests {
     fn fallback_no_code() {
         let p = provider();
         let err = p.map_error(RawApiError::new("no code at all"), ctx());
-        match err {
-            ProviderError::Unknown {
-                raw_code,
-                raw_message,
-                ..
-            } => {
-                assert!(raw_code.is_none());
-                assert_eq!(raw_message, "no code at all");
-            }
-            other => panic!("expected Unknown, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::Unknown { raw_code: None, raw_message, .. }
+                if raw_message == "no code at all"
+        ));
     }
 
     // ---- Context defaults ----
@@ -376,12 +358,10 @@ mod tests {
             RawApiError::with_code("81057", "record already exists"),
             ctx(),
         );
-        match err {
-            ProviderError::RecordExists { record_name, .. } => {
-                assert_eq!(record_name, "<unknown>");
-            }
-            other => panic!("expected RecordExists, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordExists { record_name, .. } if record_name == "<unknown>"
+        ));
     }
 
     #[test]
@@ -391,24 +371,20 @@ mod tests {
             RawApiError::with_code("81044", "record does not exist"),
             ctx(),
         );
-        match err {
-            ProviderError::RecordNotFound { record_id, .. } => {
-                assert_eq!(record_id, "<unknown>");
-            }
-            other => panic!("expected RecordNotFound, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordNotFound { record_id, .. } if record_id == "<unknown>"
+        ));
     }
 
     #[test]
     fn domain_not_found_default_context() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("7000", "no route"), ctx());
-        match err {
-            ProviderError::DomainNotFound { domain, .. } => {
-                assert_eq!(domain, "<unknown>");
-            }
-            other => panic!("expected DomainNotFound, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::DomainNotFound { domain, .. } if domain == "<unknown>"
+        ));
     }
 
     // ---- Provider name ----
@@ -423,11 +399,9 @@ mod tests {
     fn error_contains_provider_name() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("6003", "bad header"), ctx());
-        match err {
-            ProviderError::InvalidCredentials { provider, .. } => {
-                assert_eq!(provider, "cloudflare");
-            }
-            other => panic!("expected InvalidCredentials, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::InvalidCredentials { provider, .. } if provider == "cloudflare"
+        ));
     }
 }

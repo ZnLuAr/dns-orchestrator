@@ -16,7 +16,7 @@ use dns_orchestrator_provider::{
 // ============ 基础测试 ============
 
 #[tokio::test]
-#[ignore]
+#[ignore = "integration test: requires ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET and TEST_DOMAIN"]
 async fn test_aliyun_validate_credentials() {
     skip_if_no_credentials!(
         "ALIYUN_ACCESS_KEY_ID",
@@ -24,17 +24,18 @@ async fn test_aliyun_validate_credentials() {
         "TEST_DOMAIN"
     );
 
-    let ctx = TestContext::aliyun().expect("创建测试上下文失败");
-    let result = ctx.provider.validate_credentials().await;
-
-    assert!(result.is_ok(), "validate_credentials 调用失败: {result:?}");
-    assert!(result.unwrap(), "凭证应该有效");
+    let ctx = require_some!(TestContext::aliyun(), "创建测试上下文失败");
+    let valid = require_ok!(
+        ctx.provider.validate_credentials().await,
+        "validate_credentials 调用失败"
+    );
+    assert!(valid, "凭证应该有效");
 
     println!("✓ validate_credentials 测试通过");
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "integration test: requires ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET and TEST_DOMAIN"]
 async fn test_aliyun_list_domains() {
     skip_if_no_credentials!(
         "ALIYUN_ACCESS_KEY_ID",
@@ -42,13 +43,13 @@ async fn test_aliyun_list_domains() {
         "TEST_DOMAIN"
     );
 
-    let ctx = TestContext::aliyun().expect("创建测试上下文失败");
+    let ctx = require_some!(TestContext::aliyun(), "创建测试上下文失败");
     let params = PaginationParams::default();
 
-    let result = ctx.provider.list_domains(&params).await;
-    assert!(result.is_ok(), "list_domains 调用失败: {result:?}");
-
-    let response = result.unwrap();
+    let response = require_ok!(
+        ctx.provider.list_domains(&params).await,
+        "list_domains 调用失败"
+    );
     assert!(!response.items.is_empty(), "域名列表不应为空");
 
     println!(
@@ -58,7 +59,7 @@ async fn test_aliyun_list_domains() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "integration test: requires ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET and TEST_DOMAIN"]
 async fn test_aliyun_get_domain() {
     skip_if_no_credentials!(
         "ALIYUN_ACCESS_KEY_ID",
@@ -66,20 +67,20 @@ async fn test_aliyun_get_domain() {
         "TEST_DOMAIN"
     );
 
-    let mut ctx = TestContext::aliyun().expect("创建测试上下文失败");
-    let domain_id = ctx.find_domain_id().await.expect("找不到测试域名");
+    let mut ctx = require_some!(TestContext::aliyun(), "创建测试上下文失败");
+    let domain_id = require_some!(ctx.find_domain_id().await, "找不到测试域名");
 
-    let result = ctx.provider.get_domain(&domain_id).await;
-    assert!(result.is_ok(), "get_domain 调用失败: {result:?}");
-
-    let domain = result.unwrap();
+    let domain = require_ok!(
+        ctx.provider.get_domain(&domain_id).await,
+        "get_domain 调用失败"
+    );
     assert_eq!(domain.name, ctx.domain, "域名名称不匹配");
 
     println!("✓ get_domain 测试通过: {}", domain.name);
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "integration test: requires ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET and TEST_DOMAIN"]
 async fn test_aliyun_list_records() {
     skip_if_no_credentials!(
         "ALIYUN_ACCESS_KEY_ID",
@@ -87,14 +88,14 @@ async fn test_aliyun_list_records() {
         "TEST_DOMAIN"
     );
 
-    let mut ctx = TestContext::aliyun().expect("创建测试上下文失败");
-    let domain_id = ctx.find_domain_id().await.expect("找不到测试域名");
+    let mut ctx = require_some!(TestContext::aliyun(), "创建测试上下文失败");
+    let domain_id = require_some!(ctx.find_domain_id().await, "找不到测试域名");
 
     let params = RecordQueryParams::default();
-    let result = ctx.provider.list_records(&domain_id, &params).await;
-    assert!(result.is_ok(), "list_records 调用失败: {result:?}");
-
-    let response = result.unwrap();
+    let response = require_ok!(
+        ctx.provider.list_records(&domain_id, &params).await,
+        "list_records 调用失败"
+    );
     println!(
         "✓ list_records 测试通过，共 {} 条记录",
         response.total_count
@@ -105,7 +106,7 @@ async fn test_aliyun_list_records() {
 
 /// 清理所有残留的测试记录（手动运行）
 #[tokio::test]
-#[ignore]
+#[ignore = "integration test: requires ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET and TEST_DOMAIN"]
 async fn test_aliyun_cleanup_test_records() {
     skip_if_no_credentials!(
         "ALIYUN_ACCESS_KEY_ID",
@@ -113,8 +114,8 @@ async fn test_aliyun_cleanup_test_records() {
         "TEST_DOMAIN"
     );
 
-    let mut ctx = TestContext::aliyun().expect("创建测试上下文失败");
-    let domain_id = ctx.find_domain_id().await.expect("找不到测试域名");
+    let mut ctx = require_some!(TestContext::aliyun(), "创建测试上下文失败");
+    let domain_id = require_some!(ctx.find_domain_id().await, "找不到测试域名");
 
     ctx.cleanup_all_test_records(&domain_id).await;
     println!("✓ 清理完成");
@@ -125,7 +126,7 @@ async fn test_aliyun_cleanup_test_records() {
 macro_rules! crud_test {
     ($test_name:ident, $record_type:expr, $type_name:expr, $name_gen:expr) => {
         #[tokio::test]
-        #[ignore]
+        #[ignore = "integration test: requires ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET and TEST_DOMAIN"]
         async fn $test_name() {
             skip_if_no_credentials!(
                 "ALIYUN_ACCESS_KEY_ID",
@@ -133,8 +134,8 @@ macro_rules! crud_test {
                 "TEST_DOMAIN"
             );
 
-            let mut ctx = TestContext::aliyun().expect("创建测试上下文失败");
-            let domain_id = ctx.find_domain_id().await.expect("找不到测试域名");
+            let mut ctx = require_some!(TestContext::aliyun(), "创建测试上下文失败");
+            let domain_id = require_some!(ctx.find_domain_id().await, "找不到测试域名");
 
             let record_name = $name_gen();
             let (create_data, update_data) = get_test_record_data($record_type);
@@ -166,14 +167,10 @@ macro_rules! crud_test {
                 proxied: None,
             };
 
-            let create_result = ctx.provider.create_record(&create_req).await;
-            assert!(
-                create_result.is_ok(),
-                "create_record 失败: {:?}",
-                create_result
+            let created_record = require_ok!(
+                ctx.provider.create_record(&create_req).await,
+                "create_record 失败"
             );
-
-            let created_record = create_result.unwrap();
             let record_id = created_record.id.clone();
             println!("  ✓ 创建成功: id={}", record_id);
 
@@ -185,10 +182,11 @@ macro_rules! crud_test {
                 record_type: None,
             };
 
-            let list_result = ctx.provider.list_records(&domain_id, &search_params).await;
-            assert!(list_result.is_ok(), "list_records 失败: {:?}", list_result);
-
-            let found = list_result.unwrap().items.iter().any(|r| r.id == record_id);
+            let list_response = require_ok!(
+                ctx.provider.list_records(&domain_id, &search_params).await,
+                "list_records 失败"
+            );
+            let found = list_response.items.iter().any(|r| r.id == record_id);
             assert!(found, "创建的记录应该能被搜索到");
             println!("  ✓ 验证存在");
 
@@ -201,23 +199,17 @@ macro_rules! crud_test {
                 proxied: None,
             };
 
-            let update_result = ctx.provider.update_record(&record_id, &update_req).await;
-            assert!(
-                update_result.is_ok(),
-                "update_record 失败: {:?}",
-                update_result
+            let updated_record = require_ok!(
+                ctx.provider.update_record(&record_id, &update_req).await,
+                "update_record 失败"
             );
-
-            let updated_record = update_result.unwrap();
             assert_eq!(updated_record.ttl, 900, "TTL 应该被更新为 900");
             println!("  ✓ 更新成功");
 
             // 4. 删除记录
-            let delete_result = ctx.provider.delete_record(&record_id, &domain_id).await;
-            assert!(
-                delete_result.is_ok(),
-                "delete_record 失败: {:?}",
-                delete_result
+            require_ok!(
+                ctx.provider.delete_record(&record_id, &domain_id).await,
+                "delete_record 失败"
             );
             println!("  ✓ 删除成功");
 

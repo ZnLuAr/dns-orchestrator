@@ -23,6 +23,52 @@ macro_rules! skip_if_no_credentials {
     };
 }
 
+/// 断言 `Option` 为 `Some`，并解包返回内部值（失败则直接让测试失败）。
+#[macro_export]
+macro_rules! require_some {
+    ($expr:expr $(,)?) => {{
+        let opt = $expr;
+        assert!(opt.is_some(), "expected Some(..), got None");
+        let Some(val) = opt else {
+            return;
+        };
+        val
+    }};
+    ($expr:expr, $($msg:tt)+) => {{
+        let opt = $expr;
+        assert!(opt.is_some(), "{}", format_args!($($msg)+));
+        let Some(val) = opt else {
+            return;
+        };
+        val
+    }};
+}
+
+/// 断言 `Result` 为 `Ok`，并解包返回内部值（失败则直接让测试失败）。
+#[macro_export]
+macro_rules! require_ok {
+    ($expr:expr $(,)?) => {{
+        let res = $expr;
+        assert!(res.is_ok(), "expected Ok(..), got {res:?}");
+        let Ok(val) = res else {
+            return;
+        };
+        val
+    }};
+    ($expr:expr, $($msg:tt)+) => {{
+        let res = $expr;
+        assert!(
+            res.is_ok(),
+            "{}: {res:?}",
+            format_args!($($msg)+)
+        );
+        let Ok(val) = res else {
+            return;
+        };
+        val
+    }};
+}
+
 /// 生成唯一的测试记录名称
 pub fn generate_test_record_name() -> String {
     let uuid = uuid::Uuid::new_v4();

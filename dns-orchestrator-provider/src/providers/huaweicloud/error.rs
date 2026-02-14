@@ -739,12 +739,10 @@ mod tests {
             RawApiError::with_code("DNS.0312", "exists"),
             ctx_with_record("www.example.com", ""),
         );
-        match err {
-            ProviderError::RecordExists { record_name, .. } => {
-                assert_eq!(record_name, "www.example.com");
-            }
-            other => panic!("expected RecordExists, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordExists { record_name, .. } if record_name == "www.example.com"
+        ));
     }
 
     #[test]
@@ -754,12 +752,10 @@ mod tests {
             RawApiError::with_code("DNS.0313", "not found"),
             ctx_with_record("", "rec-abc-123"),
         );
-        match err {
-            ProviderError::RecordNotFound { record_id, .. } => {
-                assert_eq!(record_id, "rec-abc-123");
-            }
-            other => panic!("expected RecordNotFound, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordNotFound { record_id, .. } if record_id == "rec-abc-123"
+        ));
     }
 
     #[test]
@@ -769,12 +765,10 @@ mod tests {
             RawApiError::with_code("DNS.0302", "zone gone"),
             ctx_with_domain("example.org"),
         );
-        match err {
-            ProviderError::DomainNotFound { domain, .. } => {
-                assert_eq!(domain, "example.org");
-            }
-            other => panic!("expected DomainNotFound, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::DomainNotFound { domain, .. } if domain == "example.org"
+        ));
     }
 
     #[test]
@@ -784,23 +778,19 @@ mod tests {
             RawApiError::with_code("DNS.0213", "suspended"),
             ctx_with_domain("frozen.io"),
         );
-        match err {
-            ProviderError::DomainLocked { domain, .. } => {
-                assert_eq!(domain, "frozen.io");
-            }
-            other => panic!("expected DomainLocked, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::DomainLocked { domain, .. } if domain == "frozen.io"
+        ));
     }
 
     #[test]
     fn default_context_yields_unknown_placeholder() {
         let p = provider();
         let err = p.map_error(RawApiError::with_code("DNS.0312", "exists"), default_ctx());
-        match err {
-            ProviderError::RecordExists { record_name, .. } => {
-                assert_eq!(record_name, "<unknown>");
-            }
-            other => panic!("expected RecordExists, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            ProviderError::RecordExists { record_name, .. } if record_name == "<unknown>"
+        ));
     }
 }

@@ -107,26 +107,22 @@ mod tests {
     }
 
     /// 从签名结果中提取 Access 字段的值
-    fn extract_access(auth: &str) -> &str {
+    fn extract_access(auth: &str) -> Option<&str> {
         auth.split("Access=")
             .nth(1)
             .and_then(|s| s.split(',').next())
-            .expect("Access field not found")
     }
 
     /// 从签名结果中提取 `SignedHeaders` 字段的值
-    fn extract_signed_headers(auth: &str) -> &str {
+    fn extract_signed_headers(auth: &str) -> Option<&str> {
         auth.split("SignedHeaders=")
             .nth(1)
             .and_then(|s| s.split(',').next())
-            .expect("SignedHeaders field not found")
     }
 
     /// 从签名结果中提取 Signature 字段的值
-    fn extract_signature(auth: &str) -> &str {
-        auth.split("Signature=")
-            .nth(1)
-            .expect("Signature field not found")
+    fn extract_signature(auth: &str) -> Option<&str> {
+        auth.split("Signature=").nth(1)
     }
 
     // ============ 输出格式验证 ============
@@ -175,7 +171,12 @@ mod tests {
             "20240101T000000Z",
         );
 
-        assert_eq!(extract_access(&result), "MY-ACCESS-KEY-ID");
+        let access_opt = extract_access(&result);
+        assert!(access_opt.is_some(), "Access field not found: {result}");
+        let Some(access) = access_opt else {
+            return;
+        };
+        assert_eq!(access, "MY-ACCESS-KEY-ID");
     }
 
     // ============ 确定性验证 ============
@@ -214,9 +215,25 @@ mod tests {
         let without_slash = p.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
         let with_slash = p.sign("GET", "/v2/zones/", "", &headers, "", "20240101T000000Z");
 
+        let sig_without_opt = extract_signature(&without_slash);
+        assert!(
+            sig_without_opt.is_some(),
+            "Signature field not found: {without_slash}"
+        );
+        let Some(sig_without) = sig_without_opt else {
+            return;
+        };
+
+        let sig_with_opt = extract_signature(&with_slash);
+        assert!(
+            sig_with_opt.is_some(),
+            "Signature field not found: {with_slash}"
+        );
+        let Some(sig_with) = sig_with_opt else {
+            return;
+        };
         assert_eq!(
-            extract_signature(&without_slash),
-            extract_signature(&with_slash),
+            sig_without, sig_with,
             "URI with and without trailing slash should produce same signature"
         );
     }
@@ -245,9 +262,25 @@ mod tests {
             "20240101T000000Z",
         );
 
+        let sig_unsorted_opt = extract_signature(&unsorted);
+        assert!(
+            sig_unsorted_opt.is_some(),
+            "Signature field not found: {unsorted}"
+        );
+        let Some(sig_unsorted) = sig_unsorted_opt else {
+            return;
+        };
+
+        let sig_sorted_opt = extract_signature(&sorted);
+        assert!(
+            sig_sorted_opt.is_some(),
+            "Signature field not found: {sorted}"
+        );
+        let Some(sig_sorted) = sig_sorted_opt else {
+            return;
+        };
         assert_eq!(
-            extract_signature(&unsorted),
-            extract_signature(&sorted),
+            sig_unsorted, sig_sorted,
             "'b=2&a=1' and 'a=1&b=2' should produce same signature"
         );
     }
@@ -264,9 +297,16 @@ mod tests {
 
         let result = p.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
 
+        let signed_headers_opt = extract_signed_headers(&result);
+        assert!(
+            signed_headers_opt.is_some(),
+            "SignedHeaders field not found: {result}"
+        );
+        let Some(signed_headers) = signed_headers_opt else {
+            return;
+        };
         assert_eq!(
-            extract_signed_headers(&result),
-            "a-header;x-header",
+            signed_headers, "a-header;x-header",
             "SignedHeaders should be lowercase and sorted alphabetically"
         );
     }
@@ -285,14 +325,19 @@ mod tests {
             "20240101T000000Z",
         );
 
+        let signature_opt = extract_signature(&result);
+        assert!(
+            signature_opt.is_some(),
+            "Signature field not found: {result}"
+        );
+        let Some(signature) = signature_opt else {
+            return;
+        };
         assert!(
             result.starts_with("SDK-HMAC-SHA256 "),
             "empty query should still produce valid signature"
         );
-        assert!(
-            !extract_signature(&result).is_empty(),
-            "signature should not be empty"
-        );
+        assert!(!signature.is_empty(), "signature should not be empty");
     }
 
     // ============ 空 Payload 验证 ============
@@ -309,14 +354,19 @@ mod tests {
             "20240101T000000Z",
         );
 
+        let signature_opt = extract_signature(&result);
+        assert!(
+            signature_opt.is_some(),
+            "Signature field not found: {result}"
+        );
+        let Some(signature) = signature_opt else {
+            return;
+        };
         assert!(
             result.starts_with("SDK-HMAC-SHA256 "),
             "empty payload should still produce valid signature"
         );
-        assert!(
-            !extract_signature(&result).is_empty(),
-            "signature should not be empty"
-        );
+        assert!(!signature.is_empty(), "signature should not be empty");
     }
 
     // ============ 不同 HTTP Method 产生不同签名 ============
@@ -329,9 +379,25 @@ mod tests {
         let get_sig = p.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
         let post_sig = p.sign("POST", "/v2/zones", "", &headers, "", "20240101T000000Z");
 
+        let get_signature_opt = extract_signature(&get_sig);
+        assert!(
+            get_signature_opt.is_some(),
+            "Signature field not found: {get_sig}"
+        );
+        let Some(get_signature) = get_signature_opt else {
+            return;
+        };
+
+        let post_signature_opt = extract_signature(&post_sig);
+        assert!(
+            post_signature_opt.is_some(),
+            "Signature field not found: {post_sig}"
+        );
+        let Some(post_signature) = post_signature_opt else {
+            return;
+        };
         assert_ne!(
-            extract_signature(&get_sig),
-            extract_signature(&post_sig),
+            get_signature, post_signature,
             "GET and POST should produce different signatures"
         );
     }
@@ -347,9 +413,25 @@ mod tests {
         let sig1 = p1.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
         let sig2 = p2.sign("GET", "/v2/zones", "", &headers, "", "20240101T000000Z");
 
+        let signature_1_opt = extract_signature(&sig1);
+        assert!(
+            signature_1_opt.is_some(),
+            "Signature field not found: {sig1}"
+        );
+        let Some(signature_1) = signature_1_opt else {
+            return;
+        };
+
+        let signature_2_opt = extract_signature(&sig2);
+        assert!(
+            signature_2_opt.is_some(),
+            "Signature field not found: {sig2}"
+        );
+        let Some(signature_2) = signature_2_opt else {
+            return;
+        };
         assert_ne!(
-            extract_signature(&sig1),
-            extract_signature(&sig2),
+            signature_1, signature_2,
             "different secrets should produce different signatures"
         );
     }

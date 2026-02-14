@@ -333,13 +333,33 @@ pub fn record_data_to_single_string(data: &RecordData) -> String {
 mod tests {
     use super::*;
 
+    macro_rules! assert_ok_eq {
+        ($res:expr, $expected:expr $(,)?) => {{
+            let res = $res;
+            let expected = $expected;
+            assert!(
+                matches!(&res, Ok(v) if v == &expected),
+                "unexpected result: {res:?}"
+            );
+        }};
+    }
+
+    macro_rules! assert_err_matches {
+        ($res:expr, $pat:pat_param $(if $guard:expr)? $(,)?) => {{
+            let res = $res;
+            assert!(
+                matches!(&res, Err($pat) $(if $guard)?),
+                "unexpected result: {res:?}"
+            );
+        }};
+    }
+
     // ============ SRV 解析测试 ============
 
     #[test]
     fn parse_srv_valid() {
-        let result = parse_srv_from_string("10 20 443 example.com", "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_srv_from_string("10 20 443 example.com", "test"),
             RecordData::SRV {
                 priority: 10,
                 weight: 20,
@@ -351,9 +371,8 @@ mod tests {
 
     #[test]
     fn parse_srv_zero_values() {
-        let result = parse_srv_from_string("0 0 0 .", "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_srv_from_string("0 0 0 .", "test"),
             RecordData::SRV {
                 priority: 0,
                 weight: 0,
@@ -365,9 +384,8 @@ mod tests {
 
     #[test]
     fn parse_srv_max_values() {
-        let result = parse_srv_from_string("65535 65535 65535 target.example.com", "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_srv_from_string("65535 65535 65535 target.example.com", "test"),
             RecordData::SRV {
                 priority: 65535,
                 weight: 65535,
@@ -380,9 +398,8 @@ mod tests {
     #[test]
     fn parse_srv_target_with_spaces() {
         // splitn(4, ' ') 意味着第 4 部分包含剩余内容
-        let result = parse_srv_from_string("10 20 80 target with spaces", "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_srv_from_string("10 20 80 target with spaces", "test"),
             RecordData::SRV {
                 priority: 10,
                 weight: 20,
@@ -394,45 +411,50 @@ mod tests {
 
     #[test]
     fn parse_srv_too_few_parts() {
-        let err = parse_srv_from_string("10 20", "aliyun").unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { provider, .. } if provider == "aliyun"));
+        assert_err_matches!(
+            parse_srv_from_string("10 20", "aliyun"),
+            ProviderError::ParseError { provider, .. } if provider == "aliyun"
+        );
     }
 
     #[test]
     fn parse_srv_invalid_priority() {
-        let err = parse_srv_from_string("abc 20 443 target", "test").unwrap_err();
-        assert!(
-            matches!(err, ProviderError::ParseError { detail, .. } if detail.contains("priority"))
+        assert_err_matches!(
+            parse_srv_from_string("abc 20 443 target", "test"),
+            ProviderError::ParseError { detail, .. } if detail.contains("priority")
         );
     }
 
     #[test]
     fn parse_srv_invalid_weight() {
-        let err = parse_srv_from_string("10 abc 443 target", "test").unwrap_err();
-        assert!(
-            matches!(err, ProviderError::ParseError { detail, .. } if detail.contains("weight"))
+        assert_err_matches!(
+            parse_srv_from_string("10 abc 443 target", "test"),
+            ProviderError::ParseError { detail, .. } if detail.contains("weight")
         );
     }
 
     #[test]
     fn parse_srv_invalid_port() {
-        let err = parse_srv_from_string("10 20 abc target", "test").unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { detail, .. } if detail.contains("port")));
+        assert_err_matches!(
+            parse_srv_from_string("10 20 abc target", "test"),
+            ProviderError::ParseError { detail, .. } if detail.contains("port")
+        );
     }
 
     #[test]
     fn parse_srv_overflow_port() {
-        let err = parse_srv_from_string("10 20 99999 target", "test").unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { detail, .. } if detail.contains("port")));
+        assert_err_matches!(
+            parse_srv_from_string("10 20 99999 target", "test"),
+            ProviderError::ParseError { detail, .. } if detail.contains("port")
+        );
     }
 
     // ============ CAA 解析测试 ============
 
     #[test]
     fn parse_caa_valid_quoted() {
-        let result = parse_caa_from_string(r#"0 issue "letsencrypt.org""#, "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_caa_from_string(r#"0 issue "letsencrypt.org""#, "test"),
             RecordData::CAA {
                 flags: 0,
                 tag: "issue".to_string(),
@@ -443,9 +465,8 @@ mod tests {
 
     #[test]
     fn parse_caa_valid_unquoted() {
-        let result = parse_caa_from_string("0 issue letsencrypt.org", "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_caa_from_string("0 issue letsencrypt.org", "test"),
             RecordData::CAA {
                 flags: 0,
                 tag: "issue".to_string(),
@@ -456,9 +477,8 @@ mod tests {
 
     #[test]
     fn parse_caa_critical_flag() {
-        let result = parse_caa_from_string(r#"128 issuewild "*.example.com""#, "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_caa_from_string(r#"128 issuewild "*.example.com""#, "test"),
             RecordData::CAA {
                 flags: 128,
                 tag: "issuewild".to_string(),
@@ -469,10 +489,8 @@ mod tests {
 
     #[test]
     fn parse_caa_iodef_with_url() {
-        let result =
-            parse_caa_from_string(r#"0 iodef "mailto:admin@example.com""#, "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_caa_from_string(r#"0 iodef "mailto:admin@example.com""#, "test"),
             RecordData::CAA {
                 flags: 0,
                 tag: "iodef".to_string(),
@@ -483,15 +501,17 @@ mod tests {
 
     #[test]
     fn parse_caa_too_few_parts() {
-        let err = parse_caa_from_string("0 issue", "dnspod").unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { provider, .. } if provider == "dnspod"));
+        assert_err_matches!(
+            parse_caa_from_string("0 issue", "dnspod"),
+            ProviderError::ParseError { provider, .. } if provider == "dnspod"
+        );
     }
 
     #[test]
     fn parse_caa_invalid_flags() {
-        let err = parse_caa_from_string("abc issue letsencrypt.org", "test").unwrap_err();
-        assert!(
-            matches!(err, ProviderError::ParseError { detail, .. } if detail.contains("flags"))
+        assert_err_matches!(
+            parse_caa_from_string("abc issue letsencrypt.org", "test"),
+            ProviderError::ParseError { detail, .. } if detail.contains("flags")
         );
     }
 
@@ -499,9 +519,8 @@ mod tests {
 
     #[test]
     fn parse_mx_valid() {
-        let result = parse_mx_from_string("10 mail.example.com", "huaweicloud").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_mx_from_string("10 mail.example.com", "huaweicloud"),
             RecordData::MX {
                 priority: 10,
                 exchange: "mail.example.com".to_string(),
@@ -511,9 +530,8 @@ mod tests {
 
     #[test]
     fn parse_mx_zero_priority() {
-        let result = parse_mx_from_string("0 mx.example.com", "test").unwrap();
-        assert_eq!(
-            result,
+        assert_ok_eq!(
+            parse_mx_from_string("0 mx.example.com", "test"),
             RecordData::MX {
                 priority: 0,
                 exchange: "mx.example.com".to_string(),
@@ -523,15 +541,17 @@ mod tests {
 
     #[test]
     fn parse_mx_missing_exchange() {
-        let err = parse_mx_from_string("10", "test").unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { .. }));
+        assert_err_matches!(
+            parse_mx_from_string("10", "test"),
+            ProviderError::ParseError { .. }
+        );
     }
 
     #[test]
     fn parse_mx_invalid_priority() {
-        let err = parse_mx_from_string("abc mail.example.com", "test").unwrap_err();
-        assert!(
-            matches!(err, ProviderError::ParseError { detail, .. } if detail.contains("priority"))
+        assert_err_matches!(
+            parse_mx_from_string("abc mail.example.com", "test"),
+            ProviderError::ParseError { detail, .. } if detail.contains("priority")
         );
     }
 
@@ -629,8 +649,7 @@ mod tests {
             target: "sip.example.com".to_string(),
         };
         let (value, _) = record_data_to_value_priority(&original);
-        let parsed = parse_srv_from_string(&value, "test").unwrap();
-        assert_eq!(parsed, original);
+        assert_ok_eq!(parse_srv_from_string(&value, "test"), original);
     }
 
     #[test]
@@ -642,8 +661,7 @@ mod tests {
             target: "sip.example.com".to_string(),
         };
         let s = record_data_to_single_string(&original);
-        let parsed = parse_srv_from_string(&s, "test").unwrap();
-        assert_eq!(parsed, original);
+        assert_ok_eq!(parse_srv_from_string(&s, "test"), original);
     }
 
     #[test]
@@ -654,8 +672,7 @@ mod tests {
             value: "letsencrypt.org".to_string(),
         };
         let (value, _) = record_data_to_value_priority(&original);
-        let parsed = parse_caa_from_string(&value, "test").unwrap();
-        assert_eq!(parsed, original);
+        assert_ok_eq!(parse_caa_from_string(&value, "test"), original);
     }
 
     #[test]
@@ -665,8 +682,7 @@ mod tests {
             exchange: "mail.example.com".to_string(),
         };
         let s = record_data_to_single_string(&original);
-        let parsed = parse_mx_from_string(&s, "test").unwrap();
-        assert_eq!(parsed, original);
+        assert_ok_eq!(parse_mx_from_string(&s, "test"), original);
     }
 
     // ============ 域名辅助函数测试 ============
@@ -769,60 +785,56 @@ mod tests {
     #[test]
     fn with_priority_all_simple_types() {
         // A
-        assert_eq!(
-            parse_record_data_with_priority("A", "1.2.3.4".to_string(), None, "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_with_priority("A", "1.2.3.4".to_string(), None, "test"),
             RecordData::A {
                 address: "1.2.3.4".to_string()
             }
         );
         // AAAA
-        assert_eq!(
-            parse_record_data_with_priority("AAAA", "::1".to_string(), None, "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_with_priority("AAAA", "::1".to_string(), None, "test"),
             RecordData::AAAA {
                 address: "::1".to_string()
             }
         );
         // CNAME
-        assert_eq!(
-            parse_record_data_with_priority("CNAME", "cdn.example.com".to_string(), None, "test")
-                .unwrap(),
+        assert_ok_eq!(
+            parse_record_data_with_priority("CNAME", "cdn.example.com".to_string(), None, "test"),
             RecordData::CNAME {
                 target: "cdn.example.com".to_string()
             }
         );
         // TXT
-        assert_eq!(
-            parse_record_data_with_priority("TXT", "v=spf1".to_string(), None, "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_with_priority("TXT", "v=spf1".to_string(), None, "test"),
             RecordData::TXT {
                 text: "v=spf1".to_string()
             }
         );
         // NS
-        assert_eq!(
-            parse_record_data_with_priority("NS", "ns1.example.com".to_string(), None, "test")
-                .unwrap(),
+        assert_ok_eq!(
+            parse_record_data_with_priority("NS", "ns1.example.com".to_string(), None, "test"),
             RecordData::NS {
                 nameserver: "ns1.example.com".to_string()
             }
         );
         // MX
-        assert_eq!(
-            parse_record_data_with_priority("MX", "mail.example.com".to_string(), Some(10), "test")
-                .unwrap(),
+        assert_ok_eq!(
+            parse_record_data_with_priority("MX", "mail.example.com".to_string(), Some(10), "test"),
             RecordData::MX {
                 priority: 10,
                 exchange: "mail.example.com".to_string()
             }
         );
         // SRV
-        assert_eq!(
+        assert_ok_eq!(
             parse_record_data_with_priority(
                 "SRV",
                 "10 20 443 srv.example.com".to_string(),
                 None,
                 "test"
-            )
-            .unwrap(),
+            ),
             RecordData::SRV {
                 priority: 10,
                 weight: 20,
@@ -831,14 +843,13 @@ mod tests {
             }
         );
         // CAA
-        assert_eq!(
+        assert_ok_eq!(
             parse_record_data_with_priority(
                 "CAA",
                 r#"0 issue "letsencrypt.org""#.to_string(),
                 None,
                 "test"
-            )
-            .unwrap(),
+            ),
             RecordData::CAA {
                 flags: 0,
                 tag: "issue".to_string(),
@@ -849,19 +860,18 @@ mod tests {
 
     #[test]
     fn with_priority_mx_missing_priority() {
-        let err =
-            parse_record_data_with_priority("MX", "mail.example.com".to_string(), None, "aliyun")
-                .unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { provider, detail }
-            if provider == "aliyun" && detail.contains("priority")));
+        assert_err_matches!(
+            parse_record_data_with_priority("MX", "mail.example.com".to_string(), None, "aliyun"),
+            ProviderError::ParseError { provider, detail }
+                if provider == "aliyun" && detail.contains("priority")
+        );
     }
 
     #[test]
     fn with_priority_unsupported_type() {
-        let err = parse_record_data_with_priority("LOC", "some data".to_string(), None, "test")
-            .unwrap_err();
-        assert!(
-            matches!(err, ProviderError::UnsupportedRecordType { record_type, .. } if record_type == "LOC")
+        assert_err_matches!(
+            parse_record_data_with_priority("LOC", "some data".to_string(), None, "test"),
+            ProviderError::UnsupportedRecordType { record_type, .. } if record_type == "LOC"
         );
     }
 
@@ -870,52 +880,51 @@ mod tests {
     #[test]
     fn from_string_all_simple_types() {
         // A
-        assert_eq!(
-            parse_record_data_from_string("A", "1.2.3.4".to_string(), "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("A", "1.2.3.4".to_string(), "test"),
             RecordData::A {
                 address: "1.2.3.4".to_string()
             }
         );
         // AAAA
-        assert_eq!(
-            parse_record_data_from_string("AAAA", "::1".to_string(), "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("AAAA", "::1".to_string(), "test"),
             RecordData::AAAA {
                 address: "::1".to_string()
             }
         );
         // CNAME
-        assert_eq!(
-            parse_record_data_from_string("CNAME", "cdn.example.com".to_string(), "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("CNAME", "cdn.example.com".to_string(), "test"),
             RecordData::CNAME {
                 target: "cdn.example.com".to_string()
             }
         );
         // TXT
-        assert_eq!(
-            parse_record_data_from_string("TXT", "v=spf1".to_string(), "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("TXT", "v=spf1".to_string(), "test"),
             RecordData::TXT {
                 text: "v=spf1".to_string()
             }
         );
         // NS
-        assert_eq!(
-            parse_record_data_from_string("NS", "ns1.example.com".to_string(), "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("NS", "ns1.example.com".to_string(), "test"),
             RecordData::NS {
                 nameserver: "ns1.example.com".to_string()
             }
         );
         // MX (from string format)
-        assert_eq!(
-            parse_record_data_from_string("MX", "10 mail.example.com".to_string(), "test").unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("MX", "10 mail.example.com".to_string(), "test"),
             RecordData::MX {
                 priority: 10,
                 exchange: "mail.example.com".to_string()
             }
         );
         // SRV
-        assert_eq!(
-            parse_record_data_from_string("SRV", "10 20 443 srv.example.com".to_string(), "test")
-                .unwrap(),
+        assert_ok_eq!(
+            parse_record_data_from_string("SRV", "10 20 443 srv.example.com".to_string(), "test"),
             RecordData::SRV {
                 priority: 10,
                 weight: 20,
@@ -924,13 +933,12 @@ mod tests {
             }
         );
         // CAA
-        assert_eq!(
+        assert_ok_eq!(
             parse_record_data_from_string(
                 "CAA",
                 r#"0 issue "letsencrypt.org""#.to_string(),
                 "test"
-            )
-            .unwrap(),
+            ),
             RecordData::CAA {
                 flags: 0,
                 tag: "issue".to_string(),
@@ -941,19 +949,17 @@ mod tests {
 
     #[test]
     fn from_string_mx_invalid_format() {
-        let err = parse_record_data_from_string("MX", "just-exchange".to_string(), "huaweicloud")
-            .unwrap_err();
-        assert!(
-            matches!(err, ProviderError::ParseError { provider, .. } if provider == "huaweicloud")
+        assert_err_matches!(
+            parse_record_data_from_string("MX", "just-exchange".to_string(), "huaweicloud"),
+            ProviderError::ParseError { provider, .. } if provider == "huaweicloud"
         );
     }
 
     #[test]
     fn from_string_unsupported_type() {
-        let err =
-            parse_record_data_from_string("PTR", "some data".to_string(), "test").unwrap_err();
-        assert!(
-            matches!(err, ProviderError::UnsupportedRecordType { record_type, .. } if record_type == "PTR")
+        assert_err_matches!(
+            parse_record_data_from_string("PTR", "some data".to_string(), "test"),
+            ProviderError::UnsupportedRecordType { record_type, .. } if record_type == "PTR"
         );
     }
 }

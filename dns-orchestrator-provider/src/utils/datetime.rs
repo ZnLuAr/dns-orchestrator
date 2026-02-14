@@ -71,9 +71,23 @@ mod tests {
 
     #[test]
     fn serialize_some_datetime() {
-        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
+        let dt_opt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).single();
+        assert!(
+            dt_opt.is_some(),
+            "invalid datetime for serialize_some_datetime"
+        );
+        let Some(dt) = dt_opt else {
+            return;
+        };
         let w = Wrapper { ts: Some(dt) };
-        let json = serde_json::to_string(&w).unwrap();
+        let json_res = serde_json::to_string(&w);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
         // RFC3339 string should be in the output
         assert!(json.contains("2024-01-15T12:30:00+00:00"));
     }
@@ -81,15 +95,34 @@ mod tests {
     #[test]
     fn serialize_none() {
         let w = Wrapper { ts: None };
-        let json = serde_json::to_string(&w).unwrap();
+        let json_res = serde_json::to_string(&w);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
         assert!(json.contains("null"));
     }
 
     #[test]
     fn deserialize_rfc3339() {
         let json = r#"{"ts":"2024-01-15T12:30:00+00:00"}"#;
-        let w: Wrapper = serde_json::from_str(json).unwrap();
-        let expected = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
+        let w_res: serde_json::Result<Wrapper> = serde_json::from_str(json);
+        assert!(w_res.is_ok(), "serde_json::from_str failed: {w_res:?}");
+        let Ok(w) = w_res else {
+            return;
+        };
+
+        let expected_opt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).single();
+        assert!(
+            expected_opt.is_some(),
+            "invalid expected datetime for deserialize_rfc3339"
+        );
+        let Some(expected) = expected_opt else {
+            return;
+        };
         assert_eq!(w.ts, Some(expected));
     }
 
@@ -97,8 +130,20 @@ mod tests {
     fn deserialize_unix_seconds() {
         // 1700000000 = 2023-11-14T22:13:20Z
         let json = r#"{"ts":1700000000}"#;
-        let w: Wrapper = serde_json::from_str(json).unwrap();
-        let expected = Utc.with_ymd_and_hms(2023, 11, 14, 22, 13, 20).unwrap();
+        let w_res: serde_json::Result<Wrapper> = serde_json::from_str(json);
+        assert!(w_res.is_ok(), "serde_json::from_str failed: {w_res:?}");
+        let Ok(w) = w_res else {
+            return;
+        };
+
+        let expected_opt = Utc.with_ymd_and_hms(2023, 11, 14, 22, 13, 20).single();
+        assert!(
+            expected_opt.is_some(),
+            "invalid expected datetime for deserialize_unix_seconds"
+        );
+        let Some(expected) = expected_opt else {
+            return;
+        };
         assert_eq!(w.ts, Some(expected));
     }
 
@@ -106,15 +151,31 @@ mod tests {
     fn deserialize_unix_millis() {
         // 1700000000000 ms = same as 1700000000 seconds
         let json = r#"{"ts":1700000000000}"#;
-        let w: Wrapper = serde_json::from_str(json).unwrap();
-        let expected = Utc.with_ymd_and_hms(2023, 11, 14, 22, 13, 20).unwrap();
+        let w_res: serde_json::Result<Wrapper> = serde_json::from_str(json);
+        assert!(w_res.is_ok(), "serde_json::from_str failed: {w_res:?}");
+        let Ok(w) = w_res else {
+            return;
+        };
+
+        let expected_opt = Utc.with_ymd_and_hms(2023, 11, 14, 22, 13, 20).single();
+        assert!(
+            expected_opt.is_some(),
+            "invalid expected datetime for deserialize_unix_millis"
+        );
+        let Some(expected) = expected_opt else {
+            return;
+        };
         assert_eq!(w.ts, Some(expected));
     }
 
     #[test]
     fn deserialize_null() {
         let json = r#"{"ts":null}"#;
-        let w: Wrapper = serde_json::from_str(json).unwrap();
+        let w_res: serde_json::Result<Wrapper> = serde_json::from_str(json);
+        assert!(w_res.is_ok(), "serde_json::from_str failed: {w_res:?}");
+        let Ok(w) = w_res else {
+            return;
+        };
         assert_eq!(w.ts, None);
     }
 
@@ -127,18 +188,52 @@ mod tests {
 
     #[test]
     fn roundtrip_some() {
-        let dt = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
+        let dt_opt = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).single();
+        assert!(dt_opt.is_some(), "invalid datetime for roundtrip_some");
+        let Some(dt) = dt_opt else {
+            return;
+        };
         let original = Wrapper { ts: Some(dt) };
-        let json = serde_json::to_string(&original).unwrap();
-        let restored: Wrapper = serde_json::from_str(&json).unwrap();
+        let json_res = serde_json::to_string(&original);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
+
+        let restored_res: serde_json::Result<Wrapper> = serde_json::from_str(&json);
+        assert!(
+            restored_res.is_ok(),
+            "serde_json::from_str failed: {restored_res:?}"
+        );
+        let Ok(restored) = restored_res else {
+            return;
+        };
         assert_eq!(original, restored);
     }
 
     #[test]
     fn roundtrip_none() {
         let original = Wrapper { ts: None };
-        let json = serde_json::to_string(&original).unwrap();
-        let restored: Wrapper = serde_json::from_str(&json).unwrap();
+        let json_res = serde_json::to_string(&original);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
+
+        let restored_res: serde_json::Result<Wrapper> = serde_json::from_str(&json);
+        assert!(
+            restored_res.is_ok(),
+            "serde_json::from_str failed: {restored_res:?}"
+        );
+        let Ok(restored) = restored_res else {
+            return;
+        };
         assert_eq!(original, restored);
     }
 
@@ -146,14 +241,44 @@ mod tests {
     fn boundary_seconds_vs_millis() {
         // 100_000_000_000 is exactly the boundary -- treated as seconds (not > threshold)
         let json_seconds = r#"{"ts":100000000000}"#;
-        let w_sec: Wrapper = serde_json::from_str(json_seconds).unwrap();
-        let expected_sec = DateTime::from_timestamp(100_000_000_000, 0).unwrap();
+        let w_sec_res: serde_json::Result<Wrapper> = serde_json::from_str(json_seconds);
+        assert!(
+            w_sec_res.is_ok(),
+            "serde_json::from_str failed: {w_sec_res:?}"
+        );
+        let Ok(w_sec) = w_sec_res else {
+            return;
+        };
+
+        let expected_sec_opt = DateTime::from_timestamp(100_000_000_000, 0);
+        assert!(
+            expected_sec_opt.is_some(),
+            "DateTime::from_timestamp returned None for seconds boundary"
+        );
+        let Some(expected_sec) = expected_sec_opt else {
+            return;
+        };
         assert_eq!(w_sec.ts, Some(expected_sec));
 
         // 100_000_000_001 is > threshold -- treated as millis
         let json_millis = r#"{"ts":100000000001}"#;
-        let w_ms: Wrapper = serde_json::from_str(json_millis).unwrap();
-        let expected_ms = DateTime::from_timestamp_millis(100_000_000_001).unwrap();
+        let w_ms_res: serde_json::Result<Wrapper> = serde_json::from_str(json_millis);
+        assert!(
+            w_ms_res.is_ok(),
+            "serde_json::from_str failed: {w_ms_res:?}"
+        );
+        let Ok(w_ms) = w_ms_res else {
+            return;
+        };
+
+        let expected_ms_opt = DateTime::from_timestamp_millis(100_000_000_001);
+        assert!(
+            expected_ms_opt.is_some(),
+            "DateTime::from_timestamp_millis returned None for millis boundary"
+        );
+        let Some(expected_ms) = expected_ms_opt else {
+            return;
+        };
         assert_eq!(w_ms.ts, Some(expected_ms));
     }
 }

@@ -354,7 +354,10 @@ mod tests {
             x: i32,
         }
         let result: Result<Foo, ProviderError> = HttpUtils::parse_json(r#"{"x":42}"#, "test");
-        assert_eq!(result.unwrap(), Foo { x: 42 });
+        assert!(
+            matches!(&result, Ok(Foo { x: 42 })),
+            "unexpected parse result: {result:?}"
+        );
     }
 
     #[test]
@@ -365,8 +368,9 @@ mod tests {
             x: i32,
         }
         let result: Result<Foo, ProviderError> = HttpUtils::parse_json("not json", "test");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(matches!(err, ProviderError::ParseError { .. }));
+        assert!(
+            matches!(&result, Err(ProviderError::ParseError { .. })),
+            "unexpected parse result: {result:?}"
+        );
     }
 }

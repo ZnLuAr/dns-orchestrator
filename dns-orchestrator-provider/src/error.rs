@@ -483,7 +483,14 @@ mod tests {
             retry_after: Some(60),
             raw_message: Some("too many requests".to_string()),
         };
-        let json = serde_json::to_string(&e).unwrap();
+        let json_res = serde_json::to_string(&e);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
         assert!(json.contains("\"code\":\"RateLimited\""));
         assert!(json.contains("\"retry_after\":60"));
     }
@@ -494,8 +501,23 @@ mod tests {
             provider: "aliyun".to_string(),
             detail: "connection refused".to_string(),
         };
-        let json = serde_json::to_string(&original).unwrap();
-        let deserialized: ProviderError = serde_json::from_str(&json).unwrap();
+        let json_res = serde_json::to_string(&original);
+        assert!(
+            json_res.is_ok(),
+            "serde_json::to_string failed: {json_res:?}"
+        );
+        let Ok(json) = json_res else {
+            return;
+        };
+
+        let deserialized_res: serde_json::Result<ProviderError> = serde_json::from_str(&json);
+        assert!(
+            deserialized_res.is_ok(),
+            "serde_json::from_str failed: {deserialized_res:?}"
+        );
+        let Ok(deserialized) = deserialized_res else {
+            return;
+        };
         assert_eq!(deserialized.to_string(), original.to_string());
     }
 
@@ -572,8 +594,23 @@ mod tests {
         ];
 
         for v in &variants {
-            let json = serde_json::to_string(v).unwrap();
-            let back: ProviderError = serde_json::from_str(&json).unwrap();
+            let json_res = serde_json::to_string(v);
+            assert!(
+                json_res.is_ok(),
+                "serde_json::to_string failed: {json_res:?}"
+            );
+            let Ok(json) = json_res else {
+                return;
+            };
+
+            let back_res: serde_json::Result<ProviderError> = serde_json::from_str(&json);
+            assert!(
+                back_res.is_ok(),
+                "serde_json::from_str failed: {back_res:?}"
+            );
+            let Ok(back) = back_res else {
+                return;
+            };
             assert_eq!(back.to_string(), v.to_string());
         }
     }
