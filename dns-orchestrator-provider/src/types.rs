@@ -724,7 +724,7 @@ impl ProviderCredentials {
         }
     }
 
-    /// 从 `HashMap` 中获取必需字段，校验非空
+    /// Obtain required fields from `HashMap` and verify that it is not empty
     fn get_required_field(
         provider: &ProviderType,
         map: &std::collections::HashMap<String, String>,
@@ -793,7 +793,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    // ============ ProviderCredentials 往返测试 ============
+    // ============ ProviderCredentials Round Trip Test ============
 
     #[test]
     fn credentials_cloudflare_roundtrip() {
@@ -883,7 +883,7 @@ mod tests {
         );
     }
 
-    // ============ PaginatedResponse 分页计算测试 ============
+    // ============ PaginatedResponse paging calculation test ============
 
     #[test]
     fn paginated_response_has_more() {
@@ -911,7 +911,7 @@ mod tests {
         assert_eq!(resp.items.len(), 0);
     }
 
-    // ============ DnsRecordType serde 测试 ============
+    // ============ DnsRecordType serde test ============
 
     #[test]
     fn dns_record_type_serialize() {
@@ -971,7 +971,7 @@ mod tests {
         }
     }
 
-    // ============ RecordData serde 测试 ============
+    // ============ RecordData serde test ============
 
     #[test]
     fn record_data_srv_serde_roundtrip() {
@@ -1077,7 +1077,7 @@ mod tests {
         );
     }
 
-    // ============ PaginationParams::validated 测试 ============
+    // ============ PaginationParams::validated Test ============
 
     #[test]
     fn pagination_validated_clamps_page_zero() {

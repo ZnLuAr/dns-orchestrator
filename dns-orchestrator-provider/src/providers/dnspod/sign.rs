@@ -1,4 +1,4 @@
-//! `DNSPod` TC3-HMAC-SHA256 签名
+//! `DNSPod` TC3-HMAC-SHA256 signature
 
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
@@ -8,14 +8,14 @@ use crate::providers::common::hmac_sha256;
 use super::{DNSPOD_API_HOST, DNSPOD_SERVICE, DnspodProvider};
 
 impl DnspodProvider {
-    /// 生成 TC3-HMAC-SHA256 签名
+    /// Generate TC3-HMAC-SHA256 signature
     pub(crate) fn sign(&self, action: &str, payload: &str, timestamp: i64) -> String {
         let date = DateTime::from_timestamp(timestamp, 0)
             .unwrap_or_else(Utc::now)
             .format("%Y-%m-%d")
             .to_string();
 
-        // 1. 拼接规范请求串
+        // 1. Splicing specification request string
         let http_request_method = "POST";
         let canonical_uri = "/";
         let canonical_query_string = "";
@@ -30,14 +30,14 @@ impl DnspodProvider {
             "{http_request_method}\n{canonical_uri}\n{canonical_query_string}\n{canonical_headers}\n{signed_headers}\n{hashed_payload}"
         );
 
-        // 2. 拼接待签名字符串
+        // 2. Pin the string to be signed
         let algorithm = "TC3-HMAC-SHA256";
         let credential_scope = format!("{date}/{DNSPOD_SERVICE}/tc3_request");
         let hashed_canonical_request = hex::encode(Sha256::digest(canonical_request.as_bytes()));
         let string_to_sign =
             format!("{algorithm}\n{timestamp}\n{credential_scope}\n{hashed_canonical_request}");
 
-        // 3. 计算签名
+        // 3. Calculate signature
         let secret_date = hmac_sha256(
             format!("TC3{}", self.secret_key).as_bytes(),
             date.as_bytes(),
@@ -46,7 +46,7 @@ impl DnspodProvider {
         let secret_signing = hmac_sha256(&secret_service, b"tc3_request");
         let signature = hex::encode(hmac_sha256(&secret_signing, string_to_sign.as_bytes()));
 
-        // 4. 拼接 Authorization
+        // 4. Splicing Authorization
         format!(
             "{} Credential={}/{}, SignedHeaders={}, Signature={}",
             algorithm, self.secret_id, credential_scope, signed_headers, signature
@@ -78,7 +78,7 @@ mod tests {
         auth.split("Signature=").nth(1)
     }
 
-    // ---- 输出格式 ----
+    // ---- Output format ----
 
     #[test]
     fn sign_output_format() {
@@ -102,7 +102,7 @@ mod tests {
         );
     }
 
-    // ---- Credential 包含 secret_id 和日期路径 ----
+    // ---- Credential contains secret_id and date path ----
 
     #[test]
     fn sign_credential_contains_secret_id_and_date() {
@@ -128,7 +128,7 @@ mod tests {
         );
     }
 
-    // ---- SignedHeaders 正确 ----
+    // ---- SignedHeaders Correct ----
 
     #[test]
     fn sign_signed_headers_correct() {
@@ -149,7 +149,7 @@ mod tests {
         );
     }
 
-    // ---- 确定性 ----
+    // ----Certainty ----
 
     #[test]
     fn sign_deterministic() {
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(a, b, "same inputs should produce identical output");
     }
 
-    // ---- 不同 action 产生不同签名 ----
+    // ---- Different actions generate different signatures ----
 
     #[test]
     fn sign_different_action_changes_signature() {
@@ -199,7 +199,7 @@ mod tests {
         );
     }
 
-    // ---- 不同 payload 产生不同签名 ----
+    // ---- Different payloads generate different signatures ----
 
     #[test]
     fn sign_different_payload_changes_signature() {
@@ -231,7 +231,7 @@ mod tests {
         );
     }
 
-    // ---- 不同 secret_key 产生不同签名 ----
+    // ---- Different secret_key generates different signatures ----
 
     #[test]
     fn sign_different_secret_changes_signature() {
@@ -265,23 +265,23 @@ mod tests {
         );
     }
 
-    // ---- 日期从 timestamp 派生 ----
+    // ---- Date is derived from timestamp ----
 
     #[test]
     fn sign_date_derived_from_timestamp() {
         let p = provider();
 
-        // 同一天的两个时间戳 (2024-01-15 UTC)
+        // Two timestamps on the same day (2024-01-15 UTC)
         let ts_morning = 1_705_305_600; // 2024-01-15 08:00:00 UTC
         let ts_evening = 1_705_348_800; // 2024-01-15 20:00:00 UTC
 
         let result_morning = p.sign("DescribeRecordList", "{}", ts_morning);
         let result_evening = p.sign("DescribeRecordList", "{}", ts_evening);
 
-        // 提取 Credential 中的日期部分
+        // Extract date part from Credential
         let extract_date = |s: &str| -> Option<String> {
             let credential = extract_credential(s)?;
-            // 格式: secret_id/YYYY-MM-DD/dnspod/tc3_request
+            // Format: secret_id/YYYY-MM-DD/dnspod/tc3_request
             credential
                 .split('/')
                 .nth(1)
@@ -312,7 +312,7 @@ mod tests {
         );
         assert_eq!(date_morning, "2024-01-15");
 
-        // 不同天的时间戳 (2024-01-16 UTC)
+        // Timestamps on different days (2024-01-16 UTC)
         let ts_next_day = 1_705_392_000; // 2024-01-16 08:00:00 UTC
         let result_next_day = p.sign("DescribeRecordList", "{}", ts_next_day);
         let date_next_day_opt = extract_date(&result_next_day);

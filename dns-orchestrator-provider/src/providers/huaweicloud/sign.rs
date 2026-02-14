@@ -1,16 +1,17 @@
-//! 华为云 SDK-HMAC-SHA256 签名
+//! Huawei Cloud SDK-HMAC-SHA256 signature
 
 use std::fmt::Write;
 
 use sha2::{Digest, Sha256};
 
 use crate::providers::common::hmac_sha256;
+use crate::utils::log_sanitizer::truncate_for_log;
 
 use super::HuaweicloudProvider;
 
 impl HuaweicloudProvider {
-    /// 生成华为云 SDK 签名
-    /// 参考: <https://support.huaweicloud.com/devg-apisign/api-sign-algorithm-005.html>
+    /// Generate Huawei Cloud SDK signature
+    /// Reference: <https://support.huaweicloud.com/devg-apisign/api-sign-algorithm-005.html>
     pub(crate) fn sign(
         &self,
         method: &str,
@@ -20,14 +21,14 @@ impl HuaweicloudProvider {
         payload: &str,
         timestamp: &str,
     ) -> String {
-        // 1. URI 规范化：确保以 "/" 结尾
+        // 1. URI normalization: make sure it ends with "/"
         let canonical_uri = if uri.ends_with('/') {
             uri.to_string()
         } else {
             format!("{uri}/")
         };
 
-        // 2. Query String 排序（按参数名升序）
+        // 2. Query String sorting (in ascending order by parameter name)
         let canonical_query = if query.is_empty() {
             String::new()
         } else {
@@ -36,7 +37,7 @@ impl HuaweicloudProvider {
             params.join("&")
         };
 
-        // 3. 构造规范请求头
+        // 3. Construct the standard request header
         let mut sorted_headers: Vec<_> = headers.iter().collect();
         sorted_headers.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
 
@@ -54,29 +55,29 @@ impl HuaweicloudProvider {
             .collect::<Vec<_>>()
             .join(";");
 
-        // 4. 计算 payload hash
+        // 4. Calculate payload hash
         let hashed_payload = hex::encode(Sha256::digest(payload.as_bytes()));
 
-        // 5. 构造规范请求
+        // 5. Construct a specification request
         let canonical_request = format!(
             "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{hashed_payload}"
         );
 
-        log::debug!("CanonicalRequest:\n{canonical_request}");
+        log::debug!("CanonicalRequest:\n{}", truncate_for_log(&canonical_request));
 
-        // 6. 构造待签名字符串（3 行格式）
+        // 6. Construct the string to be signed (3-line format)
         let hashed_canonical_request = hex::encode(Sha256::digest(canonical_request.as_bytes()));
         let string_to_sign = format!("SDK-HMAC-SHA256\n{timestamp}\n{hashed_canonical_request}");
 
         log::debug!("StringToSign:\n{string_to_sign}");
 
-        // 7. 计算签名（直接用 SK）
+        // 7. Calculate signature (use SK directly)
         let signature = hex::encode(hmac_sha256(
             self.secret_access_key.as_bytes(),
             string_to_sign.as_bytes(),
         ));
 
-        // 8. 构造 Authorization 头（正确格式：Access=xxx）
+        // 8. Construct the Authorization header (correct format: Access=xxx)
         format!(
             "SDK-HMAC-SHA256 Access={}, SignedHeaders={}, Signature={}",
             self.access_key_id, signed_headers, signature
@@ -88,17 +89,17 @@ impl HuaweicloudProvider {
 mod tests {
     use super::super::HuaweicloudProvider;
 
-    /// 创建测试用 provider
+    /// Create a test provider
     fn provider() -> HuaweicloudProvider {
         HuaweicloudProvider::new("test-ak".to_string(), "test-sk".to_string())
     }
 
-    /// 创建指定密钥的 provider
+    /// Create a provider for the specified key
     fn provider_with_keys(ak: &str, sk: &str) -> HuaweicloudProvider {
         HuaweicloudProvider::new(ak.to_string(), sk.to_string())
     }
 
-    /// 默认测试参数
+    /// Default test parameters
     fn default_headers() -> Vec<(String, String)> {
         vec![
             ("Host".to_string(), "dns.myhuaweicloud.com".to_string()),
@@ -106,26 +107,26 @@ mod tests {
         ]
     }
 
-    /// 从签名结果中提取 Access 字段的值
+    /// Extract the value of an Access field from the signature result
     fn extract_access(auth: &str) -> Option<&str> {
         auth.split("Access=")
             .nth(1)
             .and_then(|s| s.split(',').next())
     }
 
-    /// 从签名结果中提取 `SignedHeaders` 字段的值
+    /// Extract the value of the `SignedHeaders` field from the signature result
     fn extract_signed_headers(auth: &str) -> Option<&str> {
         auth.split("SignedHeaders=")
             .nth(1)
             .and_then(|s| s.split(',').next())
     }
 
-    /// 从签名结果中提取 Signature 字段的值
+    /// Extract the value of the Signature field from the signature result
     fn extract_signature(auth: &str) -> Option<&str> {
         auth.split("Signature=").nth(1)
     }
 
-    // ============ 输出格式验证 ============
+    // ============ Output format verification ============
 
     #[test]
     fn sign_output_format() {
@@ -157,7 +158,7 @@ mod tests {
         );
     }
 
-    // ============ Access 字段验证 ============
+    // ============ Access field validation ============
 
     #[test]
     fn sign_access_matches_key_id() {
@@ -179,7 +180,7 @@ mod tests {
         assert_eq!(access, "MY-ACCESS-KEY-ID");
     }
 
-    // ============ 确定性验证 ============
+    // ============ Deterministic Verification ============
 
     #[test]
     fn sign_deterministic() {
@@ -205,7 +206,7 @@ mod tests {
         assert_eq!(result1, result2, "same inputs should produce same output");
     }
 
-    // ============ URI 规范化验证 ============
+    // ============ URI canonicalization verification ============
 
     #[test]
     fn sign_uri_normalization_trailing_slash() {
@@ -238,7 +239,7 @@ mod tests {
         );
     }
 
-    // ============ Query String 排序验证 ============
+    // ============ Query String Sorting Verification ============
 
     #[test]
     fn sign_query_string_sorting() {
@@ -285,7 +286,7 @@ mod tests {
         );
     }
 
-    // ============ Headers 排序验证 ============
+    // ============ Headers sorting verification ============
 
     #[test]
     fn sign_headers_sorted_by_key() {
@@ -311,7 +312,7 @@ mod tests {
         );
     }
 
-    // ============ 空 Query String 验证 ============
+    // ============ Empty Query String Validation ============
 
     #[test]
     fn sign_empty_query() {
@@ -340,7 +341,7 @@ mod tests {
         assert!(!signature.is_empty(), "signature should not be empty");
     }
 
-    // ============ 空 Payload 验证 ============
+    // ============ Empty Payload Verification ============
 
     #[test]
     fn sign_empty_payload() {
@@ -369,7 +370,7 @@ mod tests {
         assert!(!signature.is_empty(), "signature should not be empty");
     }
 
-    // ============ 不同 HTTP Method 产生不同签名 ============
+    // ============ Different HTTP Methods produce different signatures ============
 
     #[test]
     fn sign_different_method_changes_signature() {
@@ -402,7 +403,7 @@ mod tests {
         );
     }
 
-    // ============ 不同 Secret 产生不同签名 ============
+    // ============ Different Secrets generate different signatures ============
 
     #[test]
     fn sign_different_secret_changes_signature() {

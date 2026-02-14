@@ -1,4 +1,4 @@
-//! Provider 公共工具函数
+//! Provider public utility functions
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -15,15 +15,15 @@ type HmacSha256 = Hmac<Sha256>;
 
 // ============ HTTP Client ============
 
-/// 默认连接超时（秒）
+/// Default connection timeout (seconds)
 const DEFAULT_CONNECT_TIMEOUT_SECS: u64 = 10;
-/// 默认请求超时（秒）
+/// Default request timeout (seconds)
 const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 30;
 
-/// 全局共享的 HTTP Client
+/// Globally shared HTTP Client
 static SHARED_HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 
-/// 获取共享的 HTTP Client（懒初始化，线程安全）
+/// Get a shared HTTP Client (lazy initialization, thread-safe)
 pub fn create_http_client() -> Client {
     SHARED_HTTP_CLIENT
         .get_or_init(|| {
@@ -40,12 +40,12 @@ pub fn create_http_client() -> Client {
         .clone()
 }
 
-// ============ Domain 缓存 ============
+// ============ Domain Cache ============
 
-/// 域名信息缓存，减少重复 API 调用
+/// Domain name information caching to reduce repeated API calls
 ///
-/// 使用 `std::sync::Mutex` 而非 `tokio::sync`，因为临界区极短且无异步操作。
-/// TTL 为 5 分钟。
+/// Use `std::sync::Mutex` instead of `tokio::sync` because the critical section is extremely short and has no asynchronous operations.
+/// TTL is 5 minutes.
 pub struct DomainCache {
     cache: Mutex<HashMap<String, (ProviderDomain, Instant)>>,
     ttl: Duration,
@@ -58,14 +58,15 @@ impl Default for DomainCache {
 }
 
 impl DomainCache {
+    /// Creates a cache with the default 5-minute TTL.
     pub fn new() -> Self {
         Self {
             cache: Mutex::new(HashMap::new()),
-            ttl: Duration::from_secs(300), // 5 分钟
+            ttl: Duration::from_secs(300), // 5 minutes
         }
     }
 
-    /// 获取缓存的域名信息（如果未过期）
+    /// Get cached domain name information (if not expired)
     pub fn get(&self, domain_id: &str) -> Option<ProviderDomain> {
         let cache = self
             .cache
@@ -79,7 +80,7 @@ impl DomainCache {
         None
     }
 
-    /// 插入域名信息到缓存
+    /// Insert domain name information into cache
     pub fn insert(&self, domain_id: &str, domain: &ProviderDomain) {
         let mut cache = self
             .cache
@@ -89,9 +90,9 @@ impl DomainCache {
     }
 }
 
-// ============ 记录类型转换 ============
+// ============ Record type conversion ============
 
-/// 将 `DnsRecordType` 转换为大写字符串
+/// Convert `DnsRecordType` to uppercase string
 pub fn record_type_to_string(record_type: &DnsRecordType) -> &'static str {
     match record_type {
         DnsRecordType::A => "A",
@@ -107,7 +108,7 @@ pub fn record_type_to_string(record_type: &DnsRecordType) -> &'static str {
 
 // ============ HMAC-SHA256 ============
 
-/// HMAC-SHA256 计算（供 aliyun/dnspod/huaweicloud 使用）
+/// HMAC-SHA256 calculation (for use by aliyun/dnspod/huaweicloud)
 pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
     // HMAC-SHA256 accepts keys of any size, so new_from_slice never fails
     #[allow(clippy::expect_used)]
@@ -116,16 +117,16 @@ pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
     mac.finalize().into_bytes().to_vec()
 }
 
-// ============ 域名名称处理 ============
+// ============ Domain name processing ============
 
-/// 去掉域名末尾的点
+/// Remove the dot at the end of the domain name
 pub fn normalize_domain_name(name: &str) -> String {
     name.trim_end_matches('.').to_string()
 }
 
-/// 将完整域名转换为相对名称
-/// 如: "www.example.com" + "example.com" -> "www"
-/// 如: "example.com" + "example.com" -> "@"
+/// Convert full domain name to relative name
+/// For example: "www.example.com" + "example.com" -> "www"
+/// For example: "example.com" + "example.com" -> "@"
 pub fn full_name_to_relative(full_name: &str, zone_name: &str) -> String {
     let full = normalize_domain_name(full_name);
     let zone = normalize_domain_name(zone_name);
@@ -139,9 +140,9 @@ pub fn full_name_to_relative(full_name: &str, zone_name: &str) -> String {
     }
 }
 
-/// 将相对名称转换为完整域名
-/// 如: "www" + "example.com" -> "www.example.com"
-/// 如: "@" + "example.com" -> "example.com"
+/// Convert relative name to full domain name
+/// For example: "www" + "example.com" -> "www.example.com"
+/// For example: "@" + "example.com" -> "example.com"
 pub fn relative_to_full_name(relative_name: &str, zone_name: &str) -> String {
     let zone = normalize_domain_name(zone_name);
 
@@ -152,12 +153,12 @@ pub fn relative_to_full_name(relative_name: &str, zone_name: &str) -> String {
     }
 }
 
-// ============ 共享记录解析函数 ============
+// ============ Shared record parsing function ============
 
-/// 从字符串解析 SRV 记录数据
+/// Parse SRV record data from string
 ///
-/// 格式: `"priority weight port target"`
-/// Aliyun、DNSPod、Huaweicloud 均使用此格式。
+/// Format: `"priority weight port target"`
+/// Aliyun, DNSPod, and Huaweicloud all use this format.
 pub fn parse_srv_from_string(value: &str, provider: &str) -> Result<RecordData> {
     let parts: Vec<&str> = value.splitn(4, ' ').collect();
     if parts.len() == 4 {
@@ -186,10 +187,10 @@ pub fn parse_srv_from_string(value: &str, provider: &str) -> Result<RecordData> 
     }
 }
 
-/// 从字符串解析 CAA 记录数据
+/// Parse CAA record data from string
 ///
-/// 格式: `"flags tag value"`（value 可带引号）
-/// Aliyun、DNSPod、Huaweicloud 均使用此格式。
+/// Format: `"flags tag value"` (value can be quoted)
+/// Aliyun, DNSPod, and Huaweicloud all use this format.
 pub fn parse_caa_from_string(value: &str, provider: &str) -> Result<RecordData> {
     let parts: Vec<&str> = value.splitn(3, ' ').collect();
     if parts.len() >= 3 {
@@ -209,10 +210,10 @@ pub fn parse_caa_from_string(value: &str, provider: &str) -> Result<RecordData> 
     }
 }
 
-/// 从字符串解析 MX 记录数据（华为云格式）
+/// Parse MX record data from string (Huawei Cloud format)
 ///
-/// 格式: `"priority exchange"`
-/// 华为云将 priority 和 exchange 都编码在同一个字符串中。
+/// Format: `"priority exchange"`
+/// Huawei Cloud encodes both priority and exchange in the same string.
 pub fn parse_mx_from_string(value: &str, provider: &str) -> Result<RecordData> {
     let parts: Vec<&str> = value.splitn(2, ' ').collect();
     if parts.len() == 2 {
@@ -233,9 +234,9 @@ pub fn parse_mx_from_string(value: &str, provider: &str) -> Result<RecordData> {
     }
 }
 
-/// 从 type/value/priority 解析记录数据（Aliyun/DNSPod 格式）
+/// Parse record data from type/value/priority (Aliyun/DNSPod format)
 ///
-/// MX 使用独立的 priority 参数，SRV/CAA 从 value 字符串解析。
+/// MX uses a separate priority parameter, SRV/CAA parses from the value string.
 pub fn parse_record_data_with_priority(
     record_type: &str,
     value: String,
@@ -264,10 +265,10 @@ pub fn parse_record_data_with_priority(
     }
 }
 
-/// 从 type/record 字符串解析记录数据（华为云格式）
+/// Parse record data from type/record string (Huawei Cloud format)
 ///
-/// MX priority 从 record 字符串解析（`"priority exchange"` 格式），
-/// SRV/CAA 同样从字符串解析。
+/// MX priority parsed from record string (`"priority exchange"` format),
+/// SRV/CAA is also parsed from strings.
 pub fn parse_record_data_from_string(
     record_type: &str,
     record: String,
@@ -289,9 +290,9 @@ pub fn parse_record_data_from_string(
     }
 }
 
-/// 将 `RecordData` 转换为 (value, priority) 格式
+/// Convert `RecordData` to (value, priority) format
 ///
-/// Aliyun 和 `DNSPod` 使用此格式：主值在 value 字段，MX priority 在独立字段。
+/// Aliyun and `DNSPod` use this format: primary value in the value field and MX priority in the independent field.
 pub fn record_data_to_value_priority(data: &RecordData) -> (String, Option<u16>) {
     match data {
         RecordData::A { address } | RecordData::AAAA { address } => (address.clone(), None),
@@ -309,9 +310,9 @@ pub fn record_data_to_value_priority(data: &RecordData) -> (String, Option<u16>)
     }
 }
 
-/// 将 `RecordData` 转换为单个字符串
+/// Convert `RecordData` to a single string
 ///
-/// 华为云格式：所有字段都编码在一个 records 字符串中。
+/// Huawei Cloud format: All fields are encoded in a records string.
 pub fn record_data_to_single_string(data: &RecordData) -> String {
     match data {
         RecordData::A { address } | RecordData::AAAA { address } => address.clone(),
@@ -354,7 +355,7 @@ mod tests {
         }};
     }
 
-    // ============ SRV 解析测试 ============
+    // ============ SRV parsing test ============
 
     #[test]
     fn parse_srv_valid() {
@@ -397,7 +398,7 @@ mod tests {
 
     #[test]
     fn parse_srv_target_with_spaces() {
-        // splitn(4, ' ') 意味着第 4 部分包含剩余内容
+        // splitn(4, ' ') means that part 4 contains the remaining content
         assert_ok_eq!(
             parse_srv_from_string("10 20 80 target with spaces", "test"),
             RecordData::SRV {
@@ -449,7 +450,7 @@ mod tests {
         );
     }
 
-    // ============ CAA 解析测试 ============
+    // ============ CAA Parsing Test ============
 
     #[test]
     fn parse_caa_valid_quoted() {
@@ -515,7 +516,7 @@ mod tests {
         );
     }
 
-    // ============ MX 解析测试 ============
+    // ============ MX parsing test ============
 
     #[test]
     fn parse_mx_valid() {
@@ -555,7 +556,7 @@ mod tests {
         );
     }
 
-    // ============ record_data_to_value_priority 测试 ============
+    // ============ record_data_to_value_priority test ============
 
     #[test]
     fn value_priority_a_record() {
@@ -605,7 +606,7 @@ mod tests {
         assert_eq!(priority, None);
     }
 
-    // ============ record_data_to_single_string 测试 ============
+    // ============ record_data_to_single_string test ============
 
     #[test]
     fn single_string_a_record() {
@@ -638,7 +639,7 @@ mod tests {
         );
     }
 
-    // ============ SRV/CAA 往返测试 ============
+    // ============ SRV/CAA Round Trip Test ============
 
     #[test]
     fn srv_roundtrip_value_priority() {
@@ -685,7 +686,7 @@ mod tests {
         assert_ok_eq!(parse_mx_from_string(&s, "test"), original);
     }
 
-    // ============ 域名辅助函数测试 ============
+    // ============ Domain name auxiliary function test ============
 
     #[test]
     fn normalize_removes_trailing_dot() {
@@ -733,7 +734,7 @@ mod tests {
 
     #[test]
     fn full_to_relative_unrelated_domain() {
-        // 不属于该 zone，返回 full name
+        // Does not belong to the zone, returns full name
         assert_eq!(
             full_name_to_relative("www.other.com", "example.com"),
             "www.other.com"
@@ -766,7 +767,7 @@ mod tests {
         );
     }
 
-    // ============ record_type_to_string 测试 ============
+    // ============ record_type_to_string test ============
 
     #[test]
     fn record_type_all_variants() {
@@ -780,7 +781,7 @@ mod tests {
         assert_eq!(record_type_to_string(&DnsRecordType::Caa), "CAA");
     }
 
-    // ============ parse_record_data_with_priority 测试 ============
+    // ============ parse_record_data_with_priority test ============
 
     #[test]
     fn with_priority_all_simple_types() {
@@ -875,7 +876,7 @@ mod tests {
         );
     }
 
-    // ============ parse_record_data_from_string 测试 ============
+    // ============ parse_record_data_from_string test ============
 
     #[test]
     fn from_string_all_simple_types() {

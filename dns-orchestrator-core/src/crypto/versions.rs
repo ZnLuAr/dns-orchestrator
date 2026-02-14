@@ -1,27 +1,27 @@
-//! 加密算法版本管理
+//! Encryption algorithm version management
 //!
-//! 定义每个文件版本对应的加密参数（隐式契约）
+//! Define encryption parameters corresponding to each file version (implicit contract)
 //!
-//! 设计原则：
-//! - 文件版本号不暴露加密参数，参数在代码中隐式定义
-//! - Version 1: PBKDF2-HMAC-SHA256, 100,000 次迭代
-//! - Version 2: PBKDF2-HMAC-SHA256, 600,000 次迭代（OWASP 2023 推荐）
-//! - 将来可扩展到 Version 3（Argon2 等算法）
+//! Design principles:
+//! - The file version number does not expose encryption parameters, and the parameters are implicitly defined in the code
+//! - Version 1: PBKDF2-HMAC-SHA256, 100,000 iterations
+//! - Version 2: PBKDF2-HMAC-SHA256, 600,000 iterations (OWASP 2023 Recommended)
+//! - Can be expanded to Version 3 in the future (algorithms such as Argon2)
 
-/// Version 1: PBKDF2-HMAC-SHA256, 100,000 次迭代
+/// Version 1: PBKDF2-HMAC-SHA256, 100,000 iterations
 const VERSION_1_ITERATIONS: u32 = 100_000;
 
-/// Version 2: PBKDF2-HMAC-SHA256, 600,000 次迭代（OWASP 2023 推荐）
+/// Version 2: PBKDF2-HMAC-SHA256, 600,000 iterations (OWASP 2023 Recommended)
 const VERSION_2_ITERATIONS: u32 = 600_000;
 
-/// 当前文件格式版本号
+/// Current file format version number
 ///
-/// 修改此常量即可切换版本（迭代次数会自动从版本号派生）
+/// Modify this constant to switch versions (the number of iterations is automatically derived from the version number)
 pub const CURRENT_FILE_VERSION: u32 = 2;
 
-/// 获取当前版本的迭代次数（编译时计算）
+/// Get the number of iterations of the current version (calculated at compile time)
 ///
-/// 从 `CURRENT_FILE_VERSION` 自动派生，确保加密和解密使用相同参数
+/// Automatically derived from `CURRENT_FILE_VERSION`, ensuring the same parameters are used for encryption and decryption
 ///
 /// # Panics
 /// Panics at compile time if `CURRENT_FILE_VERSION` does not map to a known iteration count.
@@ -35,14 +35,14 @@ pub const fn get_current_iterations() -> u32 {
     }
 }
 
-/// 获取指定文件版本的 PBKDF2 迭代次数
+/// Get the number of PBKDF2 iterations for the specified file version
 ///
 /// # Arguments
-/// * `version` - 文件版本号
+/// * `version` - file version number
 ///
 /// # Returns
-/// - `Some(iterations)` - 该版本对应的迭代次数
-/// - `None` - 不支持的版本号
+/// - `Some(iterations)` - the number of iterations corresponding to this version
+/// - `None` - Unsupported version number
 pub const fn get_pbkdf2_iterations(version: u32) -> Option<u32> {
     match version {
         1 => Some(VERSION_1_ITERATIONS),

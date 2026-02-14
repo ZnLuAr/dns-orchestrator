@@ -1,4 +1,4 @@
-//! 类型定义模块
+//! type definition module
 
 mod account;
 mod dns;
@@ -18,7 +18,7 @@ pub use export::{
     ImportAccountsRequest, ImportFailure, ImportPreview, ImportPreviewAccount, ImportResult,
 };
 
-// Re-export provider 库的公共类型
+// Public types of the Re-export provider library
 pub use dns_orchestrator_provider::{
     BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
     BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest,

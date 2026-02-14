@@ -215,6 +215,11 @@ export const useDnsStore = create<DnsState>((set, get) => ({
     const actualPageSize = getRecordPageSize(accountId, pageSize)
     const maxPage = Math.ceil(totalCount / actualPageSize)
 
+    if (maxPage === 0) {
+      toast.error("当前没有记录，无法跳转")
+      return
+    }
+
     if (targetPage < 1 || targetPage > maxPage) {
       toast.error(`页码必须在 1-${maxPage} 之间`)
       return

@@ -1,4 +1,4 @@
-//! 华为云 HTTP 请求方法（重构版：消除代码重复）
+//! Huawei Cloud HTTP request method (refactored version: eliminating code duplication)
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -6,14 +6,15 @@ use serde::{Deserialize, Serialize};
 use crate::error::{ProviderError, Result};
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
+use crate::utils::log_sanitizer::truncate_for_log;
 
 use super::types::ErrorResponse;
 use super::{HUAWEICLOUD_DNS_HOST, HuaweicloudProvider};
 
 impl HuaweicloudProvider {
-    // ==================== 辅助方法 ====================
+    // ==================== Helper methods ====================
 
-    /// 统一处理华为云响应错误
+    /// Unified handling of Huawei Cloud response errors
     fn handle_response_error(
         &self,
         status: u16,
@@ -24,7 +25,7 @@ impl HuaweicloudProvider {
             return Ok(());
         }
 
-        // 尝试解析结构化错误
+        // Try to parse structured errors
         if let Ok(error) = serde_json::from_str::<ErrorResponse>(response_text) {
             return Err(self.map_error(
                 RawApiError::with_code(
@@ -37,11 +38,11 @@ impl HuaweicloudProvider {
             ));
         }
 
-        // 回退到通用错误
+        // fallback to generic error
         Err(self.unknown_error(RawApiError::new(format!("HTTP {status}: {response_text}"))))
     }
 
-    /// 执行带 body 的请求（POST/PUT）
+    /// Execute request with body (POST/PUT)
     async fn request_with_body<T, B>(
         &self,
         method: &str,
@@ -59,7 +60,7 @@ impl HuaweicloudProvider {
                 detail: e.to_string(),
             })?;
 
-        log::debug!("Request Body: {payload}");
+        log::debug!("Request Body: {}", truncate_for_log(&payload));
 
         let now = Utc::now();
         let timestamp = now.format("%Y%m%dT%H%M%SZ").to_string();
@@ -73,7 +74,7 @@ impl HuaweicloudProvider {
         let authorization = self.sign(method, path, "", &headers, &payload, &timestamp);
         let url = format!("https://{HUAWEICLOUD_DNS_HOST}{path}");
 
-        // 根据 method 构建请求
+        // Build the request based on method
         let request_builder = match method {
             "POST" => self.client.post(&url),
             "PUT" => self.client.put(&url),
@@ -100,9 +101,9 @@ impl HuaweicloudProvider {
         HttpUtils::parse_json(&response_text, self.provider_name())
     }
 
-    // ==================== 公开 API 方法 ====================
+    // ==================== Public API methods ====================
 
-    /// 执行 GET 请求
+    /// Perform a GET request
     pub(crate) async fn get<T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
@@ -145,7 +146,7 @@ impl HuaweicloudProvider {
         HttpUtils::parse_json(&response_text, self.provider_name())
     }
 
-    /// 执行 POST 请求
+    /// Perform a POST request
     pub(crate) async fn post<T: for<'de> Deserialize<'de>, B: Serialize>(
         &self,
         path: &str,
@@ -155,7 +156,7 @@ impl HuaweicloudProvider {
         self.request_with_body("POST", path, body, ctx).await
     }
 
-    /// 执行 PUT 请求
+    /// Perform PUT request
     pub(crate) async fn put<T: for<'de> Deserialize<'de>, B: Serialize>(
         &self,
         path: &str,
@@ -165,7 +166,7 @@ impl HuaweicloudProvider {
         self.request_with_body("PUT", path, body, ctx).await
     }
 
-    /// 执行 DELETE 请求
+    /// Perform DELETE request
     pub(crate) async fn delete(&self, path: &str, ctx: ErrorContext) -> Result<()> {
         let now = Utc::now();
         let timestamp = now.format("%Y%m%dT%H%M%SZ").to_string();

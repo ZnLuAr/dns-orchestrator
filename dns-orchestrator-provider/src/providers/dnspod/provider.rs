@@ -1,4 +1,4 @@
-//! `DNSPod` `DnsProvider` trait 实现
+//! `DNSPod` `DnsProvider` trait implementation
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ use super::{
 };
 
 impl DnspodProvider {
-    /// 获取域名信息（优先使用缓存）
+    /// Get domain name information (use cache first)
     async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
         if let Some(domain) = self.domain_cache.get(domain_id) {
             return Ok(domain);
@@ -30,7 +30,7 @@ impl DnspodProvider {
         Ok(domain)
     }
 
-    /// 将 `DNSPod` 域名状态转换为内部状态
+    /// Convert `DNSPod` domain name status to internal status
     pub(crate) fn convert_domain_status(status: &str, dns_status: &str) -> DomainStatus {
         match (status, dns_status) {
             ("ENABLE" | "enable", "") => DomainStatus::Active,
@@ -40,12 +40,12 @@ impl DnspodProvider {
         }
     }
 
-    /// 解析 `DNSPod` 记录为 RecordData（使用 mx 字段作为 priority）
+    /// Parse `DNSPod` record as RecordData (use mx field as priority)
     fn parse_record_data(record_type: &str, value: String, mx: Option<u16>) -> Result<RecordData> {
         parse_record_data_with_priority(record_type, value, mx, "dnspod")
     }
 
-    /// 将 `RecordData` 转换为 `DNSPod` API 格式 (value, mx)
+    /// Convert `RecordData` to `DNSPod` API format (value, mx)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
         record_data_to_value_priority(data)
     }
@@ -123,7 +123,7 @@ impl DnsProvider for DnspodProvider {
         }
 
         let params = params.validated(MAX_PAGE_SIZE);
-        // 将 page/page_size 转换为 offset/limit
+        // Convert page/page_size to offset/limit
         let offset = (params.page - 1) * params.page_size;
         let req = DescribeDomainListRequest {
             offset,
@@ -160,10 +160,10 @@ impl DnsProvider for DnspodProvider {
         ))
     }
 
-    /// 使用 `DescribeDomain` API 直接获取域名信息
-    /// 注意：DNSPod API 需要域名名称，如果传入的是数字 ID 则 fallback 到列表查找
+    /// Use `DescribeDomain` API to directly obtain domain name information
+    /// Note: DNSPod API requires a domain name. If a numeric ID is passed in, it will fallback to the list to find it.
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
-        // 如果 domain_id 包含 '.'，认为是域名名称，直接调用 API
+        // If domain_id contains '.', it is considered to be the domain name and the API is called directly
         if domain_id.contains('.') {
             #[derive(Serialize)]
             struct DescribeDomainRequest {
@@ -193,7 +193,7 @@ impl DnsProvider for DnspodProvider {
             });
         }
 
-        // Fallback: 数字 ID，分页查找
+        // Fallback: Numeric ID, paging search
         let mut page = 1u32;
         let page_size = 100u32;
         loop {
@@ -271,7 +271,14 @@ impl DnsProvider for DnspodProvider {
                     .unwrap_or_default()
                     .into_iter()
                     .filter_map(|r| {
-                        let data = Self::parse_record_data(&r.record_type, r.value, r.mx).ok()?;
+                        let data = match Self::parse_record_data(&r.record_type, r.value, r.mx) {
+                            Ok(data) => data,
+                            Err(ProviderError::UnsupportedRecordType { .. }) => return None,
+                            Err(e) => {
+                                log::warn!("[dnspod] Skipping record due to parse error: {e}");
+                                return None;
+                            }
+                        };
                         Some(DnsRecord {
                             id: r.record_id.to_string(),
                             domain_id: domain_id.to_string(),
@@ -331,7 +338,7 @@ impl DnsProvider for DnspodProvider {
 
         let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
-        // 从 RecordData 提取 value 和 mx
+        // Extract value and mx from RecordData
         let (value, mx) = Self::record_data_to_api(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 
@@ -401,7 +408,7 @@ impl DnsProvider for DnspodProvider {
 
         let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
-        // 从 RecordData 提取 value 和 mx
+        // Extract value and mx from RecordData
         let (value, mx) = Self::record_data_to_api(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 

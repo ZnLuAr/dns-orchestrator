@@ -1,12 +1,12 @@
-//! 阿里云错误映射
+//! Alibaba Cloud error mapping
 
 use crate::error::ProviderError;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 
 use super::AliyunProvider;
 
-/// 阿里云错误码映射
-/// 参考: <https://api.aliyun.com/document/Alidns/2015-01-09/errorCode>
+/// Alibaba Cloud error code mapping
+/// Reference: <https://api.aliyun.com/document/Alidns/2015-01-09/errorCode>
 impl ProviderErrorMapper for AliyunProvider {
     fn provider_name(&self) -> &'static str {
         "aliyun"
@@ -14,7 +14,7 @@ impl ProviderErrorMapper for AliyunProvider {
 
     fn map_error(&self, raw: RawApiError, context: ErrorContext) -> ProviderError {
         match raw.code.as_deref() {
-            // ============ 认证错误 ============
+            // ============ Authentication error ============
             Some("InvalidAccessKeyId.NotFound" | "SignatureDoesNotMatch") => {
                 ProviderError::InvalidCredentials {
                     provider: self.provider_name().to_string(),
@@ -22,7 +22,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 }
             }
 
-            // ============ 记录已存在 ============
+            // ============ Record already exists ============
             Some("DomainRecordDuplicate" | "DomainRecordConflict") => ProviderError::RecordExists {
                 provider: self.provider_name().to_string(),
                 record_name: context
@@ -31,7 +31,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 记录不存在 ============
+            // ============ Record does not exist ============
             Some(
                 "DomainRecordNotBelongToUser"
                 | "InvalidRecordId.NotFound"
@@ -43,7 +43,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 域名不存在 ============
+            // ============ The domain name does not exist ============
             Some("InvalidDomainName.NoExist" | "DomainNotFound" | "PdnsZone.NotExists") => {
                 ProviderError::DomainNotFound {
                     provider: self.provider_name().to_string(),
@@ -52,7 +52,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 }
             }
 
-            // ============ 配额限制 ============
+            // ============ Quota Limitation ============
             Some(
                 "QuotaExceeded.ARecord"
                 | "QuotaExceeded.Record"
@@ -69,14 +69,14 @@ impl ProviderErrorMapper for AliyunProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 频率限流（可重试） ============
+            // ============ Frequency limiting (can be retried) ============
             Some("Throttling" | "Throttling.User") => ProviderError::RateLimited {
                 provider: self.provider_name().to_string(),
                 retry_after: None,
                 raw_message: Some(raw.message),
             },
 
-            // ============ 域名被锁定/禁用 ============
+            // ============ Domain name is locked/disabled ============
             Some(
                 "DomainRecordLocked"
                 | "DomainExpiredDNSForbidden"
@@ -89,7 +89,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 权限/操作被拒绝 ============
+            // ============ Permission/Operation Denied ============
             Some(
                 "Forbidden"
                 | "Forbidden.RiskControl"
@@ -101,7 +101,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 参数无效 - 记录类型 ============
+            // ============ Invalid parameter - record type ============
             Some("InvalidRR.TypeEmpty" | "SubDomainInvalid.Type" | "PdnsRecord.InvalidType") => {
                 ProviderError::InvalidParameter {
                     provider: self.provider_name().to_string(),
@@ -110,7 +110,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 }
             }
 
-            // ============ 参数无效 - 记录值 ============
+            // ============ Invalid parameter - record value ============
             Some(
                 "InvalidRR.AValue"
                 | "InvalidRR.AAAAValue"
@@ -123,7 +123,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - 主机记录 ============
+            // ============ Invalid parameter - host record ============
             Some(
                 "InvalidRR.RrEmpty" | "InvalidRR.Format" | "Record.Invalid.Rr" | "InvalidRR.Length",
             ) => ProviderError::InvalidParameter {
@@ -132,7 +132,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - TTL ============
+            // ============ Invalid parameter - TTL ============
             Some("SubDomainInvalid.TTL" | "PdnsRecord.InvalidTtl") => {
                 ProviderError::InvalidParameter {
                     provider: self.provider_name().to_string(),
@@ -141,21 +141,21 @@ impl ProviderErrorMapper for AliyunProvider {
                 }
             }
 
-            // ============ 参数无效 - 线路 ============
+            // ============ Invalid parameter - line ============
             Some("SubDomainInvalid.Line" | "UnsupportedLine") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "line".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - MX优先级 ============
+            // ============ Invalid parameter - MX priority ============
             Some("SubDomainInvalid.Priority") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "priority".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - 域名格式 ============
+            // ============ Invalid parameter - domain name format ============
             Some(
                 "InvalidDomainName.Format"
                 | "InvalidDomainName.Suffix"
@@ -168,7 +168,7 @@ impl ProviderErrorMapper for AliyunProvider {
                 detail: raw.message,
             },
 
-            // ============ 其他错误 fallback ============
+            // ============ Other errors fallback ============
             _ => self.unknown_error(raw),
         }
     }

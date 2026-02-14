@@ -1,4 +1,4 @@
-//! Cloudflare `DnsProvider` trait 实现
+//! Cloudflare `DnsProvider` trait implementation
 
 use std::fmt::Write;
 
@@ -20,7 +20,7 @@ use super::{
 };
 
 impl CloudflareProvider {
-    /// 获取域名信息（优先使用缓存）
+    /// Get domain name information (use cache first)
     async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
         if let Some(domain) = self.domain_cache.get(domain_id) {
             return Ok(domain);
@@ -30,8 +30,8 @@ impl CloudflareProvider {
         Ok(domain)
     }
 
-    /// 将 Cloudflare zone 转换为 `ProviderDomain`
-    /// Cloudflare 状态：active, pending, initializing, moved
+    /// Convert Cloudflare zone to `ProviderDomain`
+    /// Cloudflare status: active, pending, initializing, moved
     pub(crate) fn zone_to_domain(zone: CloudflareZone) -> ProviderDomain {
         let status = match zone.status.as_str() {
             "active" => DomainStatus::Active,
@@ -49,7 +49,7 @@ impl CloudflareProvider {
         }
     }
 
-    /// 将 Cloudflare 记录转换为 `DnsRecord`
+    /// Convert Cloudflare records to `DnsRecord`
     pub(crate) fn cf_record_to_dns_record(
         &self,
         cf_record: CloudflareDnsRecord,
@@ -91,7 +91,7 @@ impl CloudflareProvider {
         })
     }
 
-    /// 解析 Cloudflare 记录为 `RecordData`
+    /// Parse Cloudflare record as `RecordData`
     fn parse_record_data(
         &self,
         record_type: &str,
@@ -113,7 +113,7 @@ impl CloudflareProvider {
                 nameserver: content,
             }),
             "SRV" => {
-                // SRV 记录使用 data 字段
+                // SRV records use the data field
                 if let Some(data) = data {
                     let srv: CloudflareSrvData = serde_json::from_value(data)
                         .map_err(|e| self.parse_error(format!("Failed to parse SRV data: {e}")))?;
@@ -124,7 +124,7 @@ impl CloudflareProvider {
                         target: srv.target,
                     })
                 } else {
-                    // Fallback: 尝试从 content 解析
+                    // Fallback: Try to parse from content
                     let parts: Vec<&str> = content.split_whitespace().collect();
                     if parts.len() >= 3 {
                         Ok(RecordData::SRV {
@@ -147,7 +147,7 @@ impl CloudflareProvider {
                 }
             }
             "CAA" => {
-                // CAA 记录使用 data 字段
+                // CAA records use the data field
                 if let Some(data) = data {
                     let caa: CloudflareCaaData = serde_json::from_value(data)
                         .map_err(|e| self.parse_error(format!("Failed to parse CAA data: {e}")))?;
@@ -157,7 +157,7 @@ impl CloudflareProvider {
                         value: caa.value,
                     })
                 } else {
-                    // Fallback: 尝试从 content 解析 "flags tag value"
+                    // Fallback: Try to parse "flags tag value" from content
                     let parts: Vec<&str> = content.splitn(3, ' ').collect();
                     if parts.len() >= 3 {
                         Ok(RecordData::CAA {
@@ -181,7 +181,7 @@ impl CloudflareProvider {
         }
     }
 
-    /// 将 `RecordData` 转换为 Cloudflare API 请求体
+    /// Convert `RecordData` to Cloudflare API request body
     fn build_create_body(
         full_name: &str,
         ttl: u32,
@@ -342,11 +342,11 @@ impl DnsProvider for CloudflareProvider {
             ..Default::default()
         };
 
-        // 先获取 zone 信息以获取域名（使用缓存）
+        // Get zone information first to get domain name (use cache)
         let domain_info = self.get_domain_cached(domain_id).await?;
         let zone_name = domain_info.name;
 
-        // 构建查询 URL，包含搜索参数
+        // Build query URL, including search parameters
         let mut url = format!(
             "/zones/{}/dns_records?page={}&per_page={}",
             domain_id,
@@ -354,14 +354,14 @@ impl DnsProvider for CloudflareProvider {
             params.page_size.min(MAX_PAGE_SIZE_RECORDS)
         );
 
-        // 添加搜索关键词（只搜索记录名称）
+        // Add search keywords (only search record names)
         if let Some(ref keyword) = params.keyword
             && !keyword.is_empty()
         {
             let _ = write!(url, "&name.contains={}", urlencoding::encode(keyword));
         }
 
-        // 添加记录类型过滤
+        // Add record type filter
         if let Some(ref record_type) = params.record_type {
             let type_str = crate::providers::common::record_type_to_string(record_type);
             let _ = write!(url, "&type={}", urlencoding::encode(type_str));
@@ -398,7 +398,7 @@ impl DnsProvider for CloudflareProvider {
             ..Default::default()
         };
 
-        // 获取 zone 信息（使用缓存）
+        // Get zone information (using cache)
         let domain_info = self.get_domain_cached(&req.domain_id).await?;
         let zone_name = domain_info.name;
 
@@ -423,7 +423,7 @@ impl DnsProvider for CloudflareProvider {
             domain: Some(req.domain_id.clone()),
         };
 
-        // 获取 zone 信息（使用缓存）
+        // Get zone information (using cache)
         let domain_info = self.get_domain_cached(&req.domain_id).await?;
         let zone_name = domain_info.name;
 

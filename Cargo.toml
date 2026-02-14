@@ -3,10 +3,10 @@ members = [
     "dns-orchestrator-core",
     "dns-orchestrator-provider",
     "dns-orchestrator-toolbox",
+    "dns-orchestrator-web",
+    "dns-orchestrator-web/migration",
     "src-tauri",
     "src-tauri/tauri-plugin-apk-installer",
-    "src-actix-web",
-    "src-actix-web/migration",
 ]
 resolver = "2"
 
@@ -74,7 +74,7 @@ tauri-build = { version = "2", features = [] }
 dns-orchestrator-core = { path = "dns-orchestrator-core", default-features = false }
 dns-orchestrator-provider = { path = "dns-orchestrator-provider", default-features = false }
 dns-orchestrator-toolbox = { path = "dns-orchestrator-toolbox", default-features = false }
-migration = { path = "src-actix-web/migration" }
+migration = { path = "dns-orchestrator-web/migration" }
 tauri-plugin-apk-installer = { path = "src-tauri/tauri-plugin-apk-installer" }
 
 # ─── Workspace Lints ───────────────────────────────────────

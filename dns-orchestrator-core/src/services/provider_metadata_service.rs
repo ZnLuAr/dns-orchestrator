@@ -1,22 +1,22 @@
-//! Provider 元数据服务
+//! Provider metadata service
 //!
-//! 提供 DNS Provider 的静态元数据信息（无状态服务）
+//! Provide static metadata information for DNS Provider (stateless service)
 
 use dns_orchestrator_provider::get_all_provider_metadata;
 
 use crate::types::ProviderMetadata;
 
-/// Provider 元数据服务（无状态）
+/// Provider metadata service (stateless)
 pub struct ProviderMetadataService;
 
 impl ProviderMetadataService {
-    /// 创建 Provider 元数据服务实例
+    /// Create Provider metadata service instance
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// 获取所有支持的提供商列表
+    /// Get a list of all supported providers
     pub fn list_providers(&self) -> Vec<ProviderMetadata> {
         get_all_provider_metadata()
     }

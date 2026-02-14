@@ -13,10 +13,11 @@ pub(crate) use types::{
     CloudflareCaaData, CloudflareDnsRecord, CloudflareResponse, CloudflareSrvData, CloudflareZone,
 };
 
+/// Cloudflare API v4 base URL.
 pub(crate) const CF_API_BASE: &str = "https://api.cloudflare.com/client/v4";
-/// Cloudflare Zones API 单页最大记录数
+/// Cloudflare Zones API maximum number of records on a single page
 pub(crate) const MAX_PAGE_SIZE_ZONES: u32 = 50;
-/// Cloudflare DNS Records API 单页最大记录数
+/// Cloudflare DNS Records API maximum number of records on a single page
 pub(crate) const MAX_PAGE_SIZE_RECORDS: u32 = 100;
 
 /// Cloudflare DNS provider implementation.
@@ -53,7 +54,7 @@ impl CloudflareProviderBuilder {
     fn new(api_token: String) -> Self {
         Self {
             api_token,
-            max_retries: 2, // 默认重试 2 次
+            max_retries: 2, // Default retries 2 times
         }
     }
 

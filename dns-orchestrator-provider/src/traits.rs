@@ -9,19 +9,20 @@ use crate::types::{
     UpdateDnsRecordRequest,
 };
 
-/// 批量操作默认并发数
+/// Default number of concurrent batch operations
 const DEFAULT_BATCH_CONCURRENCY: usize = 5;
 
-/// 原始 API 错误（内部使用）
+/// Raw API error (internal use)
 #[derive(Debug, Clone)]
 pub(crate) struct RawApiError {
-    /// 错误码（各 Provider 格式不同）
+    /// Error code (the format is different for each Provider)
     pub code: Option<String>,
-    /// 原始错误消息
+    /// Original error message
     pub message: String,
 }
 
 impl RawApiError {
+    /// Creates a raw API error without a provider-specific code.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             code: None,
@@ -29,6 +30,7 @@ impl RawApiError {
         }
     }
 
+    /// Creates a raw API error with a provider-specific code.
     pub fn with_code(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code: Some(code.into()),
@@ -37,28 +39,28 @@ impl RawApiError {
     }
 }
 
-/// 错误上下文信息（内部使用）
-/// 用于在映射错误时提供额外信息
+/// Error context information (internal use)
+/// Used to provide additional information in case of mapping errors
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ErrorContext {
-    /// 记录名称（用于 `RecordExists` 等错误）
+    /// Record name (used for errors such as `RecordExists`)
     pub record_name: Option<String>,
-    /// 记录 ID（用于 `RecordNotFound` 等错误）
+    /// Record ID (used for errors such as `RecordNotFound`)
     pub record_id: Option<String>,
-    /// 域名（用于 `DomainNotFound` 等错误）
+    /// Domain name (used for errors such as `DomainNotFound`)
     pub domain: Option<String>,
 }
 
-/// Provider 错误映射 Trait（内部使用）
-/// 各 Provider 实现此 trait 以将原始 API 错误映射到统一错误类型
+/// Provider error mapping Trait (internally used)
+/// Each Provider implements this trait to map raw API errors to a unified error type
 pub(crate) trait ProviderErrorMapper {
-    /// 返回 Provider 标识符
+    /// Returns the Provider identifier
     fn provider_name(&self) -> &'static str;
 
-    /// 将原始 API 错误映射到统一错误类型
+    /// Map raw API errors to unified error types
     fn map_error(&self, raw: RawApiError, context: ErrorContext) -> ProviderError;
 
-    /// 快捷方法：解析错误
+    /// Shortcut: Parsing Errors
     fn parse_error(&self, detail: impl ToString) -> ProviderError {
         ProviderError::ParseError {
             provider: self.provider_name().to_string(),
@@ -66,7 +68,7 @@ pub(crate) trait ProviderErrorMapper {
         }
     }
 
-    /// 快捷方法：未知错误（fallback）
+    /// Shortcut method: unknown error (fallback)
     fn unknown_error(&self, raw: RawApiError) -> ProviderError {
         ProviderError::Unknown {
             provider: self.provider_name().to_string(),

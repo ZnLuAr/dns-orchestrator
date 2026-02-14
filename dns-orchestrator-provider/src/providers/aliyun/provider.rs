@@ -1,4 +1,4 @@
-//! 阿里云 `DnsProvider` trait 实现
+//! Alibaba Cloud `DnsProvider` trait implementation
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -22,8 +22,8 @@ use super::{
 };
 
 impl AliyunProvider {
-    /// 将阿里云域名状态转换为内部状态
-    /// 注意：阿里云 `DescribeDomains` API 实际上不返回 `DomainStatus` 字段
+    /// Convert Alibaba Cloud domain name status to internal status
+    /// Note: Alibaba Cloud `DescribeDomains` API does not actually return the `DomainStatus` field
     pub(crate) fn convert_domain_status(status: Option<&str>) -> DomainStatus {
         match status {
             Some("ENABLE" | "enable") => DomainStatus::Active,
@@ -33,12 +33,12 @@ impl AliyunProvider {
         }
     }
 
-    /// 将阿里云的 Unix 毫秒时间戳转换为 `DateTime`<Utc>
+    /// Convert Alibaba Cloud's Unix millisecond timestamp to `DateTime`<Utc>
     pub(crate) fn timestamp_to_datetime(timestamp: Option<i64>) -> Option<DateTime<chrono::Utc>> {
         timestamp.and_then(DateTime::from_timestamp_millis)
     }
 
-    /// 解析阿里云记录为 `RecordData`
+    /// Parse Alibaba Cloud record as `RecordData`
     fn parse_record_data(
         record_type: &str,
         value: String,
@@ -47,7 +47,7 @@ impl AliyunProvider {
         parse_record_data_with_priority(record_type, value, priority, "aliyun")
     }
 
-    /// 将 `RecordData` 转换为阿里云 API 格式 (value, priority)
+    /// Convert `RecordData` to Alibaba Cloud API format (value, priority)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
         record_data_to_value_priority(data)
     }
@@ -141,7 +141,7 @@ impl DnsProvider for AliyunProvider {
             .unwrap_or_default()
             .into_iter()
             .map(|d| ProviderDomain {
-                // 阿里云 API 使用域名名称作为标识符，而非 domain_id
+                // Alibaba Cloud API uses domain name as identifier instead of domain_id
                 id: d.domain_name.clone(),
                 name: d.domain_name,
                 provider: ProviderType::Aliyun,
@@ -158,8 +158,8 @@ impl DnsProvider for AliyunProvider {
         ))
     }
 
-    /// `ErrorRequireCheck`: 使用 `DescribeDomainInfo` API 直接获取域名信息
-    /// 注意：阿里云 API 需要域名名称作为参数
+    /// `ErrorRequireCheck`: Use `DescribeDomainInfo` API to directly obtain domain name information
+    /// Note: Alibaba Cloud API requires domain name as parameter
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         #[derive(Serialize)]
         struct DescribeDomainInfoRequest {
@@ -180,7 +180,7 @@ impl DnsProvider for AliyunProvider {
             self.request("DescribeDomainInfo", &req, ctx).await?;
 
         Ok(ProviderDomain {
-            // 统一使用域名名称作为 ID，与 list_domains 保持一致
+            // Use the domain name as the ID uniformly, consistent with list_domains
             id: response.domain_name.clone(),
             name: response.domain_name,
             provider: ProviderType::Aliyun,
@@ -202,16 +202,16 @@ impl DnsProvider for AliyunProvider {
             page_number: u32,
             #[serde(rename = "PageSize")]
             page_size: u32,
-            /// 主机记录关键字（模糊搜索）
+            /// Host record keywords (fuzzy search)
             #[serde(rename = "RRKeyWord", skip_serializing_if = "Option::is_none")]
             rr_keyword: Option<String>,
-            /// 记录类型过滤
+            /// Record type filtering
             #[serde(rename = "Type", skip_serializing_if = "Option::is_none")]
             record_type: Option<String>,
         }
 
         let params = params.validated(MAX_PAGE_SIZE);
-        // 阿里云的 domain_id 就是域名名称，可以直接使用
+        // Alibaba Cloud's domain_id is the domain name and can be used directly
         let req = DescribeDomainRecordsRequest {
             domain_name: domain_id.to_string(),
             page_number: params.page,
@@ -238,14 +238,21 @@ impl DnsProvider for AliyunProvider {
             .unwrap_or_default()
             .into_iter()
             .filter_map(|r| {
-                let data = Self::parse_record_data(&r.record_type, r.value, r.priority).ok()?;
+                let data = match Self::parse_record_data(&r.record_type, r.value, r.priority) {
+                    Ok(data) => data,
+                    Err(ProviderError::UnsupportedRecordType { .. }) => return None,
+                    Err(e) => {
+                        log::warn!("[aliyun] Skipping record due to parse error: {e}");
+                        return None;
+                    }
+                };
                 Some(DnsRecord {
                     id: r.record_id,
                     domain_id: domain_id.to_string(),
                     name: r.rr,
                     ttl: r.ttl,
                     data,
-                    proxied: None, // 阿里云不支持代理
+                    proxied: None, // Alibaba Cloud does not support proxy
                     created_at: Self::timestamp_to_datetime(r.create_timestamp),
                     updated_at: Self::timestamp_to_datetime(r.update_timestamp),
                 })
@@ -277,11 +284,11 @@ impl DnsProvider for AliyunProvider {
             priority: Option<u16>,
         }
 
-        // 从 RecordData 提取 value 和 priority
+        // Extract value and priority from RecordData
         let (value, priority) = Self::record_data_to_api(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 
-        // 阿里云的 domain_id 就是域名名称，可以直接使用
+        // Alibaba Cloud's domain_id is the domain name and can be used directly
         let api_req = AddDomainRecordRequest {
             domain_name: req.domain_id.clone(),
             rr: req.name.clone(),
@@ -334,7 +341,7 @@ impl DnsProvider for AliyunProvider {
             priority: Option<u16>,
         }
 
-        // 从 RecordData 提取 value 和 priority
+        // Extract value and priority from RecordData
         let (value, priority) = Self::record_data_to_api(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 

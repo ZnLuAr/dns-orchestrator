@@ -1,6 +1,6 @@
-//! 加密模块
+//! encryption module
 //!
-//! 提供 AES-256-GCM 加密/解密功能，用于账户导入导出的加密保护。
+//! Provides AES-256-GCM encryption/decryption function for encryption protection of account import and export.
 
 mod versions;
 
@@ -17,46 +17,46 @@ use sha2::Sha256;
 
 use crate::error::{CoreError, CoreResult};
 
-// 从版本管理自动获取当前版本的迭代次数
+// Automatically obtain the iteration number of the current version from version management
 const PBKDF2_ITERATIONS: u32 = get_current_iterations();
 const SALT_LENGTH: usize = 16;
 const NONCE_LENGTH: usize = 12;
 const KEY_LENGTH: usize = 32; // AES-256
 
-/// 从密码派生加密密钥（支持自定义迭代次数）
+/// Derive encryption keys from passwords (supports custom number of iterations)
 fn derive_key_with_iterations(password: &str, salt: &[u8], iterations: u32) -> [u8; KEY_LENGTH] {
     pbkdf2_hmac_array::<Sha256, KEY_LENGTH>(password.as_bytes(), salt, iterations)
 }
 
-/// 从密码派生加密密钥（使用默认迭代次数）
+/// Derive encryption keys from passwords (using default number of iterations)
 fn derive_key(password: &str, salt: &[u8]) -> [u8; KEY_LENGTH] {
     derive_key_with_iterations(password, salt, PBKDF2_ITERATIONS)
 }
 
-/// 加密数据
+/// Encrypt data
 ///
 /// # Arguments
-/// * `plaintext` - 要加密的明文数据
-/// * `password` - 加密密码
+/// * `plaintext` - plain text data to be encrypted
+/// * `password` - encrypted password
 ///
 /// # Returns
-/// 返回 (`salt_base64`, `nonce_base64`, `ciphertext_base64`) 元组
+/// Returns (`salt_base64`, `nonce_base64`, `ciphertext_base64`) tuple
 pub fn encrypt(plaintext: &[u8], password: &str) -> CoreResult<(String, String, String)> {
-    // 生成随机盐和 nonce
+    // Generate random salt and nonce
     let mut salt = [0u8; SALT_LENGTH];
     let mut nonce_bytes = [0u8; NONCE_LENGTH];
     rand::rng().fill_bytes(&mut salt);
     rand::rng().fill_bytes(&mut nonce_bytes);
 
-    // 派生密钥
+    // derived key
     let key = derive_key(password, &salt);
 
-    // 创建加密器
+    // Create an encryptor
     let cipher = Aes256Gcm::new_from_slice(&key)
         .map_err(|e| CoreError::SerializationError(format!("Failed to create cipher: {e}")))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    // 加密
+    // encryption
     let ciphertext = cipher
         .encrypt(nonce, plaintext)
         .map_err(|e| CoreError::SerializationError(format!("Encryption failed: {e}")))?;
@@ -68,16 +68,16 @@ pub fn encrypt(plaintext: &[u8], password: &str) -> CoreResult<(String, String, 
     ))
 }
 
-/// 解密数据
+/// Decrypt data
 ///
 /// # Arguments
-/// * `ciphertext_b64` - Base64 编码的密文
-/// * `password` - 解密密码
-/// * `salt_b64` - Base64 编码的盐值
-/// * `nonce_b64` - Base64 编码的 nonce
+/// * `ciphertext_b64` - Base64 encoded ciphertext
+/// * `password` - decryption password
+/// * `salt_b64` - Base64 encoded salt value
+/// * `nonce_b64` - Base64 encoded nonce
 ///
 /// # Returns
-/// 返回解密后的明文数据
+/// Return decrypted plaintext data
 pub fn decrypt(
     ciphertext_b64: &str,
     password: &str,
@@ -93,17 +93,17 @@ pub fn decrypt(
     )
 }
 
-/// 使用自定义迭代次数解密数据（用于向后兼容）
+/// Decrypt data using a custom number of iterations (for backwards compatibility)
 ///
 /// # Arguments
-/// * `ciphertext_b64` - Base64 编码的密文
-/// * `password` - 解密密码
-/// * `salt_b64` - Base64 编码的盐值
-/// * `nonce_b64` - Base64 编码的 nonce
-/// * `iterations` - PBKDF2 迭代次数
+/// * `ciphertext_b64` - Base64 encoded ciphertext
+/// * `password` - decryption password
+/// * `salt_b64` - Base64 encoded salt value
+/// * `nonce_b64` - Base64 encoded nonce
+/// * `iterations` - PBKDF2 iteration number
 ///
 /// # Returns
-/// 返回解密后的明文数据
+/// Return decrypted plaintext data
 pub fn decrypt_with_iterations(
     ciphertext_b64: &str,
     password: &str,
@@ -111,7 +111,7 @@ pub fn decrypt_with_iterations(
     nonce_b64: &str,
     iterations: u32,
 ) -> CoreResult<Vec<u8>> {
-    // 解码 Base64
+    // Decode Base64
     let salt = BASE64
         .decode(salt_b64)
         .map_err(|e| CoreError::SerializationError(format!("Invalid salt: {e}")))?;
@@ -122,15 +122,15 @@ pub fn decrypt_with_iterations(
         .decode(ciphertext_b64)
         .map_err(|e| CoreError::SerializationError(format!("Invalid ciphertext: {e}")))?;
 
-    // 使用指定迭代次数派生密钥
+    // Derive the key using the specified number of iterations
     let key = derive_key_with_iterations(password, &salt, iterations);
 
-    // 创建解密器
+    // Create decryptor
     let cipher = Aes256Gcm::new_from_slice(&key)
         .map_err(|e| CoreError::SerializationError(format!("Failed to create cipher: {e}")))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    // 解密
+    // Decrypt
     cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|_| {
         CoreError::SerializationError(
             "Decryption failed: invalid password or corrupted data".to_string(),
@@ -168,7 +168,7 @@ mod tests {
         let password = "password";
         let (salt, nonce, _) = encrypt(plaintext, password).unwrap();
 
-        // 构造一个合法 base64 但内容是垃圾的密文
+        // Construct a valid base64 ciphertext but the content is garbage
         let corrupted = BASE64.encode(b"this is not valid ciphertext at all!!");
         let result = decrypt(&corrupted, password, &salt, &nonce);
         assert!(result.is_err());
@@ -188,7 +188,7 @@ mod tests {
         let (salt1, nonce1, ct1) = encrypt(plaintext, password).unwrap();
         let (salt2, nonce2, ct2) = encrypt(plaintext, password).unwrap();
 
-        // 随机 salt/nonce 使得输出不同
+        // Random salt/nonce makes output different
         assert!(salt1 != salt2 || nonce1 != nonce2 || ct1 != ct2);
     }
 
@@ -197,10 +197,10 @@ mod tests {
         let plaintext = b"version test data";
         let password = "test-password";
 
-        // 用当前版本（v2, 600k 次）加密
+        // Encrypted with current version (v2, 600k times)
         let (salt, nonce, ciphertext) = encrypt(plaintext, password).unwrap();
 
-        // 用 v1 迭代次数（100k）解密 → 密钥不同，必然失败
+        // Decrypt with v1 iteration number (100k) → different keys, bound to fail
         let v1_iterations = versions::get_pbkdf2_iterations(1).unwrap();
         let result = decrypt_with_iterations(&ciphertext, password, &salt, &nonce, v1_iterations);
         assert!(result.is_err());

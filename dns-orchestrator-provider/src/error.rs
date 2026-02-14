@@ -163,10 +163,10 @@ pub enum ProviderError {
 }
 
 impl ProviderError {
-    /// 是否为预期行为（用户输入、资源不存在等），用于日志分级。
+    /// Whether it is expected behavior (user input, resource does not exist, etc.) is used for log classification.
     ///
-    /// 返回 `true` 时应使用 `warn` 级别，`false` 时使用 `error` 级别。
-    /// **新增变体时请同步更新此方法。**
+    /// Level `warn` should be used when returning `true` and level `error` when returning `false`.
+    /// **Please update this method simultaneously when new variants are added. **
     #[must_use]
     pub fn is_expected(&self) -> bool {
         matches!(
@@ -617,7 +617,7 @@ mod tests {
 
     #[test]
     fn is_retryable_variants() {
-        // 引入 http_client 的 is_retryable 逻辑做等价测试
+        // Introduce the is_retryable logic of http_client to do equivalence testing
         let retryable = |e: &ProviderError| {
             matches!(
                 e,

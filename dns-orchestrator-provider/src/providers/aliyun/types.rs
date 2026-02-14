@@ -1,4 +1,4 @@
-//! 阿里云 API 类型定义和辅助函数
+//! Alibaba Cloud API type definitions and auxiliary functions
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -6,9 +6,9 @@ use std::fmt::Write;
 
 use crate::error::{ProviderError, Result};
 
-// ============ RFC3986 URL 编码 ============
+// ============ RFC3986 URL encoding ============
 
-/// RFC3986 URL 编码
+/// RFC3986 URL encoding
 pub fn url_encode(s: &str) -> String {
     let mut result = String::new();
     for c in s.chars() {
@@ -26,7 +26,7 @@ pub fn url_encode(s: &str) -> String {
     result
 }
 
-/// 将 `serde_json::Value` 展平为 key-value 对 (处理嵌套对象)
+/// Flatten `serde_json::Value` into key-value pairs (handling nested objects)
 pub fn flatten_value(
     prefix: &str,
     value: &serde_json::Value,
@@ -62,7 +62,7 @@ pub fn flatten_value(
     }
 }
 
-/// 将结构体序列化为排序后的 query string
+/// Serialize the structure into a sorted query string
 pub fn serialize_to_query_string<T: Serialize>(params: &T) -> Result<String> {
     let value = serde_json::to_value(params).map_err(|e| ProviderError::SerializationError {
         provider: "aliyun".to_string(),
@@ -81,8 +81,9 @@ pub fn serialize_to_query_string<T: Serialize>(params: &T) -> Result<String> {
     Ok(query_string)
 }
 
-// ============ 域名相关结构 ============
+// ============ Domain name related structure ============
 
+/// Response payload for `DescribeDomains`.
 #[derive(Debug, Deserialize)]
 pub struct DescribeDomainsResponse {
     #[serde(rename = "Domains")]
@@ -91,12 +92,14 @@ pub struct DescribeDomainsResponse {
     pub total_count: Option<u32>,
 }
 
+/// Wrapper object that contains a domain list in `DescribeDomains`.
 #[derive(Debug, Deserialize)]
 pub struct DomainsWrapper {
     #[serde(rename = "Domain")]
     pub domain: Option<Vec<AliyunDomain>>,
 }
 
+/// Domain item returned by Alibaba Cloud DNS domain APIs.
 #[derive(Debug, Deserialize)]
 pub struct AliyunDomain {
     #[serde(rename = "DomainName")]
@@ -107,7 +110,7 @@ pub struct AliyunDomain {
     pub record_count: Option<u32>,
 }
 
-/// `ErrorRequireCheck`: `DescribeDomainInfo` API 响应结构，需验证字段映射是否正确
+/// Response payload for `DescribeDomainInfo`.
 #[derive(Debug, Deserialize)]
 pub struct DescribeDomainInfoResponse {
     #[serde(rename = "DomainName")]
@@ -118,8 +121,9 @@ pub struct DescribeDomainInfoResponse {
     pub record_count: Option<u32>,
 }
 
-// ============ 记录相关结构 ============
+// ============ Record related structures ============
 
+/// Response payload for `DescribeDomainRecords`.
 #[derive(Debug, Deserialize)]
 pub struct DescribeDomainRecordsResponse {
     #[serde(rename = "DomainRecords")]
@@ -128,12 +132,14 @@ pub struct DescribeDomainRecordsResponse {
     pub total_count: Option<u32>,
 }
 
+/// Wrapper object that contains record items in `DescribeDomainRecords`.
 #[derive(Debug, Deserialize)]
 pub struct DomainRecordsWrapper {
     #[serde(rename = "Record")]
     pub record: Option<Vec<AliyunRecord>>,
 }
 
+/// DNS record item returned by Alibaba Cloud DNS record APIs.
 #[derive(Debug, Deserialize)]
 pub struct AliyunRecord {
     #[serde(rename = "RecordId")]
@@ -154,15 +160,18 @@ pub struct AliyunRecord {
     pub update_timestamp: Option<i64>,
 }
 
+/// Response payload for `AddDomainRecord`.
 #[derive(Debug, Deserialize)]
 pub struct AddDomainRecordResponse {
     #[serde(rename = "RecordId")]
     pub record_id: String,
 }
 
+/// Response payload for `UpdateDomainRecord`.
 #[derive(Debug, Deserialize)]
 pub struct UpdateDomainRecordResponse {}
 
+/// Response payload for `DeleteDomainRecord`.
 #[derive(Debug, Deserialize)]
 pub struct DeleteDomainRecordResponse {}
 

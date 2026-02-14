@@ -1,4 +1,4 @@
-//! 存储层抽象 Trait 定义
+//! Storage layer abstraction trait definition
 
 mod account_repository;
 mod credential_store;

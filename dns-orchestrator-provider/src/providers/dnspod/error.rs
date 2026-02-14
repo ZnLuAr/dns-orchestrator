@@ -1,12 +1,12 @@
-//! `DNSPod` 错误映射
+//! `DNSPod` wrong mapping
 
 use crate::error::ProviderError;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 
 use super::DnspodProvider;
 
-/// `DNSPod` 错误码映射
-/// 参考: <https://cloud.tencent.com/document/api/1427/56192>
+/// `DNSPod` Error code mapping
+/// Reference: <https://cloud.tencent.com/document/api/1427/56192>
 impl ProviderErrorMapper for DnspodProvider {
     fn provider_name(&self) -> &'static str {
         "dnspod"
@@ -14,7 +14,7 @@ impl ProviderErrorMapper for DnspodProvider {
 
     fn map_error(&self, raw: RawApiError, context: ErrorContext) -> ProviderError {
         match raw.code.as_deref() {
-            // ============ 认证错误 ============
+            // ============ Authentication error ============
             Some(
                 "AuthFailure"
                 | "AuthFailure.InvalidAuthorization"
@@ -36,7 +36,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message.clone()),
             },
 
-            // ============ 配额限制（资源用完，不可重试） ============
+            // ============ Quota limit (resources run out, no retry) ============
             Some(
                 "LimitExceeded"
                 | "LimitExceeded.AAAACountLimit"
@@ -64,7 +64,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 频率限流（临时限制，可重试） ============
+            // ============ Frequency limit (temporary limit, can be retried) ============
             Some(
                 "RequestLimitExceeded"
                 | "RequestLimitExceeded.RequestLimitExceeded"
@@ -76,7 +76,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 记录已存在 ============
+            // ============ Record already exists ============
             Some("InvalidParameter.DomainRecordExist") => ProviderError::RecordExists {
                 provider: self.provider_name().to_string(),
                 record_name: context
@@ -85,7 +85,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 域名不存在 ============
+            // ============ The domain name does not exist ============
             Some("ResourceNotFound.NoDataOfDomain" | "InvalidParameterValue.DomainNotExists") => {
                 ProviderError::DomainNotFound {
                     provider: self.provider_name().to_string(),
@@ -94,7 +94,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 }
             }
 
-            // ============ 域名被锁定/禁用 ============
+            // ============ Domain name is locked/disabled ============
             Some(
                 "FailedOperation.DomainIsLocked"
                 | "FailedOperation.DomainIsSpam"
@@ -108,7 +108,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 权限/操作被拒绝 ============
+            // ============ Permission/Operation Denied ============
             Some(
                 "OperationDenied"
                 | "OperationDenied.AccessDenied"
@@ -133,7 +133,7 @@ impl ProviderErrorMapper for DnspodProvider {
                 raw_message: Some(raw.message),
             },
 
-            // ============ 参数无效 - 线路 ============
+            // ============ Invalid parameter - line ============
             Some("InvalidParameter.RecordLineInvalid" | "InvalidParameter.LineNotExist") => {
                 ProviderError::InvalidParameter {
                     provider: self.provider_name().to_string(),
@@ -142,14 +142,14 @@ impl ProviderErrorMapper for DnspodProvider {
                 }
             }
 
-            // ============ 参数无效 - 记录类型 ============
+            // ============ Invalid parameter - record type ============
             Some("InvalidParameter.RecordTypeInvalid") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "type".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - 记录值 ============
+            // ============ Invalid parameter - record value ============
             Some(
                 "InvalidParameter.RecordValueInvalid" | "InvalidParameter.RecordValueLengthInvalid",
             ) => ProviderError::InvalidParameter {
@@ -158,28 +158,28 @@ impl ProviderErrorMapper for DnspodProvider {
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - 子域名 ============
+            // ============ Invalid parameter - subdomain ============
             Some("InvalidParameter.SubdomainInvalid") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "subdomain".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - TTL ============
+            // ============ Invalid parameter - TTL ============
             Some("LimitExceeded.RecordTtlLimit") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "ttl".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - MX优先级 ============
+            // ============ Invalid parameter - MX priority ============
             Some("InvalidParameter.MxInvalid") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "mx".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - 域名 ============
+            // ============ Invalid parameter - domain name ============
             Some(
                 "InvalidParameter.DomainIdInvalid"
                 | "InvalidParameter.DomainInvalid"
@@ -191,14 +191,14 @@ impl ProviderErrorMapper for DnspodProvider {
                 detail: raw.message,
             },
 
-            // ============ 参数无效 - 记录ID ============
+            // ============ Invalid parameter - record ID ============
             Some("InvalidParameter.RecordIdInvalid") => ProviderError::InvalidParameter {
                 provider: self.provider_name().to_string(),
                 param: "record_id".to_string(),
                 detail: raw.message,
             },
 
-            // ============ 其他错误 fallback ============
+            // ============ Other errors fallback ============
             _ => self.unknown_error(raw),
         }
     }
@@ -231,7 +231,7 @@ mod tests {
         }
     }
 
-    // ---- 认证错误 ----
+    // ---- Authentication error ----
 
     #[test]
     fn auth_failure_maps_to_invalid_credentials() {
@@ -250,7 +250,7 @@ mod tests {
         }
     }
 
-    // ---- 配额限制 ----
+    // ---- Quota Limitation ----
 
     #[test]
     fn quota_codes_map_to_quota_exceeded() {
@@ -269,7 +269,7 @@ mod tests {
         }
     }
 
-    // ---- 频率限流 ----
+    // ---- Frequency current limit ----
 
     #[test]
     fn rate_limit_codes_map_to_rate_limited() {
@@ -294,7 +294,7 @@ mod tests {
         }
     }
 
-    // ---- 记录已存在 ----
+    // ---- Record already exists ----
 
     #[test]
     fn record_exist_maps_to_record_exists() {
@@ -307,7 +307,7 @@ mod tests {
         );
     }
 
-    // ---- 域名不存在 ----
+    // ---- The domain name does not exist ----
 
     #[test]
     fn domain_not_found_codes() {
@@ -325,7 +325,7 @@ mod tests {
         }
     }
 
-    // ---- 域名被锁定 ----
+    // ---- Domain name is locked ----
 
     #[test]
     fn domain_locked_codes() {
@@ -343,7 +343,7 @@ mod tests {
         }
     }
 
-    // ---- 权限被拒绝 ----
+    // ---- Permission denied ----
 
     #[test]
     fn permission_denied_codes() {
@@ -362,7 +362,7 @@ mod tests {
         }
     }
 
-    // ---- 参数无效 - 线路 ----
+    // ---- Invalid parameter - line ----
 
     #[test]
     fn invalid_param_line() {
@@ -375,7 +375,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - 记录类型 ----
+    // ---- Invalid parameter - record type ----
 
     #[test]
     fn invalid_param_type() {
@@ -388,7 +388,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - 记录值 ----
+    // ---- Invalid parameter - record value ----
 
     #[test]
     fn invalid_param_value() {
@@ -401,7 +401,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - 子域名 ----
+    // ---- Invalid parameter - subdomain name ----
 
     #[test]
     fn invalid_param_subdomain() {
@@ -414,7 +414,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - TTL ----
+    // ---- Invalid parameter - TTL ----
 
     #[test]
     fn invalid_param_ttl() {
@@ -427,7 +427,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - MX ----
+    // ---- Invalid parameter - MX ----
 
     #[test]
     fn invalid_param_mx() {
@@ -440,7 +440,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - 域名 ----
+    // ---- Invalid parameter - domain name ----
 
     #[test]
     fn invalid_param_domain() {
@@ -453,7 +453,7 @@ mod tests {
         );
     }
 
-    // ---- 参数无效 - 记录ID ----
+    // ---- Invalid parameter - Record ID ----
 
     #[test]
     fn invalid_param_record_id() {
@@ -466,7 +466,7 @@ mod tests {
         );
     }
 
-    // ---- Fallback: 未知错误码 ----
+    // ---- Fallback: Unknown error code ----
 
     #[test]
     fn unknown_code_maps_to_unknown() {
@@ -479,7 +479,7 @@ mod tests {
         );
     }
 
-    // ---- Fallback: 无错误码 ----
+    // ---- Fallback: No error code ----
 
     #[test]
     fn no_code_maps_to_unknown() {

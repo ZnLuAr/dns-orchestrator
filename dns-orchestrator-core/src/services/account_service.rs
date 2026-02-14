@@ -1,7 +1,7 @@
-//! 统一账户服务
+//! Unified account service
 //!
-//! 合并原有的 AccountMetadataService、CredentialManagementService、
-//! AccountLifecycleService、AccountBootstrapService 四个服务。
+//! Merge the original AccountMetadataService, CredentialManagementService,
+//! AccountLifecycleService, AccountBootstrapService four services.
 
 use std::sync::Arc;
 
@@ -16,40 +16,40 @@ use crate::types::{
     UpdateAccountRequest,
 };
 
-/// 账户恢复结果
+/// Account recovery results
 #[derive(Debug, Clone)]
 pub struct RestoreResult {
-    /// 成功恢复的账户数
+    /// Number of accounts successfully recovered
     pub success_count: usize,
-    /// 恢复失败的账户数
+    /// Number of accounts that failed to be restored
     pub error_count: usize,
 }
 
-/// 统一账户服务
+/// Unified account service
 pub struct AccountService {
     ctx: Arc<ServiceContext>,
 }
 
 impl AccountService {
-    /// 创建账户服务实例
+    /// Create an account service instance
     #[must_use]
     pub fn new(ctx: Arc<ServiceContext>) -> Self {
         Self { ctx }
     }
 
-    // ===== CRUD 操作 =====
+    // ===== CRUD operations =====
 
-    /// 列出所有账户
+    /// List all accounts
     pub async fn list_accounts(&self) -> CoreResult<Vec<Account>> {
         self.ctx.account_repository().find_all().await
     }
 
-    /// 根据 ID 获取账户
+    /// Get account based on ID
     pub async fn get_account(&self, account_id: &str) -> CoreResult<Option<Account>> {
         self.ctx.account_repository().find_by_id(account_id).await
     }
 
-    /// 更新账户状态
+    /// Update account status
     pub async fn update_status(
         &self,
         account_id: &str,
@@ -62,32 +62,32 @@ impl AccountService {
             .await
     }
 
-    // ===== 生命周期操作 =====
+    // ===== Life cycle operations =====
 
-    /// 创建账户
+    /// create Account
     ///
-    /// 完整流程：验证凭证 -> 保存凭证 -> 注册 Provider -> 保存元数据
-    /// 如果保存元数据失败，会自动清理已保存的凭证和已注册的 Provider
+    /// Complete process: Verify credentials -> Save credentials -> Register Provider -> Save metadata
+    /// If saving metadata fails, saved credentials and registered Providers will be automatically cleaned up
     pub async fn create_account(&self, request: CreateAccountRequest) -> CoreResult<Account> {
-        // 1. 验证凭证
+        // 1. Verify credentials
         let provider = self
             .validate_and_create_provider(&request.credentials)
             .await?;
 
-        // 2. 生成账号 ID
+        // 2. Generate account ID
         let account_id = uuid::Uuid::new_v4().to_string();
         let now = Utc::now();
 
-        // 3. 保存凭证
+        // 3. Save the credentials
         log::info!("Saving credentials for account: {account_id}");
         self.save_credentials(&account_id, &request.credentials)
             .await?;
         log::info!("Credentials saved successfully");
 
-        // 4. 注册 provider
+        // 4. Register provider
         self.register_provider(account_id.clone(), provider).await;
 
-        // 5. 创建账号元数据
+        // 5. Create account metadata
         let account = Account {
             id: account_id.clone(),
             name: request.name,
@@ -98,7 +98,7 @@ impl AccountService {
             error: None,
         };
 
-        // 6. 保存元数据，失败时 cleanup
+        // 6. Save metadata and cleanup if failed
         if let Err(e) = self.ctx.account_repository().save(&account).await {
             log::error!("Failed to save account metadata, cleaning up: {e}");
             if let Err(cleanup_err) = self.delete_credentials(&account_id).await {
@@ -111,7 +111,7 @@ impl AccountService {
         Ok(account)
     }
 
-    /// 从导入数据创建账户（不验证凭证）
+    /// Create account from imported data (does not verify credentials)
     pub async fn create_account_from_import(
         &self,
         name: String,
@@ -147,12 +147,12 @@ impl AccountService {
         Ok(account)
     }
 
-    /// 更新账户
+    /// Update account
     ///
-    /// 支持更新账户名称和/或凭证。
-    /// 如果更新凭证，会重新验证并重新注册 Provider。
+    /// Supports updating account names and/or credentials.
+    /// If the credentials are updated, the provider is revalidated and reregistered.
     pub async fn update_account(&self, request: UpdateAccountRequest) -> CoreResult<Account> {
-        // 1. 获取现有账户
+        // 1. Get an existing account
         let mut account = self
             .ctx
             .account_repository()
@@ -160,11 +160,11 @@ impl AccountService {
             .await?
             .ok_or_else(|| CoreError::AccountNotFound(request.id.clone()))?;
 
-        // 2. 如果提供了新凭证，验证并更新
+        // 2. If new credentials are provided, verify and update
         let old_credentials = if let Some(ref new_credentials) = request.credentials {
             let new_provider = self.validate_and_create_provider(new_credentials).await?;
 
-            // 备份旧凭证用于回滚
+            // Back up old credentials for rollback
             let old_creds = self.load_credentials(&request.id).await.ok();
 
             log::info!("Updating credentials for account: {}", request.id);
@@ -180,15 +180,15 @@ impl AccountService {
             None
         };
 
-        // 3. 更新名称（如果提供）
+        // 3. Update name (if provided)
         if let Some(new_name) = request.name {
             account.name = new_name;
         }
 
-        // 4. 更新时间戳
+        // 4. Update timestamp
         account.updated_at = Utc::now();
 
-        // 5. 保存更新后的账户，失败时回滚凭证
+        // 5. Save the updated account and roll back the credentials if it fails.
         if let Err(e) = self.ctx.account_repository().save(&account).await {
             if let Some(old_creds) = old_credentials {
                 log::warn!("Rolling back credentials for account: {}", request.id);
@@ -198,7 +198,7 @@ impl AccountService {
                         request.id
                     );
                 }
-                // 回滚 provider
+                // Rollback provider
                 if let Ok(old_provider) = create_provider(old_creds) {
                     self.register_provider(request.id.clone(), old_provider)
                         .await;
@@ -210,29 +210,24 @@ impl AccountService {
         Ok(account)
     }
 
-    /// 删除账户
+    /// Delete account
     ///
-    /// 流程：先删除元数据，再清理内存和凭证（避免出现"幽灵账户"）
+    /// Process: Restorable operations come first, irreversible operations come last.
+    /// Failure to delete credentials will abort the entire operation (the account is still in the list and the user can try again),
+    /// Only a warning if domain name metadata deletion fails (does not affect the main process),
+    /// Account metadata is finally deleted (irreversibly).
     pub async fn delete_account(&self, account_id: &str) -> CoreResult<()> {
-        // 1. 检查账户存在
+        // 1. Check account existence
         self.ctx
             .account_repository()
             .find_by_id(account_id)
             .await?
             .ok_or_else(|| CoreError::AccountNotFound(account_id.to_string()))?;
 
-        // 2. 先删除账号元数据
-        self.ctx.account_repository().delete(account_id).await?;
+        // 2. Delete the credentials (abort if failed: to prevent orphan credentials)
+        self.delete_credentials(account_id).await?;
 
-        // 3. 注销 provider
-        self.unregister_provider(account_id).await;
-
-        // 4. 删除凭证
-        if let Err(e) = self.delete_credentials(account_id).await {
-            log::warn!("Failed to delete credentials for {account_id}: {e}");
-        }
-
-        // 5. 清理域名元数据
+        // 3. Clean up domain name metadata (soft failure: does not affect the deletion process)
         if let Err(e) = self
             .ctx
             .domain_metadata_repository()
@@ -242,10 +237,16 @@ impl AccountService {
             log::warn!("Failed to delete domain metadata for {account_id}: {e}");
         }
 
+        // 4. Log out of the provider (memory operation)
+        self.unregister_provider(account_id).await;
+
+        // 5. Finally delete the account metadata (irreversible)
+        self.ctx.account_repository().delete(account_id).await?;
+
         Ok(())
     }
 
-    /// 批量删除账户
+    /// Delete accounts in batches
     pub async fn batch_delete_accounts(
         &self,
         account_ids: Vec<String>,
@@ -272,9 +273,9 @@ impl AccountService {
         })
     }
 
-    // ===== 凭证操作 =====
+    // ===== Voucher operation =====
 
-    /// 验证凭证并创建 Provider 实例
+    /// Validate credentials and create Provider instance
     pub async fn validate_and_create_provider(
         &self,
         credentials: &ProviderCredentials,
@@ -291,7 +292,7 @@ impl AccountService {
         Ok(provider)
     }
 
-    /// 保存凭证
+    /// Save credentials
     pub async fn save_credentials(
         &self,
         account_id: &str,
@@ -303,7 +304,7 @@ impl AccountService {
             .await
     }
 
-    /// 加载凭证
+    /// Load credentials
     pub async fn load_credentials(&self, account_id: &str) -> CoreResult<ProviderCredentials> {
         self.ctx
             .credential_store()
@@ -316,19 +317,19 @@ impl AccountService {
             })
     }
 
-    /// 删除凭证
+    /// Delete credentials
     pub async fn delete_credentials(&self, account_id: &str) -> CoreResult<()> {
         self.ctx.credential_store().remove(account_id).await
     }
 
-    /// 加载所有凭证
+    /// Load all credentials
     pub async fn load_all_credentials(&self) -> CoreResult<CredentialsMap> {
         self.ctx.credential_store().load_all().await
     }
 
-    // ===== Provider 注册 =====
+    // ===== Provider Registration =====
 
-    /// 注册 Provider 到 Registry
+    /// Register Provider to Registry
     pub async fn register_provider(&self, account_id: String, provider: Arc<dyn DnsProvider>) {
         self.ctx
             .provider_registry()
@@ -336,22 +337,22 @@ impl AccountService {
             .await;
     }
 
-    /// 注销 Provider
+    /// Log out Provider
     pub async fn unregister_provider(&self, account_id: &str) {
         self.ctx.provider_registry().unregister(account_id).await;
     }
 
-    // ===== 启动恢复 =====
+    // ===== Start recovery =====
 
-    /// 恢复账户（启动时调用）
+    /// Restore account (called at startup)
     pub async fn restore_accounts(&self) -> CoreResult<RestoreResult> {
         let mut success_count = 0;
         let mut error_count = 0;
 
-        // 1. 加载所有账户元数据
+        // 1. Load all account metadata
         let accounts = self.list_accounts().await?;
 
-        // 2. 加载所有凭证
+        // 2. Load all credentials
         let all_credentials = match self.load_all_credentials().await {
             Ok(creds) => creds,
             Err(e) => {
@@ -374,7 +375,7 @@ impl AccountService {
             }
         };
 
-        // 3. 逐个恢复账户
+        // 3. Restore accounts one by one
         for account in &accounts {
             let Some(credentials) = all_credentials.get(&account.id) else {
                 log::warn!("No credentials found for account: {}", account.id);
@@ -461,15 +462,15 @@ mod tests {
         assert_eq!(account.provider, ProviderType::Cloudflare);
         assert_eq!(account.status, Some(AccountStatus::Active));
 
-        // 验证凭证已保存
+        // Verification credentials saved
         let creds = credential_store.get(&account.id).await.unwrap();
         assert!(creds.is_some());
 
-        // 验证账户元数据已保存
+        // Verify account metadata is saved
         let saved = account_repo.find_by_id(&account.id).await.unwrap();
         assert!(saved.is_some());
 
-        // 验证 provider 已注册
+        // Verify provider is registered
         let provider = svc.ctx.provider_registry().get(&account.id).await;
         assert!(provider.is_some());
     }
@@ -478,7 +479,7 @@ mod tests {
     async fn create_account_from_import_save_failure_cleanup() {
         let (svc, account_repo, credential_store, _) = create_test_account_service();
 
-        // 设置 save 必定失败
+        // Setting save must fail
         account_repo
             .set_save_error(Some("disk full".to_string()))
             .await;
@@ -493,11 +494,11 @@ mod tests {
 
         assert!(result.is_err());
 
-        // 验证 cleanup：凭证被清理
+        // Verify cleanup: Credentials are cleaned
         let all_creds = credential_store.load_all().await.unwrap();
         assert!(all_creds.is_empty());
 
-        // 验证 cleanup：provider 已注销
+        // Verify cleanup:provider is logged out
         let ids = svc.ctx.provider_registry().list_account_ids().await;
         assert!(ids.is_empty());
     }
@@ -518,11 +519,11 @@ mod tests {
 
         svc.delete_account(&id).await.unwrap();
 
-        // 账户元数据已删除
+        // Account metadata deleted
         assert!(account_repo.find_by_id(&id).await.unwrap().is_none());
-        // 凭证已删除
+        // Credential deleted
         assert!(credential_store.get(&id).await.unwrap().is_none());
-        // provider 已注销
+        // provider has logged out
         assert!(svc.ctx.provider_registry().get(&id).await.is_none());
     }
 
@@ -547,7 +548,7 @@ mod tests {
             .unwrap();
         let id = account.id.clone();
 
-        // 为该账户的域名添加一些元数据
+        // Add some metadata to the account's domain name
         use crate::types::{DomainMetadata, DomainMetadataKey};
         let key = DomainMetadataKey::new(id.clone(), "example.com".to_string());
         let mut meta = DomainMetadata::default();
@@ -555,10 +556,10 @@ mod tests {
         meta.favorited_at = Some(chrono::Utc::now());
         domain_meta_repo.save(&key, &meta).await.unwrap();
 
-        // 删除账户
+        // Delete account
         svc.delete_account(&id).await.unwrap();
 
-        // 域名元数据也被清理了
+        // Domain name metadata has also been cleaned
         let found = domain_meta_repo.find_by_key(&key).await.unwrap();
         assert!(found.is_none());
     }
@@ -654,5 +655,64 @@ mod tests {
         let updated = svc.get_account(&acc.id).await.unwrap().unwrap();
         assert_eq!(updated.status, Some(AccountStatus::Error));
         assert_eq!(updated.error, Some("broken".to_string()));
+    }
+
+    #[tokio::test]
+    async fn delete_account_credential_failure_aborts() {
+        let (svc, account_repo, credential_store, _) = create_test_account_service();
+
+        let account = svc
+            .create_account_from_import(
+                "Cred Fail".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+        let id = account.id.clone();
+
+        // Set credential deletion must fail
+        credential_store
+            .set_remove_error(Some("keychain locked".to_string()))
+            .await;
+
+        // Delete should fail
+        let result = svc.delete_account(&id).await;
+        assert!(result.is_err());
+
+        // Account metadata still exists (irreversible operations are not performed)
+        let still_exists = account_repo.find_by_id(&id).await.unwrap();
+        assert!(still_exists.is_some(), "account should still exist when credential deletion fails");
+
+        // The credentials also still exist
+        let creds = credential_store.get(&id).await.unwrap();
+        assert!(creds.is_some(), "credentials should still exist");
+
+        // provider is still registered
+        let provider = svc.ctx.provider_registry().get(&id).await;
+        assert!(provider.is_some(), "provider should still be registered");
+    }
+
+    #[tokio::test]
+    async fn delete_account_credential_success_then_completes() {
+        let (svc, account_repo, credential_store, _) = create_test_account_service();
+
+        let account = svc
+            .create_account_from_import(
+                "Clean Delete".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+        let id = account.id.clone();
+
+        // Delete normally
+        svc.delete_account(&id).await.unwrap();
+
+        // clean it all
+        assert!(account_repo.find_by_id(&id).await.unwrap().is_none());
+        assert!(credential_store.get(&id).await.unwrap().is_none());
+        assert!(svc.ctx.provider_registry().get(&id).await.is_none());
     }
 }

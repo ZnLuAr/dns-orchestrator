@@ -1,5 +1,6 @@
 //! DNS Provider implementations
 
+/// Shared utilities used by provider implementations.
 pub mod common;
 
 #[cfg(feature = "aliyun")]

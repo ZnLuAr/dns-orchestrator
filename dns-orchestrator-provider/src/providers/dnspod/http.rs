@@ -1,4 +1,4 @@
-//! `DNSPod` HTTP 请求方法（重构版：使用通用 HTTP 工具）
+//! `DNSPod` HTTP request method (refactored version: use common HTTP tools)
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -6,31 +6,32 @@ use serde::{Deserialize, Serialize};
 use crate::error::{ProviderError, Result};
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
+use crate::utils::log_sanitizer::truncate_for_log;
 
 use super::{DNSPOD_API_HOST, DNSPOD_VERSION, DnspodProvider, TencentError, TencentResponse};
 
 impl DnspodProvider {
-    /// 执行腾讯云 API 请求
+    /// Execute Tencent Cloud API request
     pub(crate) async fn request<T: for<'de> Deserialize<'de>, B: Serialize>(
         &self,
         action: &str,
         body: &B,
         ctx: ErrorContext,
     ) -> Result<T> {
-        // 1. 序列化请求体
+        // 1. Serialize request body
         let payload =
             serde_json::to_string(body).map_err(|e| ProviderError::SerializationError {
                 provider: self.provider_name().to_string(),
                 detail: e.to_string(),
             })?;
 
-        log::debug!("Request Body: {payload}");
+        log::debug!("Request Body: {}", truncate_for_log(&payload));
 
-        // 2. 生成签名
+        // 2. Generate signature
         let timestamp = Utc::now().timestamp();
         let authorization = self.sign(action, &payload, timestamp);
 
-        // 3. 发送请求（使用 HttpUtils）
+        // 3. Send request (using HttpUtils)
         let url = format!("https://{DNSPOD_API_HOST}");
         let request = self
             .client
@@ -52,12 +53,12 @@ impl DnspodProvider {
         )
         .await?;
 
-        // 4. 解析外层包装
+        // 4. Parse the outer packaging
         let tc_response: TencentResponse =
             HttpUtils::parse_json(&response_text, self.provider_name())?;
         let response_value = tc_response.response;
 
-        // 5. 检查错误
+        // 5. Check for errors
         if let Some(error_value) = response_value.get("Error") {
             let error: TencentError = serde_json::from_value(error_value.clone())
                 .map_err(|e| self.parse_error(format!("Failed to parse error: {e}")))?;
@@ -65,7 +66,7 @@ impl DnspodProvider {
             return Err(self.map_error(RawApiError::with_code(&error.code, &error.message), ctx));
         }
 
-        // 6. 反序列化为目标类型
+        // 6. Deserialize to target type
         serde_json::from_value(response_value).map_err(|e| ProviderError::ParseError {
             provider: self.provider_name().to_string(),
             detail: e.to_string(),

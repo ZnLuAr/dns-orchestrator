@@ -1,6 +1,6 @@
-//! `DNSPod` Provider 集成测试
+//! `DNSPod` Provider integration test
 //!
-//! 运行方式:
+//! Operation mode:
 //! ```bash
 //! DNSPOD_SECRET_ID=xxx DNSPOD_SECRET_KEY=xxx TEST_DOMAIN=example.com \
 //!     cargo test -p dns-orchestrator-provider --test dnspod_test -- --ignored --nocapture --test-threads=1
@@ -13,7 +13,7 @@ use dns_orchestrator_provider::{
     CreateDnsRecordRequest, PaginationParams, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
-// ============ 基础测试 ============
+// ============ Basic Test ============
 
 #[tokio::test]
 #[ignore = "integration test: requires DNSPOD_SECRET_ID, DNSPOD_SECRET_KEY and TEST_DOMAIN"]
@@ -86,9 +86,9 @@ async fn test_dnspod_list_records() {
     );
 }
 
-// ============ 清理测试 ============
+// ============ Cleanup Test ============
 
-/// 清理所有残留的测试记录（手动运行）
+/// Clean up any remaining test records (run manually)
 #[tokio::test]
 #[ignore = "integration test: requires DNSPOD_SECRET_ID, DNSPOD_SECRET_KEY and TEST_DOMAIN"]
 async fn test_dnspod_cleanup_test_records() {
@@ -101,7 +101,7 @@ async fn test_dnspod_cleanup_test_records() {
     println!("✓ 清理完成");
 }
 
-// ============ CRUD 测试宏 ============
+// ============ CRUD test macro ============
 
 macro_rules! crud_test {
     ($test_name:ident, $record_type:expr, $type_name:expr, $name_gen:expr) => {
@@ -118,7 +118,7 @@ macro_rules! crud_test {
 
             println!("测试 {} 记录: {}", $type_name, record_name);
 
-            // 0. 清理可能存在的同名记录（防止残留）
+            // 0. Clean up possible records with the same name (to prevent residues)
             let list_params = RecordQueryParams {
                 page: 1,
                 page_size: 100,
@@ -134,7 +134,7 @@ macro_rules! crud_test {
                 }
             }
 
-            // 1. 创建记录
+            // 1. Create a record
             let create_req = CreateDnsRecordRequest {
                 domain_id: domain_id.clone(),
                 name: record_name.clone(),
@@ -150,7 +150,7 @@ macro_rules! crud_test {
             let record_id = created_record.id.clone();
             println!("  ✓ 创建成功: id={}", record_id);
 
-            // 2. 验证记录存在（不使用 keyword，遍历所有记录）
+            // 2. Verify that the record exists (do not use keyword, traverse all records)
             let list_response = require_ok!(
                 ctx.provider.list_records(&domain_id, &list_params).await,
                 "list_records 失败"
@@ -159,11 +159,11 @@ macro_rules! crud_test {
             assert!(found, "创建的记录应该能被找到");
             println!("  ✓ 验证存在");
 
-            // 3. 更新记录
+            // 3. Update records
             let update_req = UpdateDnsRecordRequest {
                 domain_id: domain_id.clone(),
                 name: record_name.clone(),
-                ttl: 1200, // DNSPod 要求 TTL >= 600
+                ttl: 1200, // DNSPod requires TTL >= 600
                 data: update_data,
                 proxied: None,
             };
@@ -175,14 +175,14 @@ macro_rules! crud_test {
             assert_eq!(updated_record.ttl, 1200, "TTL 应该被更新为 1200");
             println!("  ✓ 更新成功");
 
-            // 4. 删除记录
+            // 4. Delete records
             require_ok!(
                 ctx.provider.delete_record(&record_id, &domain_id).await,
                 "delete_record 失败"
             );
             println!("  ✓ 删除成功");
 
-            // 5. 验证已删除
+            // 5. Verify deleted
             let verify_result = ctx.provider.list_records(&domain_id, &list_params).await;
             if let Ok(response) = verify_result {
                 let still_exists = response.items.iter().any(|r| r.id == record_id);
@@ -195,7 +195,7 @@ macro_rules! crud_test {
     };
 }
 
-// ============ 各类型 CRUD 测试 ============
+// ============ Various types of CRUD tests ============
 
 crud_test!(
     test_dnspod_crud_a_record,

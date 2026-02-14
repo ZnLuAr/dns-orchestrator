@@ -47,13 +47,13 @@ where
     }
 }
 
-/// 解析 Unix 时间戳（自动判断秒/毫秒）
+/// Parse Unix timestamp (automatically determine seconds/milliseconds)
 fn parse_unix_timestamp(ts: i64) -> Option<DateTime<Utc>> {
-    // 如果时间戳 > 10^11，认为是毫秒（阿里云使用毫秒时间戳）
+    // If the timestamp > 10^11, it is considered to be milliseconds (Alibaba Cloud uses millisecond timestamps)
     if ts > 100_000_000_000 {
         DateTime::from_timestamp_millis(ts)
     } else {
-        // 否则认为是秒
+        // Otherwise it is considered to be seconds
         DateTime::from_timestamp(ts, 0)
     }
 }

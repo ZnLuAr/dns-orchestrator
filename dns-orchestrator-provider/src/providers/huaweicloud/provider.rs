@@ -1,4 +1,4 @@
-//! 华为云 `DnsProvider` trait 实现
+//! Huawei Cloud `DnsProvider` trait implementation
 
 use std::fmt::Write;
 
@@ -23,7 +23,7 @@ use super::types::{
 use super::{HuaweicloudProvider, MAX_PAGE_SIZE};
 
 impl HuaweicloudProvider {
-    /// 获取域名信息（优先使用缓存）
+    /// Get domain name information (use cache first)
     async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
         if let Some(domain) = self.domain_cache.get(domain_id) {
             return Ok(domain);
@@ -33,31 +33,31 @@ impl HuaweicloudProvider {
         Ok(domain)
     }
 
-    /// 将华为云域名状态转换为内部状态
-    /// 华为云状态：ACTIVE, `PENDING_CREATE`, `PENDING_UPDATE`, `PENDING_DELETE`,
+    /// Convert Huawei Cloud domain name status to internal status
+    /// Huawei Cloud status: ACTIVE, `PENDING_CREATE`, `PENDING_UPDATE`, `PENDING_DELETE`,
     /// `PENDING_FREEZE`, FREEZE, ILLEGAL, POLICE, `PENDING_DISABLE`, DISABLE, ERROR
     pub(crate) fn convert_domain_status(status: Option<&str>) -> DomainStatus {
         match status {
             Some("ACTIVE") => DomainStatus::Active,
-            // 各种 PENDING 状态
+            // Various PENDING states
             Some(
                 "PENDING_CREATE" | "PENDING_UPDATE" | "PENDING_DELETE" | "PENDING_FREEZE"
                 | "PENDING_DISABLE",
             ) => DomainStatus::Pending,
-            // 冻结/暂停状态
+            // freeze/pause state
             Some("FREEZE" | "ILLEGAL" | "POLICE" | "DISABLE") => DomainStatus::Paused,
             Some("ERROR") => DomainStatus::Error,
             _ => DomainStatus::Unknown,
         }
     }
 
-    /// 解析华为云记录为 `RecordData`
-    /// 华为云格式：MX/SRV/CAA 的所有字段都编码在 records 字符串中
+    /// Parse the Huawei Cloud record as `RecordData`
+    /// Huawei Cloud format: All fields of MX/SRV/CAA are encoded in the records string
     fn parse_record_data(record_type: &str, record: String) -> Result<RecordData> {
         parse_record_data_from_string(record_type, record, "huaweicloud")
     }
 
-    /// 将 `RecordData` 转换为华为云 API 格式（records 字符串）
+    /// Convert `RecordData` to Huawei Cloud API format (records string)
     fn record_data_to_record_string(data: &RecordData) -> String {
         record_data_to_single_string(data)
     }
@@ -114,7 +114,7 @@ impl DnsProvider for HuaweicloudProvider {
         params: &PaginationParams,
     ) -> Result<PaginatedResponse<ProviderDomain>> {
         let params = params.validated(MAX_PAGE_SIZE);
-        // 华为云使用 offset/limit 分页
+        // Huawei Cloud uses offset/limit paging
         let offset = (params.page - 1) * params.page_size;
         let limit = params.page_size;
         let query = format!("type=public&offset={offset}&limit={limit}");
@@ -146,7 +146,7 @@ impl DnsProvider for HuaweicloudProvider {
         ))
     }
 
-    /// 使用 `ShowPublicZone` API 直接获取域名信息
+    /// Use `ShowPublicZone` API to directly obtain domain name information
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         let path = format!("/v2/zones/{domain_id}");
         let ctx = ErrorContext {
@@ -170,22 +170,22 @@ impl DnsProvider for HuaweicloudProvider {
         params: &RecordQueryParams,
     ) -> Result<PaginatedResponse<DnsRecord>> {
         let params = params.validated(MAX_PAGE_SIZE);
-        // 获取域名信息以获取域名名称（使用缓存）
+        // Get domain name information to get the domain name (using cache)
         let domain_info = self.get_domain_cached(domain_id).await?;
 
-        // 华为云使用 offset/limit 分页
+        // Huawei Cloud uses offset/limit paging
         let offset = (params.page - 1) * params.page_size;
         let limit = params.page_size;
         let mut query = format!("offset={offset}&limit={limit}");
 
-        // 添加搜索关键词（华为云支持 name 参数模糊匹配）
+        // Add search keywords (Huawei Cloud supports name parameter fuzzy matching)
         if let Some(ref keyword) = params.keyword
             && !keyword.is_empty()
         {
             let _ = write!(query, "&name={}", urlencoding::encode(keyword));
         }
 
-        // 添加记录类型过滤
+        // Add record type filter
         if let Some(ref record_type) = params.record_type {
             let type_str = record_type_to_string(record_type);
             let _ = write!(query, "&type={}", urlencoding::encode(type_str));
@@ -205,13 +205,13 @@ impl DnsProvider for HuaweicloudProvider {
             .unwrap_or_default()
             .into_iter()
             .filter_map(|r| {
-                // 跳过 SOA 和 NS 根记录
+                // Skip SOA and NS root records
                 if r.record_type == "SOA" {
                     return None;
                 }
 
-                // TODO: 华为云 recordset 可含多条 records（round-robin），
-                // 当前数据模型仅支持单值记录，故只取第一条。
+                // TODO: Huawei Cloud recordset can contain multiple records (round-robin),
+                // The current data model only supports single-value records, so only the first one is taken.
                 let records = r.records.as_ref()?;
                 if records.len() > 1 {
                     log::debug!(
@@ -221,7 +221,14 @@ impl DnsProvider for HuaweicloudProvider {
                     );
                 }
                 let value = records.first()?.clone();
-                let data = Self::parse_record_data(&r.record_type, value).ok()?;
+                let data = match Self::parse_record_data(&r.record_type, value) {
+                    Ok(data) => data,
+                    Err(ProviderError::UnsupportedRecordType { .. }) => return None,
+                    Err(e) => {
+                        log::warn!("[huaweicloud] Skipping record due to parse error: {e}");
+                        return None;
+                    }
+                };
 
                 Some(DnsRecord {
                     id: r.id,
@@ -262,13 +269,13 @@ impl DnsProvider for HuaweicloudProvider {
             ttl: u32,
         }
 
-        // 获取域名信息（使用缓存）
+        // Get domain name information (using cache)
         let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
-        // 构造完整的记录名称（华为云需要末尾带点）
+        // Construct a complete record name (Huawei Cloud requires a dot at the end)
         let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
 
-        // 构造记录值
+        // Construct record value
         let record_value = Self::record_data_to_record_string(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 
@@ -314,13 +321,13 @@ impl DnsProvider for HuaweicloudProvider {
             ttl: u32,
         }
 
-        // 获取域名信息（使用缓存）
+        // Get domain name information (using cache)
         let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
-        // 构造完整的记录名称（华为云需要末尾带点）
+        // Construct a complete record name (Huawei Cloud requires a dot at the end)
         let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
 
-        // 构造记录值
+        // Construct record value
         let record_value = Self::record_data_to_record_string(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 

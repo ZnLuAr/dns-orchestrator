@@ -1,4 +1,4 @@
-//! 凭证存储抽象 Trait
+//! Credential storage abstraction Trait
 
 use async_trait::async_trait;
 use dns_orchestrator_provider::ProviderCredentials;
@@ -6,75 +6,75 @@ use std::collections::HashMap;
 
 use crate::error::CoreResult;
 
-/// 凭证映射类型：`account_id` -> ProviderCredentials（类型安全）
+/// Credential mapping type: `account_id` -> ProviderCredentials (type safe)
 pub type CredentialsMap = HashMap<String, ProviderCredentials>;
 
-/// 旧格式凭证映射（迁移期间使用）
+/// Old format credential mapping (used during migration)
 pub type LegacyCredentialsMap = HashMap<String, HashMap<String, String>>;
 
-/// 凭证存储 Trait
+/// Credential storage Trait
 ///
-/// 平台实现:
+/// Platform implementation:
 /// - Tauri Desktop: `TauriCredentialStore` (keyring crate)
 /// - Tauri Android: `TauriCredentialStore` (tauri-plugin-store)
-/// - Actix-Web: `DatabaseCredentialStore` (`SeaORM` + AES 加密)
+/// - Actix-Web: `DatabaseCredentialStore` (`SeaORM` + AES encryption)
 ///
-/// # v1.7.0 变更
+/// # v1.7.0 changes
 ///
-/// - 使用类型安全的 `ProviderCredentials` 替代 `HashMap<String, String>`
-/// - 方法重命名以符合 Rust 惯用法：`load()` → `get()`, `save()` → `set()`, `delete()` → `remove()`
-/// - 新增 `save_all()` 用于批量保存（迁移场景）
-/// - 新增 `load_raw_json()` 和 `save_raw_json()` 用于迁移检测
+/// - Use type-safe `ProviderCredentials` instead of `HashMap<String, String>`
+/// - Methods renamed to match Rust idioms: `load()` → `get()`, `save()` → `set()`, `delete()` → `remove()`
+/// - Added `save_all()` for batch saving (migration scenario)
+/// - Added `load_raw_json()` and `save_raw_json()` for migration detection
 #[async_trait]
 pub trait CredentialStore: Send + Sync {
-    /// 加载所有凭证（新格式）
+    /// Load all credentials (new format)
     ///
-    /// 启动时使用，减少存储访问次数。返回类型安全的 `CredentialsMap`。
+    /// Used at startup to reduce the number of storage accesses. Returns type-safe `CredentialsMap`.
     async fn load_all(&self) -> CoreResult<CredentialsMap>;
 
-    /// 批量保存凭证（新格式）
+    /// Save vouchers in batches (new format)
     ///
-    /// 用于迁移场景，一次性写入所有凭证。
+    /// Used in migration scenarios to write all credentials at once.
     ///
     /// # Arguments
-    /// * `credentials` - 凭证映射
+    /// * `credentials` - Credential mapping
     async fn save_all(&self, credentials: &CredentialsMap) -> CoreResult<()>;
 
-    /// 获取单个账户凭证
+    /// Get individual account credentials
     ///
     /// # Arguments
-    /// * `account_id` - 账户 ID
+    /// * `account_id` - Account ID
     ///
     /// # Returns
-    /// * `Ok(Some(credentials))` - 凭证存在
-    /// * `Ok(None)` - 凭证不存在
+    /// * `Ok(Some(credentials))` - token exists
+    /// * `Ok(None)` - token does not exist
     async fn get(&self, account_id: &str) -> CoreResult<Option<ProviderCredentials>>;
 
-    /// 设置单个账户凭证
+    /// Set up individual account credentials
     ///
     /// # Arguments
-    /// * `account_id` - 账户 ID
-    /// * `credentials` - 类型安全的凭证
+    /// * `account_id` - Account ID
+    /// * `credentials` - type-safe token
     async fn set(&self, account_id: &str, credentials: &ProviderCredentials) -> CoreResult<()>;
 
-    /// 删除凭证
+    /// Delete credentials
     ///
     /// # Arguments
-    /// * `account_id` - 账户 ID
+    /// * `account_id` - Account ID
     async fn remove(&self, account_id: &str) -> CoreResult<()>;
 
-    // === 迁移辅助方法 ===
+    // === Migration helper methods ===
 
-    /// 加载原始 JSON（用于格式检测和迁移）
+    /// Load raw JSON (for format detection and migration)
     ///
-    /// 返回存储中的原始 JSON 字符串，不进行反序列化。
+    /// Returns the raw JSON string from storage, without deserialization.
     async fn load_raw_json(&self) -> CoreResult<String>;
 
-    /// 保存原始 JSON（用于迁移写入）
+    /// Save raw JSON (for migration writes)
     ///
-    /// 直接写入 JSON 字符串到存储，不进行序列化。
+    /// Write JSON string directly to storage without serialization.
     ///
     /// # Arguments
-    /// * `json` - JSON 字符串
+    /// * `json` - JSON string
     async fn save_raw_json(&self, json: &str) -> CoreResult<()>;
 }

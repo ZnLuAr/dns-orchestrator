@@ -1,6 +1,6 @@
-//! 测试辅助模块
+//! Test auxiliary module
 //!
-//! 提供 mock 实现和便捷的测试工厂方法。
+//! Provides mock implementation and convenient test factory methods.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ use crate::types::{
 
 pub struct MockAccountRepository {
     accounts: RwLock<HashMap<String, Account>>,
-    /// 如果 Some，save 时返回此错误（用于测试 cleanup 路径）
+    /// If Some, this error is returned when saving (used to test the cleanup path)
     save_error: RwLock<Option<String>>,
 }
 
@@ -93,13 +93,20 @@ impl AccountRepository for MockAccountRepository {
 
 pub struct MockCredentialStore {
     credentials: RwLock<HashMap<String, ProviderCredentials>>,
+    /// If Some, this error is returned when remove (used to test the credential removal failure path)
+    remove_error: RwLock<Option<String>>,
 }
 
 impl MockCredentialStore {
     pub fn new() -> Self {
         Self {
             credentials: RwLock::new(HashMap::new()),
+            remove_error: RwLock::new(None),
         }
+    }
+
+    pub async fn set_remove_error(&self, err: Option<String>) {
+        *self.remove_error.write().await = err;
     }
 }
 
@@ -127,6 +134,9 @@ impl CredentialStore for MockCredentialStore {
     }
 
     async fn remove(&self, account_id: &str) -> CoreResult<()> {
+        if let Some(ref msg) = *self.remove_error.read().await {
+            return Err(CoreError::StorageError(msg.clone()));
+        }
         self.credentials.write().await.remove(account_id);
         Ok(())
     }
@@ -273,9 +283,9 @@ impl DomainMetadataRepository for MockDomainMetadataRepository {
     }
 }
 
-// ===== 工厂方法 =====
+// ===== Factory method =====
 
-/// 创建测试用 `ServiceContext`
+/// Create `ServiceContext` for testing
 pub fn create_test_context() -> (
     Arc<ServiceContext>,
     Arc<MockAccountRepository>,
@@ -297,7 +307,7 @@ pub fn create_test_context() -> (
     (ctx, account_repo, credential_store, domain_metadata_repo)
 }
 
-/// 创建测试用 `AccountService`
+/// Create `AccountService` for testing
 pub fn create_test_account_service() -> (
     AccountService,
     Arc<MockAccountRepository>,
@@ -314,9 +324,9 @@ pub fn create_test_account_service() -> (
     )
 }
 
-/// 创建一个用于测试的 `ProviderCredentials`
+/// Create a `ProviderCredentials` for testing
 ///
-/// 使用 Cloudflare 作为默认 provider（因为它只需一个字段）。
+/// Use Cloudflare as the default provider (since it only requires one field).
 pub fn test_credentials() -> ProviderCredentials {
     ProviderCredentials::Cloudflare {
         api_token: "test-token-12345".to_string(),

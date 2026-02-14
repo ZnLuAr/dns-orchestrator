@@ -1,13 +1,13 @@
-//! DNS 记录相关类型定义
+//! DNS record related type definitions
 
 use serde::{Deserialize, Serialize};
 
-/// 批量删除 DNS 记录请求
+/// Bulk delete DNS record requests
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchDeleteRequest {
-    /// 域名 ID
+    /// Domain ID
     pub domain_id: String,
-    /// 记录 ID 列表
+    /// Record ID list
     pub record_ids: Vec<String>,
 }

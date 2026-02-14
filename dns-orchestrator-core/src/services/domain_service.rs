@@ -1,4 +1,4 @@
-//! 域名管理服务
+//! Domain name management services
 
 use std::sync::Arc;
 
@@ -6,14 +6,14 @@ use crate::error::CoreResult;
 use crate::services::{DomainMetadataService, ServiceContext};
 use crate::types::{AppDomain, DomainMetadataKey, PaginatedResponse, PaginationParams};
 
-/// 域名管理服务
+/// Domain name management services
 pub struct DomainService {
     ctx: Arc<ServiceContext>,
     metadata_service: Arc<DomainMetadataService>,
 }
 
 impl DomainService {
-    /// 创建域名服务实例
+    /// Create a domain name service instance
     #[must_use]
     pub fn new(ctx: Arc<ServiceContext>, metadata_service: Arc<DomainMetadataService>) -> Self {
         Self {
@@ -22,7 +22,7 @@ impl DomainService {
         }
     }
 
-    /// 列出账号下的所有域名（分页）
+    /// List all domain names under the account (paginated)
     pub async fn list_domains(
         &self,
         account_id: &str,
@@ -44,7 +44,7 @@ impl DomainService {
                     .map(|d| AppDomain::from_provider(d, account_id.to_string()))
                     .collect();
 
-                // 批量加载元数据并合并
+                // Batch load metadata and merge
                 let keys: Vec<(String, String)> = domains
                     .iter()
                     .map(|d| (d.account_id.clone(), d.id.clone()))
@@ -71,7 +71,7 @@ impl DomainService {
         }
     }
 
-    /// 获取域名详情
+    /// Get domain name details
     pub async fn get_domain(&self, account_id: &str, domain_id: &str) -> CoreResult<AppDomain> {
         let provider = self.ctx.get_provider(account_id).await?;
 

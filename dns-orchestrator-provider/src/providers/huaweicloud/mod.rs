@@ -1,17 +1,19 @@
-//! 华为云 DNS Provider
+//! Huawei Cloud DNS Provider
 
 mod error;
 mod http;
 mod provider;
 mod sign;
+/// Huawei Cloud API-specific request/response types.
 pub(crate) mod types;
 
 use reqwest::Client;
 
 use crate::providers::common::{DomainCache, create_http_client};
 
+/// Huawei Cloud DNS API host.
 pub(crate) const HUAWEICLOUD_DNS_HOST: &str = "dns.myhuaweicloud.com";
-/// 华为云 API 单页最大记录数
+/// Maximum number of records on a single page of Huawei Cloud API
 pub(crate) const MAX_PAGE_SIZE: u32 = 500;
 
 /// Huawei Cloud DNS provider implementation.

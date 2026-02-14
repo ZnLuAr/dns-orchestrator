@@ -1,4 +1,4 @@
-//! 阿里云 HTTP 请求方法（重构版：使用通用 HTTP 工具）
+//! Alibaba Cloud HTTP request method (reconstructed version: using general HTTP tools)
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -13,30 +13,30 @@ use super::{
 };
 
 impl AliyunProvider {
-    /// 执行阿里云 API 请求 (RPC 风格: 参数通过 query string 传递)
+    /// Execute Alibaba Cloud API request (RPC style: parameters are passed through query string)
     pub(crate) async fn request<T: for<'de> Deserialize<'de>, B: Serialize>(
         &self,
         action: &str,
         params: &B,
         ctx: ErrorContext,
     ) -> Result<T> {
-        // 1. 序列化参数为 query string
+        // 1. The serialization parameter is query string
         let query_string = serialize_to_query_string(params)?;
 
         let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let nonce = uuid::Uuid::new_v4().to_string();
 
-        // 2. 生成签名 (使用 query string)
+        // 2. Generate signature (using query string)
         let authorization = self.sign(action, &query_string, &timestamp, &nonce);
 
-        // 3. 构造 URL (参数在 query string 中)
+        // 3. Construct URL (parameters are in query string)
         let url = if query_string.is_empty() {
             format!("https://{ALIYUN_DNS_HOST}/")
         } else {
             format!("https://{ALIYUN_DNS_HOST}/?{query_string}")
         };
 
-        // 4. 发送请求 (body 为空，使用 HttpUtils)
+        // 4. Send request (body is empty, use HttpUtils)
         let request = self
             .client
             .post(&url)
@@ -57,9 +57,9 @@ impl AliyunProvider {
         )
         .await?;
 
-        // 对 HTTP 4xx/5xx 错误，尝试解析 JSON 错误体
+        // For HTTP 4xx/5xx errors, try parsing the JSON error body
         if status >= 400 {
-            // 尝试解析为 Value 并提取 Code/Message
+            // Try to parse to Value and extract Code/Message
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&response_text)
                 && let (Some(code), Some(message)) = (
                     value.get("Code").and_then(|v| v.as_str()),
@@ -69,17 +69,17 @@ impl AliyunProvider {
                 log::error!("API error: {code} - {message}");
                 return Err(self.map_error(RawApiError::with_code(code, message), ctx));
             }
-            // 无法解析为结构化错误，返回通用 NetworkError
+            // Unable to resolve as structured error, returns generic NetworkError
             return Err(ProviderError::NetworkError {
                 provider: self.provider_name().to_string(),
                 detail: format!("HTTP {status}: {response_text}"),
             });
         }
 
-        // 5. 解析为 Value（只做一次字符串解析）
+        // 5. Parse to Value (only perform string parsing once)
         let value: serde_json::Value = HttpUtils::parse_json(&response_text, self.provider_name())?;
 
-        // 6. 检查错误
+        // 6. Check for errors
         if let (Some(code), Some(message)) = (
             value.get("Code").and_then(|v| v.as_str()),
             value.get("Message").and_then(|v| v.as_str()),
@@ -88,7 +88,7 @@ impl AliyunProvider {
             return Err(self.map_error(RawApiError::with_code(code, message), ctx));
         }
 
-        // 7. 转换为目标类型（Value → T，不需要重新 tokenize）
+        // 7. Convert to target type (Value → T, no need to re-tokenize)
         serde_json::from_value(value).map_err(|e| ProviderError::ParseError {
             provider: self.provider_name().to_string(),
             detail: e.to_string(),

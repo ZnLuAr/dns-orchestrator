@@ -1,4 +1,4 @@
-//! 阿里云 DNS Provider
+//! Alibaba Cloud DNS Provider
 
 mod error;
 mod http;
@@ -16,12 +16,14 @@ pub(crate) use types::{
     serialize_to_query_string,
 };
 
+/// Alibaba Cloud DNS API host.
 pub(crate) const ALIYUN_DNS_HOST: &str = "alidns.cn-hangzhou.aliyuncs.com";
+/// Alibaba Cloud DNS API version.
 pub(crate) const ALIYUN_DNS_VERSION: &str = "2015-01-09";
-/// 空 body 的 SHA256 hash (固定值)
+/// SHA256 hash of empty body (fixed value)
 pub(crate) const EMPTY_BODY_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-/// 阿里云 API 单页最大记录数
+/// Alibaba Cloud API maximum number of records on a single page
 pub(crate) const MAX_PAGE_SIZE: u32 = 100;
 
 /// Aliyun DNS provider implementation.

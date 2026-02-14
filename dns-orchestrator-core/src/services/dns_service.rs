@@ -1,4 +1,4 @@
-//! DNS 记录管理服务
+//! DNS record management service
 
 use std::sync::Arc;
 
@@ -12,19 +12,19 @@ use crate::types::{
     DnsRecordType, PaginatedResponse, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
-/// DNS 记录管理服务
+/// DNS record management service
 pub struct DnsService {
     ctx: Arc<ServiceContext>,
 }
 
 impl DnsService {
-    /// 创建 DNS 服务实例
+    /// Create a DNS service instance
     #[must_use]
     pub fn new(ctx: Arc<ServiceContext>) -> Self {
         Self { ctx }
     }
 
-    /// 列出域名下的所有 DNS 记录（分页 + 搜索）
+    /// List all DNS records under a domain name (paging + search)
     pub async fn list_records(
         &self,
         account_id: &str,
@@ -49,7 +49,7 @@ impl DnsService {
         }
     }
 
-    /// 创建 DNS 记录
+    /// Create DNS record
     pub async fn create_record(
         &self,
         account_id: &str,
@@ -62,7 +62,7 @@ impl DnsService {
         }
     }
 
-    /// 更新 DNS 记录
+    /// Update DNS records
     pub async fn update_record(
         &self,
         account_id: &str,
@@ -76,7 +76,7 @@ impl DnsService {
         }
     }
 
-    /// 删除 DNS 记录
+    /// Delete DNS records
     pub async fn delete_record(
         &self,
         account_id: &str,
@@ -90,7 +90,7 @@ impl DnsService {
         }
     }
 
-    /// 批量删除 DNS 记录
+    /// Delete DNS records in bulk
     pub async fn batch_delete_records(
         &self,
         account_id: &str,
