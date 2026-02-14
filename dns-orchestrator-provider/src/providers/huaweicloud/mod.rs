@@ -14,7 +14,20 @@ pub(crate) const HUAWEICLOUD_DNS_HOST: &str = "dns.myhuaweicloud.com";
 /// 华为云 API 单页最大记录数
 pub(crate) const MAX_PAGE_SIZE: u32 = 500;
 
-/// 华为云 DNS Provider
+/// Huawei Cloud DNS provider implementation.
+///
+/// Authenticates via AK/SK request signing.
+///
+/// # Construction
+///
+/// ```rust,no_run
+/// use dns_orchestrator_provider::HuaweicloudProvider;
+///
+/// let provider = HuaweicloudProvider::new(
+///     "your-access-key-id".to_string(),
+///     "your-secret-access-key".to_string(),
+/// );
+/// ```
 pub struct HuaweicloudProvider {
     pub(crate) client: Client,
     pub(crate) access_key_id: String,
@@ -22,7 +35,7 @@ pub struct HuaweicloudProvider {
     pub(crate) max_retries: u32,
 }
 
-/// 华为云 Provider Builder
+/// Builder for [`HuaweicloudProvider`] with configurable retry behavior.
 pub struct HuaweicloudProviderBuilder {
     access_key_id: String,
     secret_access_key: String,
@@ -38,11 +51,13 @@ impl HuaweicloudProviderBuilder {
         }
     }
 
+    /// Set the maximum number of automatic retries for transient errors (default: 2).
     pub fn max_retries(mut self, retries: u32) -> Self {
         self.max_retries = retries;
         self
     }
 
+    /// Build the [`HuaweicloudProvider`] instance.
     pub fn build(self) -> HuaweicloudProvider {
         HuaweicloudProvider {
             client: create_http_client(),
@@ -54,10 +69,12 @@ impl HuaweicloudProviderBuilder {
 }
 
 impl HuaweicloudProvider {
+    /// Creates a new Huawei Cloud provider with default settings (2 retries).
     pub fn new(access_key_id: String, secret_access_key: String) -> Self {
         Self::builder(access_key_id, secret_access_key).build()
     }
 
+    /// Returns a builder for customizing the provider configuration.
     pub fn builder(access_key_id: String, secret_access_key: String) -> HuaweicloudProviderBuilder {
         HuaweicloudProviderBuilder::new(access_key_id, secret_access_key)
     }

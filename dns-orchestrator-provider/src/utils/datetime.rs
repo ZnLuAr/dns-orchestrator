@@ -1,13 +1,13 @@
-//! 日期时间序列化/反序列化工具
+//! Date/time serialization and deserialization utilities.
 //!
-//! 提供自定义 Serde 序列化/反序列化支持：
-//! - 序列化: `DateTime`<Utc> -> RFC3339 字符串
-//! - 反序列化: RFC3339 字符串 或 Unix 时间戳 -> `DateTime`<Utc>
+//! Provides custom Serde support for `Option<DateTime<Utc>>`:
+//! - Serialize: `DateTime<Utc>` -> RFC 3339 string
+//! - Deserialize: RFC 3339 string or Unix timestamp (seconds/milliseconds) -> `DateTime<Utc>`
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serializer};
 
-/// 序列化 Option<`DateTime`<Utc>> 为 Option<RFC3339 字符串>
+/// Serialize `Option<DateTime<Utc>>` as an optional RFC 3339 string.
 pub fn serialize<S>(dt: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -18,7 +18,7 @@ where
     }
 }
 
-/// 反序列化：支持 RFC3339 字符串或 Unix 时间戳（秒/毫秒自动识别）
+/// Deserialize `Option<DateTime<Utc>>` from an RFC 3339 string or Unix timestamp (seconds/milliseconds).
 pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
 where
     D: Deserializer<'de>,

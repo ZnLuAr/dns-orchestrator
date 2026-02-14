@@ -1,12 +1,21 @@
 use serde::{Deserialize, Serialize};
 
-// ============ 分页相关类型 ============
+// ============ Pagination ============
 
-/// 分页参数
+/// Pagination parameters for list operations.
+///
+/// All list endpoints accept these parameters to control page-based pagination.
+/// Pages are 1-indexed.
+///
+/// # Default
+///
+/// The default is `page = 1, page_size = 20`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaginationParams {
+    /// Page number (1-indexed).
     pub page: u32,
+    /// Number of items per page.
     pub page_size: u32,
 }
 
@@ -19,16 +28,24 @@ impl Default for PaginationParams {
     }
 }
 
-/// DNS 记录查询参数（包含搜索和过滤）
+/// Query parameters for DNS record listing, with optional search and filtering.
+///
+/// Extends basic pagination with keyword search and record type filtering.
+///
+/// # Default
+///
+/// The default is `page = 1, page_size = 20`, with no keyword or type filter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordQueryParams {
+    /// Page number (1-indexed).
     pub page: u32,
+    /// Number of items per page.
     pub page_size: u32,
-    /// 搜索关键词（匹配记录名称或值）
+    /// Optional keyword to match against record names or values.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keyword: Option<String>,
-    /// 记录类型过滤
+    /// Optional record type filter.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub record_type: Option<DnsRecordType>,
 }
@@ -45,7 +62,7 @@ impl Default for RecordQueryParams {
 }
 
 impl RecordQueryParams {
-    /// 转换为基础分页参数
+    /// Convert to basic [`PaginationParams`], discarding search/filter fields.
     pub fn to_pagination(&self) -> PaginationParams {
         PaginationParams {
             page: self.page,
@@ -54,18 +71,31 @@ impl RecordQueryParams {
     }
 }
 
-/// 分页响应
+/// A paginated response wrapper.
+///
+/// Returned by all list operations. Contains the current page of items
+/// along with pagination metadata.
+///
+/// # Type Parameters
+///
+/// * `T` — The item type (e.g., [`ProviderDomain`], [`DnsRecord`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaginatedResponse<T> {
+    /// Items in the current page.
     pub items: Vec<T>,
+    /// Current page number.
     pub page: u32,
+    /// Page size used for this request.
     pub page_size: u32,
+    /// Total number of items across all pages.
     pub total_count: u32,
+    /// Whether there are more pages after this one.
     pub has_more: bool,
 }
 
 impl<T> PaginatedResponse<T> {
+    /// Create a new paginated response, automatically computing [`has_more`](Self::has_more).
     pub fn new(items: Vec<T>, page: u32, page_size: u32, total_count: u32) -> Self {
         let has_more = (page * page_size) < total_count;
         Self {
@@ -78,18 +108,24 @@ impl<T> PaginatedResponse<T> {
     }
 }
 
-// ============ Provider 相关类型 ============
+// ============ Provider Types ============
 
-/// Provider 类型枚举（原名 DnsProvider，重命名避免与 trait 冲突）
+/// Identifies which DNS provider implementation to use.
+///
+/// Each variant is gated behind its corresponding feature flag.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderType {
+    /// Cloudflare DNS. Requires feature `cloudflare`.
     #[cfg(feature = "cloudflare")]
     Cloudflare,
+    /// Aliyun (China) DNS. Requires feature `aliyun`.
     #[cfg(feature = "aliyun")]
     Aliyun,
+    /// Tencent Cloud `DNSPod`. Requires feature `dnspod`.
     #[cfg(feature = "dnspod")]
     Dnspod,
+    /// Huawei Cloud DNS. Requires feature `huaweicloud`.
     #[cfg(feature = "huaweicloud")]
     Huaweicloud,
 }
@@ -109,84 +145,137 @@ impl std::fmt::Display for ProviderType {
     }
 }
 
-// ============ 域名相关类型 ============
+// ============ Domain Types ============
 
+/// Status of a domain/zone within a DNS provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DomainStatus {
+    /// Domain is active and resolving.
     Active,
+    /// Domain is paused (not resolving).
     Paused,
+    /// Domain is pending activation/verification.
     Pending,
+    /// Domain is in an error state.
     Error,
+    /// Status could not be determined.
     Unknown,
 }
 
+/// A domain (zone) managed by a DNS provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderDomain {
+    /// Provider-specific domain/zone identifier.
     pub id: String,
+    /// Domain name (e.g., `"example.com"`).
     pub name: String,
+    /// Which provider manages this domain.
     pub provider: ProviderType,
+    /// Current domain status.
     pub status: DomainStatus,
+    /// Number of DNS records in this domain, if known.
     #[serde(rename = "recordCount", skip_serializing_if = "Option::is_none")]
     pub record_count: Option<u32>,
 }
 
-// ============ DNS 记录相关类型 ============
+// ============ DNS Record Types ============
 
-/// DNS 记录类型（用于查询过滤）
+/// DNS record type identifier, used for query filtering.
+///
+/// Serialized as uppercase strings (`"A"`, `"AAAA"`, `"CNAME"`, etc.).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum DnsRecordType {
+    /// IPv4 address record.
     A,
+    /// IPv6 address record.
     Aaaa,
+    /// Canonical name (alias) record.
     Cname,
+    /// Mail exchange record.
     Mx,
+    /// Text record.
     Txt,
+    /// Name server record.
     Ns,
+    /// Service locator record.
     Srv,
+    /// Certificate Authority Authorization record.
     Caa,
 }
 
-/// DNS 记录数据 - 类型安全的多态表示
+/// Type-safe representation of DNS record data.
+///
+/// Each variant carries the fields specific to that record type.
+/// Use [`record_type()`](Self::record_type) to get the [`DnsRecordType`] discriminant,
+/// or [`display_value()`](Self::display_value) to get the primary value for display.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "content")]
 pub enum RecordData {
-    /// A 记录：IPv4 地址
-    A { address: String },
+    /// A record — maps a hostname to an IPv4 address.
+    A {
+        /// IPv4 address (e.g., `"1.2.3.4"`).
+        address: String,
+    },
 
-    /// AAAA 记录：IPv6 地址
-    AAAA { address: String },
+    /// AAAA record — maps a hostname to an IPv6 address.
+    AAAA {
+        /// IPv6 address (e.g., `"2001:db8::1"`).
+        address: String,
+    },
 
-    /// CNAME 记录：别名
-    CNAME { target: String },
-
-    /// MX 记录：邮件交换
-    MX { priority: u16, exchange: String },
-
-    /// TXT 记录：文本
-    TXT { text: String },
-
-    /// NS 记录：域名服务器
-    NS { nameserver: String },
-
-    /// SRV 记录：服务定位
-    SRV {
-        priority: u16,
-        weight: u16,
-        port: u16,
+    /// CNAME record — alias from one name to another.
+    CNAME {
+        /// Target hostname.
         target: String,
     },
 
-    /// CAA 记录：证书颁发机构授权
+    /// MX record — mail exchange server.
+    MX {
+        /// Priority (lower = preferred).
+        priority: u16,
+        /// Mail server hostname.
+        exchange: String,
+    },
+
+    /// TXT record — arbitrary text data.
+    TXT {
+        /// Text content.
+        text: String,
+    },
+
+    /// NS record — authoritative name server.
+    NS {
+        /// Name server hostname.
+        nameserver: String,
+    },
+
+    /// SRV record — service locator.
+    SRV {
+        /// Priority (lower = preferred).
+        priority: u16,
+        /// Weight for load balancing among same-priority targets.
+        weight: u16,
+        /// TCP/UDP port number.
+        port: u16,
+        /// Target hostname providing the service.
+        target: String,
+    },
+
+    /// CAA record — Certificate Authority Authorization.
     CAA {
+        /// Issuer critical flag (0 or 128).
         flags: u8,
+        /// Property tag (`"issue"`, `"issuewild"`, or `"iodef"`).
         tag: String,
+        /// CA domain or reporting URI.
         value: String,
     },
 }
 
 impl RecordData {
-    /// 获取记录类型
+    /// Returns the [`DnsRecordType`] discriminant for this record data.
     pub fn record_type(&self) -> DnsRecordType {
         match self {
             Self::A { .. } => DnsRecordType::A,
@@ -200,7 +289,8 @@ impl RecordData {
         }
     }
 
-    /// 获取显示用的主要值（用于列表显示）
+    /// Returns the primary display value for this record (e.g., the IP address for A/AAAA,
+    /// the target for CNAME/SRV, the exchange for MX).
     pub fn display_value(&self) -> &str {
         match self {
             Self::A { address } | Self::AAAA { address } => address,
@@ -213,189 +303,264 @@ impl RecordData {
     }
 }
 
+/// A DNS record as returned by a provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsRecord {
+    /// Provider-specific record identifier.
     pub id: String,
+    /// Domain/zone identifier this record belongs to.
     pub domain_id: String,
+    /// Record name (e.g., `"www"` or `"@"` for apex).
     pub name: String,
+    /// Time to live in seconds.
     pub ttl: u32,
+    /// Type-specific record data.
     pub data: RecordData,
 
-    /// Cloudflare 专用：是否启用代理
+    /// Whether Cloudflare CDN proxy is enabled (Cloudflare only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxied: Option<bool>,
 
+    /// When the record was created, if known.
     #[serde(with = "crate::utils::datetime")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 
+    /// When the record was last updated, if known.
     #[serde(with = "crate::utils::datetime")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// Request to create a new DNS record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDnsRecordRequest {
+    /// Domain/zone identifier to create the record in.
     pub domain_id: String,
+    /// Record name (e.g., `"www"`).
     pub name: String,
+    /// Time to live in seconds.
     pub ttl: u32,
+    /// Type-specific record data.
     pub data: RecordData,
+    /// Enable Cloudflare CDN proxy (Cloudflare only, ignored by other providers).
     pub proxied: Option<bool>,
 }
 
+/// Request to update an existing DNS record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDnsRecordRequest {
+    /// Domain/zone identifier the record belongs to.
     pub domain_id: String,
+    /// New record name.
     pub name: String,
+    /// New TTL in seconds.
     pub ttl: u32,
+    /// New type-specific record data.
     pub data: RecordData,
+    /// Enable Cloudflare CDN proxy (Cloudflare only, ignored by other providers).
     pub proxied: Option<bool>,
 }
 
-// ============ 批量操作类型 ============
+// ============ Batch Operation Types ============
 
-/// 批量创建结果
+/// Result of a batch create operation.
+///
+/// Contains both successfully created records and any per-record failures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchCreateResult {
+    /// Number of records successfully created.
     pub success_count: usize,
+    /// Number of records that failed to create.
     pub failed_count: usize,
+    /// Successfully created records.
     pub created_records: Vec<DnsRecord>,
+    /// Details about each failed creation.
     pub failures: Vec<BatchCreateFailure>,
 }
 
-/// 批量创建失败项
+/// Information about a single failed record creation in a batch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchCreateFailure {
+    /// Index of the failed request in the original request slice.
     pub request_index: usize,
+    /// Name of the record that failed.
     pub record_name: String,
+    /// Human-readable reason for the failure.
     pub reason: String,
 }
 
-/// 批量更新结果
+/// Result of a batch update operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchUpdateResult {
+    /// Number of records successfully updated.
     pub success_count: usize,
+    /// Number of records that failed to update.
     pub failed_count: usize,
+    /// Successfully updated records.
     pub updated_records: Vec<DnsRecord>,
+    /// Details about each failed update.
     pub failures: Vec<BatchUpdateFailure>,
 }
 
-/// 批量更新失败项
+/// Information about a single failed record update in a batch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchUpdateFailure {
+    /// ID of the record that failed to update.
     pub record_id: String,
+    /// Human-readable reason for the failure.
     pub reason: String,
 }
 
-/// 批量更新请求项
+/// A single item in a batch update request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchUpdateItem {
+    /// ID of the record to update.
     pub record_id: String,
+    /// The update payload.
     pub request: UpdateDnsRecordRequest,
 }
 
-/// 批量删除结果
+/// Result of a batch delete operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchDeleteResult {
+    /// Number of records successfully deleted.
     pub success_count: usize,
+    /// Number of records that failed to delete.
     pub failed_count: usize,
+    /// Details about each failed deletion.
     pub failures: Vec<BatchDeleteFailure>,
 }
 
-/// 批量删除失败项
+/// Information about a single failed record deletion in a batch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchDeleteFailure {
+    /// ID of the record that failed to delete.
     pub record_id: String,
+    /// Human-readable reason for the failure.
     pub reason: String,
 }
 
-// ============ Provider 元数据类型 ============
+// ============ Provider Metadata Types ============
 
-/// 凭证字段类型
+/// The input type of a credential field (affects UI rendering).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum FieldType {
+    /// Plain text input.
     Text,
+    /// Masked/password input.
     Password,
 }
 
-/// 提供商凭证字段定义
+/// Definition of a single credential field required by a provider.
+///
+/// Used to dynamically build credential forms in UIs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderCredentialField {
+    /// Machine-readable field key (e.g., `"apiToken"`).
     pub key: String,
+    /// Human-readable label (e.g., `"API Token"`).
     pub label: String,
+    /// Input type for UI rendering.
     #[serde(rename = "type")]
     pub field_type: FieldType,
+    /// Optional placeholder text.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub placeholder: Option<String>,
+    /// Optional help/description text.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub help_text: Option<String>,
 }
 
-/// 提供商支持的功能
+/// Provider-specific feature support flags.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderFeatures {
-    /// 是否支持代理功能 (如 Cloudflare 的 CDN 代理)
+    /// Whether the provider supports CDN proxy (e.g., Cloudflare's orange-cloud proxy).
     pub proxy: bool,
 }
 
-/// 提供商分页限制
+/// Provider-specific pagination limits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderLimits {
-    /// 域名列表的最大分页大小
+    /// Maximum page size for domain list requests.
     pub max_page_size_domains: u32,
-    /// DNS 记录列表的最大分页大小
+    /// Maximum page size for DNS record list requests.
     pub max_page_size_records: u32,
 }
 
-/// 提供商元数据
+/// Static metadata describing a DNS provider.
+///
+/// Contains the provider's identity, required credential fields, supported features,
+/// and API limits. Useful for building dynamic UIs or validating configuration.
+///
+/// Obtain via [`DnsProvider::metadata()`](crate::DnsProvider::metadata) or
+/// [`get_all_provider_metadata()`](crate::get_all_provider_metadata).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderMetadata {
+    /// Provider type identifier.
     pub id: ProviderType,
+    /// Human-readable provider name.
     pub name: String,
+    /// Short description of the provider.
     pub description: String,
+    /// Credential fields required to authenticate with this provider.
     pub required_fields: Vec<ProviderCredentialField>,
+    /// Feature flags for this provider.
     pub features: ProviderFeatures,
+    /// API pagination limits for this provider.
     pub limits: ProviderLimits,
 }
 
-// ============ 凭证类型 ============
+// ============ Credential Types ============
 
-/// 凭证验证错误
+/// Validation error for provider credentials.
+///
+/// Returned when credential fields are missing, empty, or have an invalid format.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum CredentialValidationError {
-    /// 缺失必需字段
+    /// A required credential field is missing entirely.
     MissingField {
+        /// Which provider the error relates to.
         provider: ProviderType,
+        /// Machine-readable field key.
         field: String,
+        /// Human-readable field label.
         label: String,
     },
-    /// 字段值为空
+    /// A credential field is present but empty/whitespace-only.
     EmptyField {
+        /// Which provider the error relates to.
         provider: ProviderType,
+        /// Machine-readable field key.
         field: String,
+        /// Human-readable field label.
         label: String,
     },
-    /// 字段格式无效
+    /// A credential field has an invalid format.
     InvalidFormat {
+        /// Which provider the error relates to.
         provider: ProviderType,
+        /// Machine-readable field key.
         field: String,
+        /// Human-readable field label.
         label: String,
+        /// Description of what's wrong with the format.
         reason: String,
     },
 }
@@ -403,8 +568,8 @@ pub enum CredentialValidationError {
 impl std::fmt::Display for CredentialValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingField { label, .. } => write!(f, "缺少必填字段: {label}"),
-            Self::EmptyField { label, .. } => write!(f, "字段不能为空: {label}"),
+            Self::MissingField { label, .. } => write!(f, "Missing required field: {label}"),
+            Self::EmptyField { label, .. } => write!(f, "Field must not be empty: {label}"),
             Self::InvalidFormat { label, reason, .. } => write!(f, "{label}: {reason}"),
         }
     }
@@ -412,38 +577,68 @@ impl std::fmt::Display for CredentialValidationError {
 
 impl std::error::Error for CredentialValidationError {}
 
-/// 凭证枚举 - 类型安全的凭证定义
+/// Type-safe credential container for all supported DNS providers.
+///
+/// Each variant holds the authentication fields required by that provider.
+/// Pass this to [`create_provider()`](crate::create_provider) to instantiate a provider.
+///
+/// # Serialization
+///
+/// Serialized as a tagged enum with `"provider"` as the tag and `"credentials"` as the content:
+///
+/// ```json
+/// { "provider": "cloudflare", "credentials": { "api_token": "..." } }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "provider", content = "credentials")]
 pub enum ProviderCredentials {
+    /// Cloudflare credentials. Requires feature `cloudflare`.
     #[cfg(feature = "cloudflare")]
     #[serde(rename = "cloudflare")]
-    Cloudflare { api_token: String },
+    Cloudflare {
+        /// Cloudflare API token.
+        api_token: String,
+    },
 
+    /// Aliyun DNS credentials. Requires feature `aliyun`.
     #[cfg(feature = "aliyun")]
     #[serde(rename = "aliyun")]
     Aliyun {
+        /// Aliyun Access Key ID.
         access_key_id: String,
+        /// Aliyun Access Key Secret.
         access_key_secret: String,
     },
 
+    /// Tencent Cloud `DNSPod` credentials. Requires feature `dnspod`.
     #[cfg(feature = "dnspod")]
     #[serde(rename = "dnspod")]
     Dnspod {
+        /// Tencent Cloud Secret ID.
         secret_id: String,
+        /// Tencent Cloud Secret Key.
         secret_key: String,
     },
 
+    /// Huawei Cloud DNS credentials. Requires feature `huaweicloud`.
     #[cfg(feature = "huaweicloud")]
     #[serde(rename = "huaweicloud")]
     Huaweicloud {
+        /// Huawei Cloud Access Key ID.
         access_key_id: String,
+        /// Huawei Cloud Secret Access Key.
         secret_access_key: String,
     },
 }
 
 impl ProviderCredentials {
-    /// 从 `HashMap` 转换（兼容旧格式存储）
+    /// Construct credentials from a `HashMap`, validating required fields.
+    ///
+    /// Useful for deserializing credentials stored in a flat key-value format.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CredentialValidationError`] if a required field is missing or empty.
     pub fn from_map(
         provider: &ProviderType,
         map: &std::collections::HashMap<String, String>,
@@ -522,7 +717,7 @@ impl ProviderCredentials {
         }
     }
 
-    /// 转换为 HashMap（保存时用，保持存储格式兼容）
+    /// Convert credentials to a `HashMap` for flat key-value storage.
     pub fn to_map(&self) -> std::collections::HashMap<String, String> {
         match self {
             Self::Cloudflare { api_token } => [("apiToken".to_string(), api_token.clone())].into(),
@@ -553,7 +748,7 @@ impl ProviderCredentials {
         }
     }
 
-    /// 获取凭证对应的 provider 类型
+    /// Returns the [`ProviderType`] corresponding to this credential variant.
     pub fn provider_type(&self) -> ProviderType {
         match self {
             Self::Cloudflare { .. } => ProviderType::Cloudflare,

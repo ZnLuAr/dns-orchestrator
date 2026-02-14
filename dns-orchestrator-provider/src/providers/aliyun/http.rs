@@ -65,7 +65,7 @@ impl AliyunProvider {
             value.get("Code").and_then(|v| v.as_str()),
             value.get("Message").and_then(|v| v.as_str()),
         ) {
-            log::error!("API 错误: {code} - {message}");
+            log::error!("API error: {code} - {message}");
             return Err(self.map_error(RawApiError::with_code(code, message), ctx));
         }
 

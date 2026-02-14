@@ -1,4 +1,4 @@
-//! Provider factory functions and metadata
+//! Provider factory functions and metadata.
 
 use std::sync::Arc;
 
@@ -15,7 +15,21 @@ use crate::providers::DnspodProvider;
 #[cfg(feature = "huaweicloud")]
 use crate::providers::HuaweicloudProvider;
 
-/// 工厂函数 - 根据凭证类型创建 Provider 实例
+/// Creates a [`DnsProvider`] instance from the given credentials.
+///
+/// The concrete provider type is determined by the [`ProviderCredentials`] variant.
+/// The returned provider is wrapped in `Arc<dyn DnsProvider>` for easy sharing
+/// across async tasks.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use dns_orchestrator_provider::{create_provider, ProviderCredentials};
+///
+/// let provider = create_provider(ProviderCredentials::Cloudflare {
+///     api_token: "your-token".to_string(),
+/// }).unwrap();
+/// ```
 pub fn create_provider(credentials: ProviderCredentials) -> Result<Arc<dyn DnsProvider>> {
     match credentials {
         #[cfg(feature = "cloudflare")]
@@ -46,7 +60,10 @@ pub fn create_provider(credentials: ProviderCredentials) -> Result<Arc<dyn DnsPr
     }
 }
 
-/// 获取所有支持的提供商元数据
+/// Returns metadata for all providers enabled via feature flags.
+///
+/// Useful for building dynamic UIs that enumerate available providers
+/// and their required credential fields.
 pub fn get_all_provider_metadata() -> Vec<ProviderMetadata> {
     vec![
         #[cfg(feature = "cloudflare")]

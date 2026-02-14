@@ -50,21 +50,21 @@ impl DnsProvider for DnspodProvider {
     fn metadata() -> ProviderMetadata {
         ProviderMetadata {
             id: ProviderType::Dnspod,
-            name: "腾讯云 DNSPod".to_string(),
-            description: "腾讯云 DNS 解析服务".to_string(),
+            name: "Tencent Cloud DNSPod".to_string(),
+            description: "Tencent Cloud DNS resolution service".to_string(),
             required_fields: vec![
                 ProviderCredentialField {
                     key: "secretId".to_string(),
                     label: "SecretId".to_string(),
                     field_type: FieldType::Text,
-                    placeholder: Some("输入 SecretId".to_string()),
+                    placeholder: Some("Enter SecretId".to_string()),
                     help_text: None,
                 },
                 ProviderCredentialField {
                     key: "secretKey".to_string(),
                     label: "SecretKey".to_string(),
                     field_type: FieldType::Password,
-                    placeholder: Some("输入 SecretKey".to_string()),
+                    placeholder: Some("Enter SecretKey".to_string()),
                     help_text: None,
                 },
             ],
@@ -97,7 +97,7 @@ impl DnsProvider for DnspodProvider {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
             Err(e) => {
-                log::warn!("凭证验证失败: {e}");
+                log::warn!("Credential validation failed: {e}");
                 Ok(false)
             }
         }

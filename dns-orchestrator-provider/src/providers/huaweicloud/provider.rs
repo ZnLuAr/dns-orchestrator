@@ -62,21 +62,21 @@ impl DnsProvider for HuaweicloudProvider {
     fn metadata() -> ProviderMetadata {
         ProviderMetadata {
             id: ProviderType::Huaweicloud,
-            name: "华为云 DNS".to_string(),
-            description: "华为云云解析服务".to_string(),
+            name: "Huawei Cloud DNS".to_string(),
+            description: "Huawei Cloud DNS resolution service".to_string(),
             required_fields: vec![
                 ProviderCredentialField {
                     key: "accessKeyId".to_string(),
                     label: "Access Key ID".to_string(),
                     field_type: FieldType::Text,
-                    placeholder: Some("输入 Access Key ID".to_string()),
+                    placeholder: Some("Enter Access Key ID".to_string()),
                     help_text: None,
                 },
                 ProviderCredentialField {
                     key: "secretAccessKey".to_string(),
                     label: "Secret Access Key".to_string(),
                     field_type: FieldType::Password,
-                    placeholder: Some("输入 Secret Access Key".to_string()),
+                    placeholder: Some("Enter Secret Access Key".to_string()),
                     help_text: None,
                 },
             ],
@@ -96,7 +96,7 @@ impl DnsProvider for HuaweicloudProvider {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
             Err(e) => {
-                log::warn!("凭证验证失败: {e}");
+                log::warn!("Credential validation failed: {e}");
                 Ok(false)
             }
         }

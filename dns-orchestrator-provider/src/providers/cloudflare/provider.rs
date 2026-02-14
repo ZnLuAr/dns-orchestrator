@@ -259,14 +259,14 @@ impl DnsProvider for CloudflareProvider {
         ProviderMetadata {
             id: ProviderType::Cloudflare,
             name: "Cloudflare".to_string(),
-            description: "全球领先的 CDN 和 DNS 服务商".to_string(),
+            description: "Global CDN and DNS service provider".to_string(),
             required_fields: vec![ProviderCredentialField {
                 key: "apiToken".to_string(),
                 label: "API Token".to_string(),
                 field_type: FieldType::Password,
-                placeholder: Some("输入 Cloudflare API Token".to_string()),
+                placeholder: Some("Enter Cloudflare API Token".to_string()),
                 help_text: Some(
-                    "在 Cloudflare Dashboard -> My Profile -> API Tokens 创建".to_string(),
+                    "Create at Cloudflare Dashboard -> My Profile -> API Tokens".to_string(),
                 ),
             }],
             features: ProviderFeatures { proxy: true },

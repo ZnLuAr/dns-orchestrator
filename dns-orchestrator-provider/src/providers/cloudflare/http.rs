@@ -42,7 +42,7 @@ impl CloudflareProvider {
                         .map(|e| (e.code.to_string(), e.message.clone()))
                 })
                 .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
-            log::error!("API 错误: {message}");
+            log::error!("API error: {message}");
             return Err(self.map_error(RawApiError::with_code(code, message), ctx));
         }
         Ok(())
@@ -61,7 +61,7 @@ impl CloudflareProvider {
 
         cf_response
             .result
-            .ok_or_else(|| self.parse_error("响应中缺少 result 字段"))
+            .ok_or_else(|| self.parse_error("Missing 'result' field in response"))
     }
 
     /// 统一处理 Cloudflare API 响应（带分页信息）
@@ -97,7 +97,7 @@ impl CloudflareProvider {
 
         if log::log_enabled!(log::Level::Debug) {
             let body_json = serde_json::to_string_pretty(body)
-                .unwrap_or_else(|_| "无法序列化请求体".to_string());
+                .unwrap_or_else(|_| "Failed to serialize request body".to_string());
             log::debug!("Request Body: {body_json}");
         }
 

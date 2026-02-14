@@ -24,7 +24,20 @@ pub(crate) const EMPTY_BODY_SHA256: &str =
 /// 阿里云 API 单页最大记录数
 pub(crate) const MAX_PAGE_SIZE: u32 = 100;
 
-/// 阿里云 DNS Provider
+/// Aliyun DNS provider implementation.
+///
+/// Authenticates via HMAC-SHA256 V3 signing with Access Key ID/Secret.
+///
+/// # Construction
+///
+/// ```rust,no_run
+/// use dns_orchestrator_provider::AliyunProvider;
+///
+/// let provider = AliyunProvider::new(
+///     "your-access-key-id".to_string(),
+///     "your-access-key-secret".to_string(),
+/// );
+/// ```
 pub struct AliyunProvider {
     pub(crate) client: Client,
     pub(crate) access_key_id: String,
@@ -32,7 +45,7 @@ pub struct AliyunProvider {
     pub(crate) max_retries: u32,
 }
 
-/// 阿里云 Provider Builder
+/// Builder for [`AliyunProvider`] with configurable retry behavior.
 pub struct AliyunProviderBuilder {
     access_key_id: String,
     access_key_secret: String,
@@ -48,11 +61,13 @@ impl AliyunProviderBuilder {
         }
     }
 
+    /// Set the maximum number of automatic retries for transient errors (default: 2).
     pub fn max_retries(mut self, retries: u32) -> Self {
         self.max_retries = retries;
         self
     }
 
+    /// Build the [`AliyunProvider`] instance.
     pub fn build(self) -> AliyunProvider {
         AliyunProvider {
             client: create_http_client(),
@@ -64,10 +79,12 @@ impl AliyunProviderBuilder {
 }
 
 impl AliyunProvider {
+    /// Creates a new Aliyun provider with default settings (2 retries).
     pub fn new(access_key_id: String, access_key_secret: String) -> Self {
         Self::builder(access_key_id, access_key_secret).build()
     }
 
+    /// Returns a builder for customizing the provider configuration.
     pub fn builder(access_key_id: String, access_key_secret: String) -> AliyunProviderBuilder {
         AliyunProviderBuilder::new(access_key_id, access_key_secret)
     }

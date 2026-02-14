@@ -1,95 +1,163 @@
 use serde::{Deserialize, Serialize};
 
-/// Provider 统一错误类型
-/// 用于将各 DNS Provider 的原始错误映射到统一的错误类型
+/// Unified error type for all DNS provider operations.
+///
+/// Each variant includes a `provider` field identifying which provider produced the error,
+/// plus variant-specific context. All variants are serializable for structured error reporting.
+///
+/// # Retryable Errors
+///
+/// The following variants represent transient failures that may succeed on retry:
+/// - [`NetworkError`](Self::NetworkError) — network connectivity issues
+/// - [`Timeout`](Self::Timeout) — request timed out
+/// - [`RateLimited`](Self::RateLimited) — API rate limit exceeded
+///
+/// The built-in HTTP client automatically retries these with exponential backoff.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "code")]
 pub enum ProviderError {
-    /// 网络请求失败
-    NetworkError { provider: String, detail: String },
-
-    /// 凭证无效
-    InvalidCredentials {
+    /// A network-level error occurred (DNS resolution failure, connection refused, etc.).
+    ///
+    /// This is a transient error and is automatically retried.
+    NetworkError {
+        /// Provider that produced the error.
         provider: String,
-        raw_message: Option<String>,
-    },
-
-    /// 记录已存在
-    RecordExists {
-        provider: String,
-        record_name: String,
-        raw_message: Option<String>,
-    },
-
-    /// 记录不存在
-    RecordNotFound {
-        provider: String,
-        record_id: String,
-        raw_message: Option<String>,
-    },
-
-    /// 参数无效（TTL、值等）
-    InvalidParameter {
-        provider: String,
-        param: String,
+        /// Error details.
         detail: String,
     },
 
-    /// 不支持的记录类型
-    UnsupportedRecordType {
+    /// The provided credentials are invalid or expired.
+    InvalidCredentials {
+        /// Provider that produced the error.
         provider: String,
+        /// Original error message from the provider API, if available.
+        raw_message: Option<String>,
+    },
+
+    /// A DNS record with the same name/type already exists.
+    RecordExists {
+        /// Provider that produced the error.
+        provider: String,
+        /// Name of the conflicting record.
+        record_name: String,
+        /// Original error message from the provider API, if available.
+        raw_message: Option<String>,
+    },
+
+    /// The specified DNS record was not found.
+    RecordNotFound {
+        /// Provider that produced the error.
+        provider: String,
+        /// ID of the record that was not found.
+        record_id: String,
+        /// Original error message from the provider API, if available.
+        raw_message: Option<String>,
+    },
+
+    /// A request parameter is invalid (e.g., bad TTL value, malformed IP address).
+    InvalidParameter {
+        /// Provider that produced the error.
+        provider: String,
+        /// Name of the invalid parameter.
+        param: String,
+        /// Description of what's wrong.
+        detail: String,
+    },
+
+    /// The requested DNS record type is not supported by this provider.
+    UnsupportedRecordType {
+        /// Provider that produced the error.
+        provider: String,
+        /// The unsupported record type string.
         record_type: String,
     },
 
-    /// 配额超限
-    QuotaExceeded {
-        provider: String,
-        raw_message: Option<String>,
-    },
-
-    /// API 限流（HTTP 429 或等效错误码）
+    /// The account's resource quota has been exceeded.
     ///
-    /// 与 `QuotaExceeded` 不同：限流是临时的，应 backoff 重试；
-    /// 配额超限是资源用完了，重试无意义。
+    /// Unlike [`RateLimited`](Self::RateLimited), this is not a transient condition.
+    QuotaExceeded {
+        /// Provider that produced the error.
+        provider: String,
+        /// Original error message from the provider API, if available.
+        raw_message: Option<String>,
+    },
+
+    /// The API rate limit has been exceeded (HTTP 429 or equivalent).
+    ///
+    /// This is a transient error. Unlike [`QuotaExceeded`](Self::QuotaExceeded),
+    /// the request should succeed after waiting.
     RateLimited {
+        /// Provider that produced the error.
         provider: String,
+        /// Suggested wait time in seconds before retrying, if provided by the API.
         retry_after: Option<u64>,
+        /// Original error message from the provider API, if available.
         raw_message: Option<String>,
     },
 
-    /// 请求超时
-    Timeout { provider: String, detail: String },
+    /// The HTTP request timed out.
+    ///
+    /// This is a transient error and is automatically retried.
+    Timeout {
+        /// Provider that produced the error.
+        provider: String,
+        /// Error details.
+        detail: String,
+    },
 
-    /// 域名不存在
+    /// The specified domain/zone was not found.
     DomainNotFound {
+        /// Provider that produced the error.
         provider: String,
+        /// Domain name that was not found.
         domain: String,
+        /// Original error message from the provider API, if available.
         raw_message: Option<String>,
     },
 
-    /// 域名被锁定/禁用
+    /// The domain is locked or disabled and cannot be modified.
     DomainLocked {
+        /// Provider that produced the error.
         provider: String,
+        /// Domain name that is locked.
         domain: String,
+        /// Original error message from the provider API, if available.
         raw_message: Option<String>,
     },
 
-    /// 权限/操作被拒绝
+    /// The authenticated user lacks permission for the requested operation.
     PermissionDenied {
+        /// Provider that produced the error.
         provider: String,
+        /// Original error message from the provider API, if available.
         raw_message: Option<String>,
     },
 
-    /// 响应解析失败
-    ParseError { provider: String, detail: String },
-
-    /// 序列化/反序列化失败
-    SerializationError { provider: String, detail: String },
-
-    /// 未知错误（fallback）
-    Unknown {
+    /// Failed to parse the provider's API response.
+    ParseError {
+        /// Provider that produced the error.
         provider: String,
+        /// Details about the parse failure.
+        detail: String,
+    },
+
+    /// Failed to serialize a request body.
+    SerializationError {
+        /// Provider that produced the error.
+        provider: String,
+        /// Details about the serialization failure.
+        detail: String,
+    },
+
+    /// An unrecognized error from the provider API.
+    ///
+    /// This is a catch-all for error codes not yet mapped to a specific variant.
+    Unknown {
+        /// Provider that produced the error.
+        provider: String,
+        /// Raw error code from the API, if available.
         raw_code: Option<String>,
+        /// Raw error message from the API.
         raw_message: String,
     },
 }
@@ -205,7 +273,7 @@ impl std::fmt::Display for ProviderError {
 
 impl std::error::Error for ProviderError {}
 
-/// 库的统一 Result 类型
+/// Convenience type alias for `Result<T, ProviderError>`.
 pub type Result<T> = std::result::Result<T, ProviderError>;
 
 #[cfg(test)]

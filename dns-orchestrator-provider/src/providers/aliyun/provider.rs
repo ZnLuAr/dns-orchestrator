@@ -62,21 +62,21 @@ impl DnsProvider for AliyunProvider {
     fn metadata() -> ProviderMetadata {
         ProviderMetadata {
             id: ProviderType::Aliyun,
-            name: "阿里云 DNS".to_string(),
-            description: "阿里云域名解析服务".to_string(),
+            name: "Aliyun DNS".to_string(),
+            description: "Alibaba Cloud DNS resolution service".to_string(),
             required_fields: vec![
                 ProviderCredentialField {
                     key: "accessKeyId".to_string(),
                     label: "AccessKey ID".to_string(),
                     field_type: FieldType::Text,
-                    placeholder: Some("输入 AccessKey ID".to_string()),
+                    placeholder: Some("Enter AccessKey ID".to_string()),
                     help_text: None,
                 },
                 ProviderCredentialField {
                     key: "accessKeySecret".to_string(),
                     label: "AccessKey Secret".to_string(),
                     field_type: FieldType::Password,
-                    placeholder: Some("输入 AccessKey Secret".to_string()),
+                    placeholder: Some("Enter AccessKey Secret".to_string()),
                     help_text: None,
                 },
             ],
@@ -109,7 +109,7 @@ impl DnsProvider for AliyunProvider {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
             Err(e) => {
-                log::warn!("凭证验证失败: {e}");
+                log::warn!("Credential validation failed: {e}");
                 Ok(false)
             }
         }

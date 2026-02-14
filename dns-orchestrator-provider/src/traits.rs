@@ -72,65 +72,90 @@ pub(crate) trait ProviderErrorMapper {
     }
 }
 
-/// DNS 提供商 Trait
+/// The core DNS provider trait.
+///
+/// All DNS providers implement this trait, providing a uniform interface for
+/// managing DNS records across different cloud platforms.
+///
+/// # Usage
+///
+/// You typically obtain a `dyn DnsProvider` via [`create_provider()`](crate::create_provider)
+/// rather than constructing provider instances directly.
+///
+/// # Batch Operations
+///
+/// The batch methods ([`batch_create_records`](Self::batch_create_records),
+/// [`batch_update_records`](Self::batch_update_records),
+/// [`batch_delete_records`](Self::batch_delete_records)) have default
+/// implementations that call the single-record methods concurrently.
+/// Providers may override these with native batch APIs for better performance.
 #[async_trait]
 pub trait DnsProvider: Send + Sync {
-    /// 提供商标识符
+    /// Returns the provider's unique identifier string (e.g., `"cloudflare"`, `"aliyun"`).
     fn id(&self) -> &'static str;
 
-    /// 获取 Provider 元数据（类型级别）
+    /// Returns static metadata about this provider type.
     ///
-    /// 返回该 Provider 的元数据，包括名称、描述、凭证字段等。
-    /// 此方法不需要实例，可以在创建 Provider 之前调用。
+    /// Includes the provider name, description, required credential fields,
+    /// supported features, and API limits.
     fn metadata() -> ProviderMetadata
     where
         Self: Sized;
 
-    /// 验证凭证是否有效
+    /// Validates the stored credentials by making a lightweight API call.
+    ///
+    /// Returns `Ok(true)` if the credentials are valid, or a [`ProviderError`]
+    /// (typically [`InvalidCredentials`](ProviderError::InvalidCredentials)) on failure.
     async fn validate_credentials(&self) -> Result<bool>;
 
-    /// 获取域名列表 (分页)
+    /// Lists domains (zones) managed by this provider.
+    ///
+    /// Results are paginated according to `params`.
     async fn list_domains(
         &self,
         params: &PaginationParams,
     ) -> Result<PaginatedResponse<ProviderDomain>>;
 
-    /// 获取域名详情
+    /// Retrieves details for a single domain by its provider-specific ID.
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain>;
 
-    /// 获取 DNS 记录列表 (分页 + 搜索)
+    /// Lists DNS records within a domain, with optional search and type filtering.
     async fn list_records(
         &self,
         domain_id: &str,
         params: &RecordQueryParams,
     ) -> Result<PaginatedResponse<DnsRecord>>;
 
-    /// 创建 DNS 记录
+    /// Creates a new DNS record.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::RecordExists`] if a conflicting record already exists.
     async fn create_record(&self, req: &CreateDnsRecordRequest) -> Result<DnsRecord>;
 
-    /// 更新 DNS 记录
+    /// Updates an existing DNS record.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::RecordNotFound`] if the record does not exist.
     async fn update_record(
         &self,
         record_id: &str,
         req: &UpdateDnsRecordRequest,
     ) -> Result<DnsRecord>;
 
-    /// 删除 DNS 记录
+    /// Deletes a DNS record.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::RecordNotFound`] if the record does not exist.
     async fn delete_record(&self, record_id: &str, domain_id: &str) -> Result<()>;
 
-    /// 批量创建 DNS 记录
+    /// Creates multiple DNS records in a single logical operation.
     ///
-    /// 默认实现逐条调用 `create_record()`，收集成功/失败结果。
-    /// Provider 可覆写以使用原生批量 API 提升性能。
-    ///
-    /// # TODO — 各 Provider 原生批量 API 覆写
-    /// - [ ] Cloudflare: `POST /zones/{zone_id}/dns_records/batch`
-    ///       <https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/batch/>
-    /// - [ ] `DNSPod`: `CreateRecordBatch`（异步任务）
-    ///       <https://cloud.tencent.com/document/product/1427/56194>
-    /// - [ ] Aliyun: 批量操作 API
-    ///       <https://help.aliyun.com/zh/dns/pubz-batch-operation/>
-    /// - [ ] Huaweicloud: 待调研
+    /// The default implementation calls [`create_record()`](Self::create_record)
+    /// concurrently for each request and collects successes/failures.
+    /// Providers may override this with a native batch API for better performance.
     async fn batch_create_records(
         &self,
         requests: &[CreateDnsRecordRequest],
@@ -160,18 +185,11 @@ pub trait DnsProvider: Send + Sync {
         })
     }
 
-    /// 批量更新 DNS 记录
+    /// Updates multiple DNS records in a single logical operation.
     ///
-    /// 默认实现逐条调用 `update_record()`，收集成功/失败结果。
-    /// Provider 可覆写以使用原生批量 API 提升性能。
-    ///
-    /// # TODO — 各 Provider 原生批量 API 覆写
-    /// - [ ] Cloudflare: 批量 API
-    /// - [ ] `DNSPod`: `ModifyRecordBatch`
-    ///       <https://cloud.tencent.com/document/product/1427/56198>
-    /// - [ ] Huaweicloud: `BatchUpdateRecordSetWithLine`
-    ///       <https://support.huaweicloud.com/api-dns/BatchUpdateRecordSetWithLine.html>
-    /// - [ ] Aliyun: 调研批量 API 支持
+    /// The default implementation calls [`update_record()`](Self::update_record)
+    /// concurrently for each item and collects successes/failures.
+    /// Providers may override this with a native batch API for better performance.
     async fn batch_update_records(&self, updates: &[BatchUpdateItem]) -> Result<BatchUpdateResult> {
         let futures: Vec<_> = updates
             .iter()
@@ -200,16 +218,11 @@ pub trait DnsProvider: Send + Sync {
         })
     }
 
-    /// 批量删除 DNS 记录
+    /// Deletes multiple DNS records in a single logical operation.
     ///
-    /// 默认实现逐条调用 `delete_record()`，收集成功/失败结果。
-    /// Provider 可覆写以使用原生批量 API 提升性能。
-    ///
-    /// # TODO — 各 Provider 原生批量 API 覆写
-    /// - [ ] Cloudflare: 批量 API
-    /// - [ ] `DNSPod`: 批量删除 API
-    /// - [ ] Aliyun: 调研批量 API 支持
-    /// - [ ] Huaweicloud: 调研批量 API 支持
+    /// The default implementation calls [`delete_record()`](Self::delete_record)
+    /// concurrently for each ID and collects successes/failures.
+    /// Providers may override this with a native batch API for better performance.
     async fn batch_delete_records(
         &self,
         domain_id: &str,

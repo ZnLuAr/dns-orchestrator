@@ -58,7 +58,7 @@ impl DnspodProvider {
 
         // 5. 处理错误
         if let Some(error) = tc_response.response.error {
-            log::error!("API 错误: {} - {}", error.code, error.message);
+            log::error!("API error: {} - {}", error.code, error.message);
             return Err(self.map_error(RawApiError::with_code(&error.code, &error.message), ctx));
         }
 
@@ -66,6 +66,6 @@ impl DnspodProvider {
         tc_response
             .response
             .data
-            .ok_or_else(|| self.parse_error("响应中缺少数据"))
+            .ok_or_else(|| self.parse_error("Missing data in response"))
     }
 }

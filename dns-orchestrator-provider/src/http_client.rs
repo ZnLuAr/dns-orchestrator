@@ -63,7 +63,7 @@ impl HttpUtils {
             .await
             .map_err(|e| ProviderError::NetworkError {
                 provider: provider_name.to_string(),
-                detail: format!("读取响应失败: {e}"),
+                detail: format!("Failed to read response body: {e}"),
             })?;
 
         log::debug!("[{provider_name}] Response Body: {response_text}");
@@ -88,8 +88,8 @@ impl HttpUtils {
         T: DeserializeOwned,
     {
         serde_json::from_str(response_text).map_err(|e| {
-            log::error!("[{provider_name}] JSON 解析失败: {e}");
-            log::error!("[{provider_name}] 原始响应: {response_text}");
+            log::error!("[{provider_name}] JSON parse failed: {e}");
+            log::error!("[{provider_name}] Raw response: {response_text}");
             ProviderError::ParseError {
                 provider: provider_name.to_string(),
                 detail: e.to_string(),
@@ -140,7 +140,7 @@ impl HttpUtils {
             // 克隆请求（RequestBuilder 只能使用一次）
             let Some(req) = request_builder.try_clone() else {
                 // 无法克隆（通常是 body stream 导致），回退到不重试
-                log::warn!("[{provider_name}] 无法克隆请求，禁用重试");
+                log::warn!("[{provider_name}] Cannot clone request, disabling retry");
                 return Self::execute_request(
                     request_builder,
                     provider_name,
@@ -155,7 +155,7 @@ impl HttpUtils {
                 Err(e) if attempt < max_retries && is_retryable(&e) => {
                     let delay = backoff_delay(attempt);
                     log::warn!(
-                        "[{}] 请求失败（尝试 {}/{}），{:.1}秒后重试: {}",
+                        "[{}] Request failed (attempt {}/{}), retrying in {:.1}s: {}",
                         provider_name,
                         attempt + 1,
                         max_retries,
@@ -171,7 +171,7 @@ impl HttpUtils {
 
         Err(last_error.unwrap_or_else(|| ProviderError::NetworkError {
             provider: provider_name.to_string(),
-            detail: "所有重试均失败，但未捕获到错误".to_string(),
+            detail: "All retries exhausted with no error captured".to_string(),
         }))
     }
 }
