@@ -1,9 +1,10 @@
-//! 华为云 DNS API 类型定义
+//! Huawei Cloud DNS API type definition
 
 use serde::Deserialize;
 
-// ============ 华为云 API 响应结构 ============
+// ============ Huawei Cloud API response structure ============
 
+/// Response payload for `ListPublicZones`.
 #[derive(Debug, Deserialize)]
 pub struct ListZonesResponse {
     pub zones: Option<Vec<HuaweicloudZone>>,
@@ -11,11 +12,13 @@ pub struct ListZonesResponse {
     pub metadata: Option<ListMetadata>,
 }
 
+/// Pagination metadata for list APIs.
 #[derive(Debug, Deserialize)]
 pub struct ListMetadata {
     pub total_count: Option<u32>,
 }
 
+/// Public zone item returned by Huawei Cloud DNS APIs.
 #[derive(Debug, Deserialize)]
 pub struct HuaweicloudZone {
     pub id: String,
@@ -24,9 +27,12 @@ pub struct HuaweicloudZone {
     pub record_num: Option<u32>,
 }
 
-/// ShowPublicZone API 响应结构，需验证是否直接返回 zone 对象
+/// Response payload for `ShowPublicZone`.
+///
+/// The API returns the zone object directly, so this is an alias.
 pub type ShowPublicZoneResponse = HuaweicloudZone;
 
+/// Response payload for `ListRecordSetsByZone`.
 #[derive(Debug, Deserialize)]
 pub struct ListRecordSetsResponse {
     pub recordsets: Option<Vec<HuaweicloudRecordSet>>,
@@ -34,6 +40,7 @@ pub struct ListRecordSetsResponse {
     pub metadata: Option<ListMetadata>,
 }
 
+/// Record set item returned by Huawei Cloud DNS APIs.
 #[derive(Debug, Deserialize)]
 pub struct HuaweicloudRecordSet {
     pub id: String,
@@ -42,28 +49,19 @@ pub struct HuaweicloudRecordSet {
     pub record_type: String,
     pub records: Option<Vec<String>>,
     pub ttl: Option<u32>,
-    #[allow(dead_code)]
-    pub status: Option<String>,
     #[serde(rename = "created_at")]
     pub created_at: Option<String>,
     #[serde(rename = "updated_at")]
     pub updated_at: Option<String>,
 }
 
+/// Response payload for `CreateRecordSet`.
 #[derive(Debug, Deserialize)]
 pub struct CreateRecordSetResponse {
     pub id: String,
-    #[allow(dead_code)]
-    pub name: String,
-    #[serde(rename = "type")]
-    #[allow(dead_code)]
-    pub record_type: String,
-    #[allow(dead_code)]
-    pub records: Option<Vec<String>>,
-    #[allow(dead_code)]
-    pub ttl: Option<u32>,
 }
 
+/// Error payload returned by Huawei Cloud DNS APIs.
 #[derive(Debug, Deserialize)]
 pub struct ErrorResponse {
     pub code: Option<String>,

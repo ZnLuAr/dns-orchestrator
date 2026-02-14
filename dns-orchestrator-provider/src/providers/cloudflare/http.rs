@@ -1,4 +1,4 @@
-//! Cloudflare HTTP 请求方法（重构版：消除代码重复）
+//! Cloudflare HTTP request methods (refactored: eliminate code duplication)
 
 use serde::{Deserialize, Serialize};
 
@@ -6,15 +6,38 @@ use crate::error::Result;
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 use crate::types::PaginationParams;
+use crate::utils::log_sanitizer::truncate_for_log;
 
 use super::{
     CF_API_BASE, CloudflareDnsRecord, CloudflareProvider, CloudflareResponse, MAX_PAGE_SIZE_ZONES,
 };
 
 impl CloudflareProvider {
-    // ==================== 辅助方法 ====================
+    // ==================== Helper methods ====================
 
-    /// 统一处理 Cloudflare API 响应
+    /// Checks the error field in the Cloudflare response and returns the mapped error on failure
+    fn check_cf_errors<T>(
+        &self,
+        cf_response: &CloudflareResponse<T>,
+        ctx: ErrorContext,
+    ) -> Result<()> {
+        if !cf_response.success {
+            let (code, message) = cf_response
+                .errors
+                .as_ref()
+                .and_then(|errors| {
+                    errors
+                        .first()
+                        .map(|e| (e.code.to_string(), e.message.clone()))
+                })
+                .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
+            log::error!("API error: {message}");
+            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
+        }
+        Ok(())
+    }
+
+    /// Unified handling of Cloudflare API responses
     fn handle_cf_response<T: for<'de> Deserialize<'de>>(
         &self,
         response_text: &str,
@@ -23,25 +46,14 @@ impl CloudflareProvider {
         let cf_response: CloudflareResponse<T> =
             HttpUtils::parse_json(response_text, self.provider_name())?;
 
-        if !cf_response.success {
-            let (code, message) = cf_response
-                .errors
-                .and_then(|errors| {
-                    errors
-                        .first()
-                        .map(|e| (e.code.to_string(), e.message.clone()))
-                })
-                .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
-            log::error!("API 错误: {message}");
-            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
-        }
+        self.check_cf_errors(&cf_response, ctx)?;
 
         cf_response
             .result
-            .ok_or_else(|| self.parse_error("响应中缺少 result 字段"))
+            .ok_or_else(|| self.parse_error("Missing 'result' field in response"))
     }
 
-    /// 统一处理 Cloudflare API 响应（带分页信息）
+    /// Unified handling of Cloudflare API responses (with pagination information)
     fn handle_cf_response_paginated<T: for<'de> Deserialize<'de>>(
         &self,
         response_text: &str,
@@ -50,18 +62,7 @@ impl CloudflareProvider {
         let cf_response: CloudflareResponse<Vec<T>> =
             HttpUtils::parse_json(response_text, self.provider_name())?;
 
-        if !cf_response.success {
-            let (code, message) = cf_response
-                .errors
-                .and_then(|errors| {
-                    errors
-                        .first()
-                        .map(|e| (e.code.to_string(), e.message.clone()))
-                })
-                .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
-            log::error!("API 错误: {message}");
-            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
-        }
+        self.check_cf_errors(&cf_response, ctx)?;
 
         let total_count = cf_response.result_info.map_or(0, |i| i.total_count);
         let items = cf_response.result.unwrap_or_default();
@@ -69,7 +70,7 @@ impl CloudflareProvider {
         Ok((items, total_count))
     }
 
-    /// 执行带 body 的请求（POST/PATCH）
+    /// Execute request with body (POST/PATCH)
     async fn request_with_body<T, B>(
         &self,
         method: reqwest::Method,
@@ -85,8 +86,8 @@ impl CloudflareProvider {
 
         if log::log_enabled!(log::Level::Debug) {
             let body_json = serde_json::to_string_pretty(body)
-                .unwrap_or_else(|_| "无法序列化请求体".to_string());
-            log::debug!("Request Body: {body_json}");
+                .unwrap_or_else(|_| "Failed to serialize request body".to_string());
+            log::debug!("Request Body: {}", truncate_for_log(&body_json));
         }
 
         let request = self
@@ -107,9 +108,9 @@ impl CloudflareProvider {
         self.handle_cf_response(&response_text, ctx)
     }
 
-    // ==================== 公开 API 方法 ====================
+    // ==================== Public API methods ====================
 
-    /// 执行 GET 请求
+    /// Perform a GET request
     pub(crate) async fn get<T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
@@ -134,7 +135,7 @@ impl CloudflareProvider {
         self.handle_cf_response(&response_text, ctx)
     }
 
-    /// 执行 GET 请求 (带分页)
+    /// Perform a GET request (with pagination)
     pub(crate) async fn get_paginated<T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
@@ -166,7 +167,7 @@ impl CloudflareProvider {
         self.handle_cf_response_paginated(&response_text, ctx)
     }
 
-    /// 执行 GET 请求 (带自定义 URL，用于 list_records)
+    /// Perform a GET request (with custom URL for `list_records`)
     pub(crate) async fn get_records(
         &self,
         url: &str,
@@ -191,7 +192,7 @@ impl CloudflareProvider {
         self.handle_cf_response_paginated(&response_text, ctx)
     }
 
-    /// 执行 POST 请求（直接使用 JSON Value）
+    /// Perform POST request (using JSON Value directly)
     pub(crate) async fn post_json<T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
@@ -202,7 +203,7 @@ impl CloudflareProvider {
             .await
     }
 
-    /// 执行 PATCH 请求（直接使用 JSON Value）
+    /// Perform PATCH request (using JSON Value directly)
     pub(crate) async fn patch_json<T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
@@ -213,7 +214,7 @@ impl CloudflareProvider {
             .await
     }
 
-    /// 执行 DELETE 请求
+    /// Perform DELETE request
     pub(crate) async fn delete(&self, path: &str, ctx: ErrorContext) -> Result<()> {
         let url = format!("{CF_API_BASE}{path}");
 
@@ -231,22 +232,11 @@ impl CloudflareProvider {
         )
         .await?;
 
-        // DELETE 响应只需检查是否成功，不需要返回数据
+        // The DELETE response only needs to check whether it is successful and does not need to return data.
         let cf_response: CloudflareResponse<serde_json::Value> =
             HttpUtils::parse_json(&response_text, self.provider_name())?;
 
-        if !cf_response.success {
-            let (code, message) = cf_response
-                .errors
-                .and_then(|errors| {
-                    errors
-                        .first()
-                        .map(|e| (e.code.to_string(), e.message.clone()))
-                })
-                .unwrap_or_else(|| (String::new(), "Unknown error".to_string()));
-            log::error!("API 错误: {message}");
-            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
-        }
+        self.check_cf_errors(&cf_response, ctx)?;
 
         Ok(())
     }

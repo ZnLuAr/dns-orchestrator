@@ -1,9 +1,9 @@
-//! Cloudflare API 类型定义
+//! Cloudflare API type definitions
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Cloudflare API 通用响应
+/// Cloudflare API generic response
 #[derive(Debug, Deserialize)]
 pub struct CloudflareResponse<T> {
     pub success: bool,
@@ -12,23 +12,20 @@ pub struct CloudflareResponse<T> {
     pub result_info: Option<CloudflareResultInfo>,
 }
 
+/// Error entry returned in `errors` by Cloudflare APIs.
 #[derive(Debug, Deserialize)]
 pub struct CloudflareError {
-    #[allow(dead_code)]
     pub code: i32,
     pub message: String,
 }
 
+/// Pagination metadata from Cloudflare list endpoints.
 #[derive(Debug, Deserialize)]
 pub struct CloudflareResultInfo {
-    #[allow(dead_code)]
-    pub page: u32,
-    #[allow(dead_code)]
-    pub per_page: u32,
     pub total_count: u32,
 }
 
-/// Cloudflare Zone 结构
+/// Cloudflare Zone structure
 #[derive(Debug, Deserialize)]
 pub struct CloudflareZone {
     pub id: String,
@@ -36,7 +33,7 @@ pub struct CloudflareZone {
     pub status: String,
 }
 
-/// Cloudflare DNS Record 结构（响应）
+/// Cloudflare DNS Record structure (response)
 #[derive(Debug, Deserialize)]
 pub struct CloudflareDnsRecord {
     pub id: String,
@@ -53,19 +50,19 @@ pub struct CloudflareDnsRecord {
     pub created_on: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modified_on: Option<String>,
-    /// SRV/CAA 等复杂记录类型的结构化数据
+    /// Structured data of complex record types such as SRV/CAA
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
 }
 
-/// SRV 记录的 data 字段
+/// The data field of the SRV record
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CloudflareSrvData {
     pub priority: u16,
     pub weight: u16,
     pub port: u16,
     pub target: String,
-    /// SRV 记录的服务名和协议（可选，API 可能返回）
+    /// Service name and protocol of SRV record (optional, API may return)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,7 +71,7 @@ pub struct CloudflareSrvData {
     pub name: Option<String>,
 }
 
-/// CAA 记录的 data 字段
+/// The data field of the CAA record
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CloudflareCaaData {
     pub flags: u8,

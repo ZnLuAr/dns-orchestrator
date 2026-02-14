@@ -1,41 +1,41 @@
-//! 账户导入导出服务
+//! Account import and export service
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use dns_orchestrator_provider::{create_provider, ProviderCredentials};
+use dns_orchestrator_provider::ProviderCredentials;
 
 use crate::crypto;
 use crate::error::{CoreError, CoreResult};
-use crate::services::ServiceContext;
+use crate::services::account_service::AccountService;
 use crate::types::{
-    Account, AccountStatus, ExportAccountsRequest, ExportAccountsResponse, ExportFile,
-    ExportFileHeader, ExportedAccount, ImportAccountsRequest, ImportFailure, ImportPreview,
-    ImportPreviewAccount, ImportResult,
+    Account, ExportAccountsRequest, ExportAccountsResponse, ExportFile, ExportFileHeader,
+    ExportedAccount, ImportAccountsRequest, ImportFailure, ImportPreview, ImportPreviewAccount,
+    ImportResult,
 };
 
-/// 账户导入导出服务
+/// Account import and export service
 pub struct ImportExportService {
-    ctx: Arc<ServiceContext>,
+    account_service: Arc<AccountService>,
 }
 
 impl ImportExportService {
-    /// 创建导入导出服务实例
+    /// Create an import and export service instance
     #[must_use]
-    pub fn new(ctx: Arc<ServiceContext>) -> Self {
-        Self { ctx }
+    pub fn new(account_service: Arc<AccountService>) -> Self {
+        Self { account_service }
     }
 
-    /// 解析并解密导出文件，返回账户列表
+    /// Parse and decrypt the exported file and return the account list
     fn parse_and_decrypt_accounts(
         content: &str,
         password: Option<&str>,
     ) -> CoreResult<(ExportFile, Option<Vec<ExportedAccount>>)> {
-        // 1. 解析文件
+        // 1. Parse the file
         let export_file: ExportFile = serde_json::from_str(content)
             .map_err(|e| CoreError::ImportExportError(format!("无效的导入文件: {e}")))?;
 
-        // 2. 检查文件格式版本并获取加密参数
+        // 2. Check the file format version and obtain encryption parameters
         let kdf_iterations = if export_file.header.encrypted {
             crypto::get_pbkdf2_iterations(export_file.header.version).ok_or_else(|| {
                 CoreError::ImportExportError(format!(
@@ -44,15 +44,15 @@ impl ImportExportService {
                 ))
             })?
         } else {
-            0 // 未加密文件不需要迭代次数
+            0 // No iterations required for unencrypted files
         };
 
-        // 3. 如果加密但未提供密码，返回 None 表示需要密码
+        // 3. If encrypted but no password is provided, return None indicating that a password is required.
         if export_file.header.encrypted && password.is_none() {
             return Ok((export_file, None));
         }
 
-        // 4. 解密或直接解析账号数据
+        // 4. Decrypt or directly parse account data
         let accounts: Vec<ExportedAccount> = if export_file.header.encrypted {
             let password = password
                 .ok_or_else(|| CoreError::ImportExportError("加密文件需要提供密码".to_string()))?;
@@ -78,7 +78,7 @@ impl ImportExportService {
                 .as_ref()
                 .ok_or_else(|| CoreError::ImportExportError("缺少加密 nonce".to_string()))?;
 
-            // 使用版本对应的迭代次数解密
+            // Decrypt using the number of iterations corresponding to the version
             let plaintext =
                 crypto::decrypt_with_iterations(ciphertext, password, salt, nonce, kdf_iterations)
                     .map_err(|_| {
@@ -95,18 +95,18 @@ impl ImportExportService {
         Ok((export_file, Some(accounts)))
     }
 
-    /// 导出账户
+    /// Export account
     ///
     /// # Arguments
-    /// * `request` - 导出请求（包含账户 ID 列表和加密选项）
-    /// * `app_version` - 应用版本号
+    /// * `request` - export request (contains list of account IDs and encryption options)
+    /// * `app_version` - application version number
     pub async fn export_accounts(
         &self,
         request: ExportAccountsRequest,
         app_version: &str,
     ) -> CoreResult<ExportAccountsResponse> {
-        // 1. 获取选中账号的元数据
-        let all_accounts = self.ctx.account_repository.find_all().await?;
+        // 1. Get the metadata of the selected account
+        let all_accounts = self.account_service.list_accounts().await?;
         let selected_accounts: Vec<&Account> = all_accounts
             .iter()
             .filter(|a| request.account_ids.contains(&a.id))
@@ -116,22 +116,22 @@ impl ImportExportService {
             return Err(CoreError::NoAccountsSelected);
         }
 
-        // 2. 加载凭证并构建导出数据
+        // 2. Load credentials and build export data
         let mut exported_accounts = Vec::new();
         for account in selected_accounts {
-            let credentials =
-                if let Some(creds) = self.ctx.credential_store.get(&account.id).await? {
-                    creds
-                } else {
-                    log::warn!("No credentials found for account: {}", account.id);
-                    continue;
-                };
+            let Ok(credentials) = self.account_service.load_credentials(&account.id).await else {
+                log::warn!(
+                    "Failed to load credentials for account {}, skipping export",
+                    account.id
+                );
+                continue;
+            };
 
-            // 转换 ProviderCredentials 为 HashMap
+            // Convert ProviderCredentials to HashMap
             let credentials_map = credentials.to_map();
 
             exported_accounts.push(ExportedAccount {
-                id: uuid::Uuid::new_v4().to_string(), // 生成新 ID，避免导入时冲突
+                id: uuid::Uuid::new_v4().to_string(), // Generate new IDs to avoid conflicts when importing
                 name: account.name.clone(),
                 provider: account.provider.clone(),
                 created_at: account.created_at,
@@ -140,11 +140,11 @@ impl ImportExportService {
             });
         }
 
-        // 3. 序列化账号数据
+        // 3. Serialize account data
         let accounts_json = serde_json::to_value(&exported_accounts)
             .map_err(|e| CoreError::SerializationError(e.to_string()))?;
 
-        // 4. 构建导出文件
+        // 4. Build the export file
         let now = chrono::Utc::now();
 
         let export_file = if request.encrypt {
@@ -184,7 +184,7 @@ impl ImportExportService {
             }
         };
 
-        // 5. 生成文件内容
+        // 5. Generate file content
         let content = serde_json::to_string_pretty(&export_file)
             .map_err(|e| CoreError::SerializationError(e.to_string()))?;
 
@@ -199,16 +199,16 @@ impl ImportExportService {
         })
     }
 
-    /// 预览导入文件
+    /// Preview imported files
     pub async fn preview_import(
         &self,
         content: &str,
         password: Option<&str>,
     ) -> CoreResult<ImportPreview> {
-        // 1. 解析并解密
+        // 1. Parse and decrypt
         let (export_file, accounts_opt) = Self::parse_and_decrypt_accounts(content, password)?;
 
-        // 2. 如果需要密码但未提供，返回提示
+        // 2. If a password is required but not provided, return the prompt
         let Some(accounts) = accounts_opt else {
             return Ok(ImportPreview {
                 encrypted: true,
@@ -217,8 +217,8 @@ impl ImportExportService {
             });
         };
 
-        // 3. 检查与现有账号的冲突
-        let existing_accounts = self.ctx.account_repository.find_all().await?;
+        // 3. Check for conflicts with existing accounts
+        let existing_accounts = self.account_service.list_accounts().await?;
         let existing_names: HashSet<_> =
             existing_accounts.iter().map(|a| a.name.as_str()).collect();
 
@@ -238,25 +238,23 @@ impl ImportExportService {
         })
     }
 
-    /// 执行导入
+    /// Execute import
     pub async fn import_accounts(
         &self,
         request: ImportAccountsRequest,
     ) -> CoreResult<ImportResult> {
-        // 1. 解析和解密
+        // 1. Parse and decrypt
         let (_, accounts_opt) =
             Self::parse_and_decrypt_accounts(&request.content, request.password.as_deref())?;
 
         let accounts = accounts_opt
             .ok_or_else(|| CoreError::ImportExportError("加密文件需要提供密码".to_string()))?;
 
-        // 2. 逐个导入账号
+        // 2. Import accounts one by one
         let mut success_count = 0;
         let mut failures = Vec::new();
-        let now = chrono::Utc::now();
 
         for exported in accounts {
-            // 2.1 转换凭证并创建 provider 实例
             let credentials =
                 match ProviderCredentials::from_map(&exported.provider, &exported.credentials) {
                     Ok(c) => c,
@@ -268,65 +266,18 @@ impl ImportExportService {
                         continue;
                     }
                 };
-            let provider = match create_provider(credentials.clone()) {
-                Ok(p) => p,
-                Err(e) => {
-                    failures.push(ImportFailure {
-                        name: exported.name.clone(),
-                        reason: format!("创建 Provider 失败: {e}"),
-                    });
-                    continue;
-                }
-            };
 
-            // 2.2 生成新的账号 ID
-            let account_id = uuid::Uuid::new_v4().to_string();
-
-            // 2.3 保存凭证
-            if let Err(e) = self
-                .ctx
-                .credential_store
-                .set(&account_id, &credentials)
+            match self
+                .account_service
+                .create_account_from_import(exported.name.clone(), exported.provider, credentials)
                 .await
             {
-                failures.push(ImportFailure {
-                    name: exported.name.clone(),
-                    reason: format!("保存凭证失败: {e}"),
-                });
-                continue;
-            }
-
-            // 2.4 注册 provider
-            self.ctx
-                .provider_registry
-                .register(account_id.clone(), provider)
-                .await;
-
-            // 2.5 创建账号元数据
-            let account = Account {
-                id: account_id.clone(),
-                name: exported.name.clone(),
-                provider: exported.provider,
-                created_at: now,
-                updated_at: now,
-                status: Some(AccountStatus::Active),
-                error: None,
-            };
-
-            // 2.6 保存到仓库，失败时 cleanup
-            if let Err(e) = self.ctx.account_repository.save(&account).await {
-                // Cleanup: 删除凭证和注销 provider
-                let _ = self.ctx.credential_store.remove(&account_id).await;
-                self.ctx.provider_registry.unregister(&account_id).await;
-
-                failures.push(ImportFailure {
+                Ok(_) => success_count += 1,
+                Err(e) => failures.push(ImportFailure {
                     name: exported.name,
-                    reason: format!("保存账户失败: {e}"),
-                });
-                continue;
+                    reason: e.to_string(),
+                }),
             }
-
-            success_count += 1;
         }
 
         Ok(ImportResult {

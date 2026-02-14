@@ -57,6 +57,7 @@ function HistoryChipsComponent({ type, onSelect, maxItems = 5 }: HistoryChipsPro
       {filteredHistory.map((item) => (
         <button
           key={item.id}
+          type="button"
           className="group inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs transition-colors hover:bg-muted/80"
           onClick={() => onSelect(item)}
         >
@@ -64,12 +65,13 @@ function HistoryChipsComponent({ type, onSelect, maxItems = 5 }: HistoryChipsPro
             <span className="font-medium text-primary">{item.recordType}</span>
           )}
           <span className="max-w-32 truncate">{item.query}</span>
-          <span
+          <button
+            type="button"
             className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
             onClick={(e) => handleRemove(item.id, e)}
           >
             <X className="h-3 w-3" />
-          </span>
+          </button>
         </button>
       ))}
       {history.filter((item) => item.type === type).length > maxItems && (

@@ -1,0 +1,59 @@
+[package]
+name = "dns-orchestrator-toolbox"
+version = "0.1.3"
+edition = "2024"
+license = "MIT"
+description = "Network diagnostic toolbox: WHOIS, DNS lookup, IP geolocation, SSL certificate check, HTTP headers, DNSSEC validation"
+authors = ["AptS-1547 <apts-1547@esaps.net>"]
+repository = "https://github.com/AptS-1547/dns-orchestrator"
+homepage = "https://github.com/AptS-1547/dns-orchestrator"
+readme = "README.md"
+keywords = ["dns", "whois", "ssl", "dnssec", "network"]
+categories = ["network-programming", "web-programming"]
+rust-version = "1.89"
+
+[dependencies]
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Async
+tokio = { workspace = true, features = ["sync", "time", "net"] }
+futures.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Logging
+log.workspace = true
+
+# HTTP
+reqwest = { workspace = true, features = ["rustls-tls"] }
+
+# WHOIS
+whois-rust = { version = "1.6", features = ["tokio"] }
+regex = "1"
+
+# DNS resolver
+hickory-resolver = { version = "0.25", features = ["dnssec-ring"] }
+
+# URL
+url = "2.5.8"
+idna = "1"
+
+# Time
+chrono.workspace = true
+
+# Crypto (DNSSEC)
+base64 = "0.22"
+hex.workspace = true
+
+# SSL/TLS inspection
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = "0.26"
+rustls-pki-types = "1"
+webpki-roots = "1"
+x509-parser = "0.18"
+
+[lints]
+workspace = true

@@ -1,4 +1,4 @@
-//! 域名相关类型定义
+//! Domain name related type definitions
 
 use serde::{Deserialize, Serialize};
 
@@ -6,30 +6,30 @@ use dns_orchestrator_provider::{DomainStatus, ProviderDomain, ProviderType};
 
 use super::domain_metadata::DomainMetadata;
 
-/// 应用层域名类型（包含 `account_id`）
+/// Application layer domain name type (including `account_id`)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppDomain {
-    /// 域名 ID
+    /// Domain ID
     pub id: String,
-    /// 域名名称
+    /// domain name
     pub name: String,
-    /// 所属账户 ID
+    /// Account ID
     #[serde(rename = "accountId")]
     pub account_id: String,
-    /// DNS 服务商类型
+    /// DNS provider type
     pub provider: ProviderType,
-    /// 域名状态
+    /// Domain name status
     pub status: DomainStatus,
-    /// DNS 记录数量
+    /// Number of DNS records
     #[serde(rename = "recordCount", skip_serializing_if = "Option::is_none")]
     pub record_count: Option<u32>,
-    /// 用户自定义元数据
+    /// User-defined metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<DomainMetadata>,
 }
 
 impl AppDomain {
-    /// 从 Provider 层的 Domain 构造应用层 Domain
+    /// Construct application layer Domain from Provider layer Domain
     #[must_use]
     pub fn from_provider(provider_domain: ProviderDomain, account_id: String) -> Self {
         Self {
@@ -41,12 +41,5 @@ impl AppDomain {
             record_count: provider_domain.record_count,
             metadata: None,
         }
-    }
-
-    /// 附加元数据（供 `DomainService` 使用）
-    #[must_use]
-    pub fn with_metadata(mut self, metadata: Option<DomainMetadata>) -> Self {
-        self.metadata = metadata;
-        self
     }
 }

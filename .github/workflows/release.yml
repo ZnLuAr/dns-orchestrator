@@ -109,7 +109,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -151,7 +151,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # Linux 构建
   release-linux:
@@ -185,7 +185,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -239,7 +239,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # MacOS 构建
   release-macos:
@@ -310,7 +310,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -361,7 +361,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # Android 构建
   release-android:
@@ -397,7 +397,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -441,12 +441,32 @@ jobs:
             echo "Renamed to: DNS.Orchestrator_${VERSION}_android.apk"
           fi
 
+      - name: Sign APK for updater
+        if: github.event_name == 'push'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          APK_DIR="src-tauri/gen/android/app/build/outputs/apk/universal/release"
+          APK_FILE="${APK_DIR}/DNS.Orchestrator_${VERSION}_android.apk"
+          if [ -f "$APK_FILE" ]; then
+            pnpm tauri signer sign --key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$APK_FILE"
+            echo "APK signed, signature:"
+            cat "${APK_FILE}.sig"
+          else
+            echo "Error: APK file not found for signing!"
+            exit 1
+          fi
+
       - name: Upload APK to Release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           files: |
             src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.sig
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -477,7 +497,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -588,14 +608,29 @@ jobs:
             APK_NAME=$(gh release view ${{ github.ref_name }} --repo ${{ github.repository }} --json assets -q '.assets[] | select(.name | endswith(".apk")) | .name' | head -1)
 
             if [ -n "$APK_NAME" ]; then
-              APK_SIGNATURE="none"
               APK_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${APK_NAME}"
+
+              # 下载签名文件
+              SIG_NAME="${APK_NAME}.sig"
+              gh release download ${{ github.ref_name }} \
+                --repo ${{ github.repository }} \
+                --pattern "$SIG_NAME" \
+                --dir . || true
+
+              if [ -f "$SIG_NAME" ]; then
+                APK_SIGNATURE=$(cat "$SIG_NAME")
+                echo "Using minisign signature from $SIG_NAME"
+              else
+                echo "Error: Signature file $SIG_NAME not found in release!"
+                echo "Android update will not be verifiable. Aborting."
+                exit 1
+              fi
 
               # 使用 jq 添加 Android 平台
               jq --arg sig "$APK_SIGNATURE" --arg url "$APK_URL" '.platforms.android = {"signature": $sig, "url": $url}' latest.json > latest.json.tmp
               mv latest.json.tmp latest.json
 
-              echo "Updated latest.json with Android URL: $APK_URL"
+              echo "Updated latest.json with Android URL and signature"
               cat latest.json
             else
               echo "No APK found in release, skipping..."

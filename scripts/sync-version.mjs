@@ -30,10 +30,10 @@ writeFileSync(cargoTomlPath, tauriCargoToml);
 console.log('✓ src-tauri/Cargo.toml');
 
 // 更新 Actix-web Cargo.toml
-const actixCargoTomlPath = resolve(root, 'src-actix-web/Cargo.toml');
+const actixCargoTomlPath = resolve(root, 'dns-orchestrator-web/Cargo.toml');
 let actixCargoToml = readFileSync(actixCargoTomlPath, 'utf-8');
 actixCargoToml = actixCargoToml.replace(/^version\s*=\s*"[^"]*"/m, `version = "${version}"`);
 writeFileSync(actixCargoTomlPath, actixCargoToml);
-console.log('✓ src-actix-web/Cargo.toml');
+console.log('✓ dns-orchestrator-web/Cargo.toml');
 
 console.log('版本同步完成');

@@ -1,0 +1,73 @@
+[package]
+name = "dns-orchestrator-tauri"
+version = "1.9.0"
+description = "DNS Orchestrator built with Tauri"
+license = "MIT"
+authors = [
+    "AptS-1547 <apts-1547@esaps.net>",
+    "YewFence <88962785+YewFence@users.noreply.github.com>",
+]
+edition = "2021"
+rust-version = "1.89"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "dns_orchestrator_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+serde_json.workspace = true
+base64 = "0.22"
+
+[dependencies]
+tauri.workspace = true
+tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
+tauri-plugin-store = "2"
+tauri-plugin-log = "2"
+tauri-plugin-process = "2"
+tauri-plugin-dialog = "2.6"
+tauri-plugin-fs = "2"
+urlencoding.workspace = true
+
+# Common deps (all platforms)
+dns-orchestrator-core = { workspace = true, features = ["rustls"] }
+dns-orchestrator-toolbox.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync", "rt-multi-thread"] }
+log.workspace = true
+futures.workspace = true
+
+# Desktop only
+[target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
+tauri-plugin-updater = "2"
+keyring = { version = "3", features = [
+    "apple-native",        # macOS/iOS
+    "windows-native",      # Windows
+    "sync-secret-service",
+    "crypto-rust",         # Linux/FreeBSD/OpenBSD (DBus Secret Service)
+] }
+
+[target."cfg(target_os = \"macos\")".dependencies]
+cocoa = "0.26"
+
+# Android
+[target."cfg(target_os = \"android\")".dependencies]
+tauri-plugin-stronghold = "2"
+tauri-plugin-apk-installer.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls", "stream"] }
+minisign-verify = "0.2"
+
+[lints]
+workspace = true

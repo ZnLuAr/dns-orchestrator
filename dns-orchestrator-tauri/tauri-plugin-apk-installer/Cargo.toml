@@ -1,0 +1,22 @@
+[package]
+name = "tauri-plugin-apk-installer"
+version = "0.1.0"
+edition = "2021"
+description = "A Tauri plugin for installing APK files on Android using FileProvider"
+license = "MIT"
+links = "tauri-plugin-apk-installer"
+repository = "https://github.com/AptS-1547/dns-orchestrator"
+homepage = "https://github.com/AptS-1547/dns-orchestrator"
+keywords = ["tauri", "android", "apk", "plugin"]
+categories = ["os"]
+rust-version = "1.89"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+log.workspace = true

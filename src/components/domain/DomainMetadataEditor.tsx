@@ -137,6 +137,8 @@ export function DomainMetadataEditor({
   }
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: wrapper div to stop event propagation
+    // biome-ignore lint/a11y/useKeyWithClickEvents: wrapper div to stop event propagation
     <div onClick={(e) => e.stopPropagation()}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>

@@ -1,32 +1,26 @@
-//! 业务逻辑服务层
+//! Business logic service layer
 
-mod account_bootstrap_service;
-mod account_lifecycle_service;
-mod account_metadata_service;
-mod credential_management_service;
+mod account_service;
 mod dns_service;
 mod domain_metadata_service;
 mod domain_service;
 mod import_export_service;
 mod migration_service;
 mod provider_metadata_service;
-mod toolbox;
 
-pub use account_bootstrap_service::{AccountBootstrapService, RestoreResult};
-pub use account_lifecycle_service::AccountLifecycleService;
-pub use account_metadata_service::AccountMetadataService;
-pub use credential_management_service::CredentialManagementService;
+pub use account_service::{AccountService, RestoreResult};
 pub use dns_service::DnsService;
 pub use domain_metadata_service::DomainMetadataService;
 pub use domain_service::DomainService;
 pub use import_export_service::ImportExportService;
 pub use migration_service::{MigrationResult, MigrationService};
 pub use provider_metadata_service::ProviderMetadataService;
-pub use toolbox::ToolboxService;
 
 use std::sync::Arc;
 
 use dns_orchestrator_provider::DnsProvider;
+
+use dns_orchestrator_provider::ProviderError;
 
 use crate::error::{CoreError, CoreResult};
 use crate::traits::{
@@ -34,22 +28,19 @@ use crate::traits::{
 };
 use crate::types::AccountStatus;
 
-/// 服务上下文 - 持有所有依赖
+/// Service context - holds all dependencies
 ///
-/// 平台层需要创建此上下文，并注入平台特定的存储实现。
+/// The platform layer needs to create this context and inject the platform-specific storage implementation.
+/// Fields are accessed through getter methods, ensuring that external crates cannot bypass the service layer and directly manipulate the storage.
 pub struct ServiceContext {
-    /// 凭证存储
-    pub credential_store: Arc<dyn CredentialStore>,
-    /// 账户持久化仓库
-    pub account_repository: Arc<dyn AccountRepository>,
-    /// Provider 注册表
-    pub provider_registry: Arc<dyn ProviderRegistry>,
-    /// 域名元数据仓库
-    pub domain_metadata_repository: Arc<dyn DomainMetadataRepository>,
+    pub(crate) credential_store: Arc<dyn CredentialStore>,
+    pub(crate) account_repository: Arc<dyn AccountRepository>,
+    pub(crate) provider_registry: Arc<dyn ProviderRegistry>,
+    pub(crate) domain_metadata_repository: Arc<dyn DomainMetadataRepository>,
 }
 
 impl ServiceContext {
-    /// 创建服务上下文
+    /// Create service context
     #[must_use]
     pub fn new(
         credential_store: Arc<dyn CredentialStore>,
@@ -65,7 +56,27 @@ impl ServiceContext {
         }
     }
 
-    /// 获取 Provider 实例
+    /// Get a reference to the credential store
+    pub fn credential_store(&self) -> &Arc<dyn CredentialStore> {
+        &self.credential_store
+    }
+
+    /// Get a reference to the account repository
+    pub fn account_repository(&self) -> &Arc<dyn AccountRepository> {
+        &self.account_repository
+    }
+
+    /// Get a reference to the Provider registry
+    pub fn provider_registry(&self) -> &Arc<dyn ProviderRegistry> {
+        &self.provider_registry
+    }
+
+    /// Get a reference to the domain name metadata repository
+    pub fn domain_metadata_repository(&self) -> &Arc<dyn DomainMetadataRepository> {
+        &self.domain_metadata_repository
+    }
+
+    /// Get Provider instance
     pub async fn get_provider(&self, account_id: &str) -> CoreResult<Arc<dyn DnsProvider>> {
         self.provider_registry
             .get(account_id)
@@ -73,9 +84,9 @@ impl ServiceContext {
             .ok_or_else(|| CoreError::AccountNotFound(account_id.to_string()))
     }
 
-    /// 标记账户为无效状态
+    /// Mark account as inactive
     ///
-    /// 当检测到凭证失效时调用此方法更新账户状态。
+    /// This method is called to update the account status when an invalid credential is detected.
     pub async fn mark_account_invalid(&self, account_id: &str, error_msg: &str) {
         if let Err(e) = self
             .account_repository
@@ -90,5 +101,13 @@ impl ServiceContext {
             return;
         }
         log::warn!("Account {account_id} marked as invalid: {error_msg}");
+    }
+
+    /// Handle Provider errors and update account status if the credentials are invalid.
+    pub async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
+        if let ProviderError::InvalidCredentials { .. } = &err {
+            self.mark_account_invalid(account_id, "凭证已失效").await;
+        }
+        CoreError::Provider(err)
     }
 }

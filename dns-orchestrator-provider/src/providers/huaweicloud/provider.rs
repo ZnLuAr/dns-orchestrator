@@ -1,11 +1,14 @@
-//! 华为云 DnsProvider trait 实现
+//! Huawei Cloud `DnsProvider` trait implementation
+
+use std::fmt::Write;
 
 use async_trait::async_trait;
 use serde::Serialize;
 
 use crate::error::{ProviderError, Result};
 use crate::providers::common::{
-    full_name_to_relative, normalize_domain_name, record_type_to_string, relative_to_full_name,
+    full_name_to_relative, normalize_domain_name, parse_record_data_from_string,
+    record_data_to_single_string, record_type_to_string, relative_to_full_name,
 };
 use crate::traits::{DnsProvider, ErrorContext};
 use crate::types::{
@@ -20,136 +23,43 @@ use super::types::{
 use super::{HuaweicloudProvider, MAX_PAGE_SIZE};
 
 impl HuaweicloudProvider {
-    /// 将华为云域名状态转换为内部状态
-    /// 华为云状态：ACTIVE, `PENDING_CREATE`, `PENDING_UPDATE`, `PENDING_DELETE`,
+    /// Get domain name information (use cache first)
+    async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
+        if let Some(domain) = self.domain_cache.get(domain_id) {
+            return Ok(domain);
+        }
+        let domain = self.get_domain(domain_id).await?;
+        self.domain_cache.insert(domain_id, &domain);
+        Ok(domain)
+    }
+
+    /// Convert Huawei Cloud domain name status to internal status
+    /// Huawei Cloud status: ACTIVE, `PENDING_CREATE`, `PENDING_UPDATE`, `PENDING_DELETE`,
     /// `PENDING_FREEZE`, FREEZE, ILLEGAL, POLICE, `PENDING_DISABLE`, DISABLE, ERROR
     pub(crate) fn convert_domain_status(status: Option<&str>) -> DomainStatus {
         match status {
             Some("ACTIVE") => DomainStatus::Active,
-            // 各种 PENDING 状态
+            // Various PENDING states
             Some(
                 "PENDING_CREATE" | "PENDING_UPDATE" | "PENDING_DELETE" | "PENDING_FREEZE"
                 | "PENDING_DISABLE",
             ) => DomainStatus::Pending,
-            // 冻结/暂停状态
+            // freeze/pause state
             Some("FREEZE" | "ILLEGAL" | "POLICE" | "DISABLE") => DomainStatus::Paused,
             Some("ERROR") => DomainStatus::Error,
             _ => DomainStatus::Unknown,
         }
     }
 
-    /// 解析华为云记录为 RecordData
-    /// 华为云格式：MX/SRV/CAA 的所有字段都编码在 records 字符串中
-    fn parse_record_data(record_type: &str, record: &str) -> Result<RecordData> {
-        match record_type {
-            "A" => Ok(RecordData::A {
-                address: record.to_string(),
-            }),
-            "AAAA" => Ok(RecordData::AAAA {
-                address: record.to_string(),
-            }),
-            "CNAME" => Ok(RecordData::CNAME {
-                target: record.to_string(),
-            }),
-            "MX" => {
-                // 华为云 MX 格式: "priority exchange"
-                let parts: Vec<&str> = record.splitn(2, ' ').collect();
-                if parts.len() == 2 {
-                    Ok(RecordData::MX {
-                        priority: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid MX priority: '{}'", parts[0]),
-                        })?,
-                        exchange: parts[1].to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "huaweicloud".to_string(),
-                        detail: format!(
-                            "Invalid MX record format: expected 'priority exchange', got '{record}'"
-                        ),
-                    })
-                }
-            }
-            "TXT" => Ok(RecordData::TXT {
-                text: record.to_string(),
-            }),
-            "NS" => Ok(RecordData::NS {
-                nameserver: record.to_string(),
-            }),
-            "SRV" => {
-                // 华为云 SRV 格式: "priority weight port target"
-                let parts: Vec<&str> = record.splitn(4, ' ').collect();
-                if parts.len() == 4 {
-                    Ok(RecordData::SRV {
-                        priority: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid SRV priority: '{}'", parts[0]),
-                        })?,
-                        weight: parts[1].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid SRV weight: '{}'", parts[1]),
-                        })?,
-                        port: parts[2].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid SRV port: '{}'", parts[2]),
-                        })?,
-                        target: parts[3].to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "huaweicloud".to_string(),
-                        detail: format!(
-                            "Invalid SRV record format: expected 'priority weight port target', got '{record}'"
-                        ),
-                    })
-                }
-            }
-            "CAA" => {
-                // 华为云 CAA 格式: "flags tag value"
-                let parts: Vec<&str> = record.splitn(3, ' ').collect();
-                if parts.len() >= 3 {
-                    Ok(RecordData::CAA {
-                        flags: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "huaweicloud".to_string(),
-                            detail: format!("Invalid CAA flags: '{}'", parts[0]),
-                        })?,
-                        tag: parts[1].to_string(),
-                        value: parts[2].trim_matches('"').to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "huaweicloud".to_string(),
-                        detail: format!(
-                            "Invalid CAA record format: expected 'flags tag value', got '{record}'"
-                        ),
-                    })
-                }
-            }
-            _ => Err(ProviderError::UnsupportedRecordType {
-                provider: "huaweicloud".to_string(),
-                record_type: record_type.to_string(),
-            }),
-        }
+    /// Parse the Huawei Cloud record as `RecordData`
+    /// Huawei Cloud format: All fields of MX/SRV/CAA are encoded in the records string
+    fn parse_record_data(record_type: &str, record: String) -> Result<RecordData> {
+        parse_record_data_from_string(record_type, record, "huaweicloud")
     }
 
-    /// 将 RecordData 转换为华为云 API 格式（records 字符串）
+    /// Convert `RecordData` to Huawei Cloud API format (records string)
     fn record_data_to_record_string(data: &RecordData) -> String {
-        match data {
-            RecordData::A { address } => address.clone(),
-            RecordData::AAAA { address } => address.clone(),
-            RecordData::CNAME { target } => target.clone(),
-            RecordData::MX { priority, exchange } => format!("{priority} {exchange}"),
-            RecordData::TXT { text } => text.clone(),
-            RecordData::NS { nameserver } => nameserver.clone(),
-            RecordData::SRV {
-                priority,
-                weight,
-                port,
-                target,
-            } => format!("{priority} {weight} {port} {target}"),
-            RecordData::CAA { flags, tag, value } => format!("{flags} {tag} \"{value}\""),
-        }
+        record_data_to_single_string(data)
     }
 }
 
@@ -162,21 +72,21 @@ impl DnsProvider for HuaweicloudProvider {
     fn metadata() -> ProviderMetadata {
         ProviderMetadata {
             id: ProviderType::Huaweicloud,
-            name: "华为云 DNS".to_string(),
-            description: "华为云云解析服务".to_string(),
+            name: "Huawei Cloud DNS".to_string(),
+            description: "Huawei Cloud DNS resolution service".to_string(),
             required_fields: vec![
                 ProviderCredentialField {
                     key: "accessKeyId".to_string(),
                     label: "Access Key ID".to_string(),
                     field_type: FieldType::Text,
-                    placeholder: Some("输入 Access Key ID".to_string()),
+                    placeholder: Some("Enter Access Key ID".to_string()),
                     help_text: None,
                 },
                 ProviderCredentialField {
                     key: "secretAccessKey".to_string(),
                     label: "Secret Access Key".to_string(),
                     field_type: FieldType::Password,
-                    placeholder: Some("输入 Secret Access Key".to_string()),
+                    placeholder: Some("Enter Secret Access Key".to_string()),
                     help_text: None,
                 },
             ],
@@ -195,10 +105,7 @@ impl DnsProvider for HuaweicloudProvider {
         {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
-            Err(e) => {
-                log::warn!("凭证验证失败: {e}");
-                Ok(false)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -206,9 +113,10 @@ impl DnsProvider for HuaweicloudProvider {
         &self,
         params: &PaginationParams,
     ) -> Result<PaginatedResponse<ProviderDomain>> {
-        // 华为云使用 offset/limit 分页
+        let params = params.validated(MAX_PAGE_SIZE);
+        // Huawei Cloud uses offset/limit paging
         let offset = (params.page - 1) * params.page_size;
-        let limit = params.page_size.min(MAX_PAGE_SIZE);
+        let limit = params.page_size;
         let query = format!("type=public&offset={offset}&limit={limit}");
 
         let response: ListZonesResponse = self
@@ -238,7 +146,7 @@ impl DnsProvider for HuaweicloudProvider {
         ))
     }
 
-    /// 使用 ShowPublicZone API 直接获取域名信息
+    /// Use `ShowPublicZone` API to directly obtain domain name information
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         let path = format!("/v2/zones/{domain_id}");
         let ctx = ErrorContext {
@@ -261,25 +169,26 @@ impl DnsProvider for HuaweicloudProvider {
         domain_id: &str,
         params: &RecordQueryParams,
     ) -> Result<PaginatedResponse<DnsRecord>> {
-        // 获取域名信息以获取域名名称
-        let domain_info = self.get_domain(domain_id).await?;
+        let params = params.validated(MAX_PAGE_SIZE);
+        // Get domain name information to get the domain name (using cache)
+        let domain_info = self.get_domain_cached(domain_id).await?;
 
-        // 华为云使用 offset/limit 分页
+        // Huawei Cloud uses offset/limit paging
         let offset = (params.page - 1) * params.page_size;
-        let limit = params.page_size.min(MAX_PAGE_SIZE);
+        let limit = params.page_size;
         let mut query = format!("offset={offset}&limit={limit}");
 
-        // 添加搜索关键词（华为云支持 name 参数模糊匹配）
+        // Add search keywords (Huawei Cloud supports name parameter fuzzy matching)
         if let Some(ref keyword) = params.keyword
             && !keyword.is_empty()
         {
-            query.push_str(&format!("&name={}", urlencoding::encode(keyword)));
+            let _ = write!(query, "&name={}", urlencoding::encode(keyword));
         }
 
-        // 添加记录类型过滤
+        // Add record type filter
         if let Some(ref record_type) = params.record_type {
             let type_str = record_type_to_string(record_type);
-            query.push_str(&format!("&type={}", urlencoding::encode(type_str)));
+            let _ = write!(query, "&type={}", urlencoding::encode(type_str));
         }
 
         let path = format!("/v2/zones/{domain_id}/recordsets");
@@ -296,13 +205,30 @@ impl DnsProvider for HuaweicloudProvider {
             .unwrap_or_default()
             .into_iter()
             .filter_map(|r| {
-                // 跳过 SOA 和 NS 根记录
+                // Skip SOA and NS root records
                 if r.record_type == "SOA" {
                     return None;
                 }
 
-                let value = r.records.as_ref()?.first()?.clone();
-                let data = Self::parse_record_data(&r.record_type, &value).ok()?;
+                // TODO: Huawei Cloud recordset can contain multiple records (round-robin),
+                // The current data model only supports single-value records, so only the first one is taken.
+                let records = r.records.as_ref()?;
+                if records.len() > 1 {
+                    log::debug!(
+                        "[huaweicloud] Record '{}' has {} values, only the first is used",
+                        r.name,
+                        records.len()
+                    );
+                }
+                let value = records.first()?.clone();
+                let data = match Self::parse_record_data(&r.record_type, value) {
+                    Ok(data) => data,
+                    Err(ProviderError::UnsupportedRecordType { .. }) => return None,
+                    Err(e) => {
+                        log::warn!("[huaweicloud] Skipping record due to parse error: {e}");
+                        return None;
+                    }
+                };
 
                 Some(DnsRecord {
                     id: r.id,
@@ -334,16 +260,6 @@ impl DnsProvider for HuaweicloudProvider {
     }
 
     async fn create_record(&self, req: &CreateDnsRecordRequest) -> Result<DnsRecord> {
-        // 获取域名信息
-        let domain_info = self.get_domain(&req.domain_id).await?;
-
-        // 构造完整的记录名称（华为云需要末尾带点）
-        let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
-
-        // 构造记录值
-        let record_value = Self::record_data_to_record_string(&req.data);
-        let record_type = record_type_to_string(&req.data.record_type());
-
         #[derive(Serialize)]
         struct CreateRecordSetRequest {
             name: String,
@@ -352,6 +268,16 @@ impl DnsProvider for HuaweicloudProvider {
             records: Vec<String>,
             ttl: u32,
         }
+
+        // Get domain name information (using cache)
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
+
+        // Construct a complete record name (Huawei Cloud requires a dot at the end)
+        let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
+
+        // Construct record value
+        let record_value = Self::record_data_to_record_string(&req.data);
+        let record_type = record_type_to_string(&req.data.record_type());
 
         let api_req = CreateRecordSetRequest {
             name: full_name,
@@ -386,16 +312,6 @@ impl DnsProvider for HuaweicloudProvider {
         record_id: &str,
         req: &UpdateDnsRecordRequest,
     ) -> Result<DnsRecord> {
-        // 获取域名信息
-        let domain_info = self.get_domain(&req.domain_id).await?;
-
-        // 构造完整的记录名称（华为云需要末尾带点）
-        let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
-
-        // 构造记录值
-        let record_value = Self::record_data_to_record_string(&req.data);
-        let record_type = record_type_to_string(&req.data.record_type());
-
         #[derive(Serialize)]
         struct UpdateRecordSetRequest {
             name: String,
@@ -404,6 +320,16 @@ impl DnsProvider for HuaweicloudProvider {
             records: Vec<String>,
             ttl: u32,
         }
+
+        // Get domain name information (using cache)
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
+
+        // Construct a complete record name (Huawei Cloud requires a dot at the end)
+        let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
+
+        // Construct record value
+        let record_value = Self::record_data_to_record_string(&req.data);
+        let record_type = record_type_to_string(&req.data.record_type());
 
         let api_req = UpdateRecordSetRequest {
             name: full_name,

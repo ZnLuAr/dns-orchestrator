@@ -1,13 +1,13 @@
-//! 日期时间序列化/反序列化工具
+//! Datetime serialization/deserialization tool
 //!
-//! 提供自定义 Serde 序列化/反序列化支持：
-//! - 序列化: `DateTime`<Utc> -> RFC3339 字符串
-//! - 反序列化: RFC3339 字符串 或 Unix 时间戳 -> `DateTime`<Utc>
+//! Provides custom Serde serialization/deserialization support:
+//! - Serialization: `DateTime`<Utc> -> RFC3339 string
+//! - Deserialization: RFC3339 string or Unix timestamp -> `DateTime`<Utc>
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serializer};
 
-/// 序列化 `DateTime`<Utc> 为 RFC3339 字符串
+/// Serialize `DateTime`<Utc> to RFC3339 string
 pub fn serialize<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -15,7 +15,7 @@ where
     serializer.serialize_str(&dt.to_rfc3339())
 }
 
-/// 反序列化：支持 RFC3339 字符串或 Unix 时间戳（秒/毫秒自动识别）
+/// Deserialization: supports RFC3339 string or Unix timestamp (seconds/milliseconds automatic recognition)
 pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
     D: Deserializer<'de>,
@@ -32,22 +32,24 @@ where
 
     match TimestampOrString::deserialize(deserializer)? {
         TimestampOrString::String(s) => {
-            // 尝试解析 RFC3339
+            // Try parsing RFC3339
             DateTime::parse_from_rfc3339(&s)
                 .map(|dt| dt.with_timezone(&Utc))
                 .map_err(|e| Error::custom(format!("Invalid RFC3339 timestamp: {e}")))
         }
         TimestampOrString::I64(ts) => {
-            // Unix 时间戳（自动判断秒/毫秒）
+            // Unix timestamp (automatically determine seconds/milliseconds)
             parse_unix_timestamp(ts).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
         }
         TimestampOrString::U64(ts) => {
-            parse_unix_timestamp(ts as i64).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
+            // The `cast_signed` method explicitly performs a wrapping cast from u64 to i64.
+            // This is safe for timestamps, which are not expected to exceed i64::MAX.
+            parse_unix_timestamp(ts.cast_signed()).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
         }
     }
 }
 
-/// Option 版本：序列化和反序列化 Option<`DateTime`<Utc>>
+/// Option version: serialization and deserialization Option<`DateTime`<Utc>>
 pub mod option {
     use super::{parse_unix_timestamp, DateTime, Deserialize, Deserializer, Serializer, Utc};
 
@@ -82,21 +84,25 @@ pub mod option {
             Some(OptionalTimestamp::I64(ts)) => parse_unix_timestamp(ts)
                 .map(Some)
                 .ok_or_else(|| Error::custom("Invalid Unix timestamp")),
-            Some(OptionalTimestamp::U64(ts)) => parse_unix_timestamp(ts as i64)
-                .map(Some)
-                .ok_or_else(|| Error::custom("Invalid Unix timestamp")),
+            Some(OptionalTimestamp::U64(ts)) => {
+                // The `cast_signed` method explicitly performs a wrapping cast from u64 to i64.
+                // This is safe for timestamps, which are not expected to exceed i64::MAX.
+                parse_unix_timestamp(ts.cast_signed())
+                    .map(Some)
+                    .ok_or_else(|| Error::custom("Invalid Unix timestamp"))
+            }
             None => Ok(None),
         }
     }
 }
 
-/// 解析 Unix 时间戳（自动判断秒/毫秒）
+/// Parse Unix timestamp (automatically determine seconds/milliseconds)
 fn parse_unix_timestamp(ts: i64) -> Option<DateTime<Utc>> {
-    // 如果时间戳 > 10^11，认为是毫秒（阿里云使用毫秒时间戳）
+    // If the timestamp > 10^11, it is considered to be milliseconds (Alibaba Cloud uses millisecond timestamps)
     if ts > 100_000_000_000 {
         DateTime::from_timestamp_millis(ts)
     } else {
-        // 否则认为是秒
+        // Otherwise it is considered to be seconds
         DateTime::from_timestamp(ts, 0)
     }
 }

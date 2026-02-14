@@ -3,8 +3,14 @@ name = "dns-orchestrator-provider"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-description = "DNS provider abstraction library for multiple cloud platforms"
+description = "DNS provider abstraction library for multiple cloud platforms (Cloudflare, Aliyun, DNSPod, Huaweicloud)"
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
+repository = "https://github.com/AptS-1547/dns-orchestrator"
+homepage = "https://github.com/AptS-1547/dns-orchestrator"
+readme = "README.md"
+keywords = ["dns", "cloudflare", "aliyun", "dnspod", "huaweicloud"]
+categories = ["api-bindings", "web-programming"]
+rust-version = "1.89"
 
 [features]
 default = ["native-tls", "all-providers"]
@@ -19,34 +25,23 @@ huaweicloud = []
 all-providers = ["cloudflare", "aliyun", "dnspod", "huaweicloud"]
 
 [dependencies]
-# 核心依赖
-async-trait = "0.1"
-thiserror = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-# HTTP 客户端（不带默认 features，让 feature flag 控制 TLS）
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
-
-# 异步运行时（用于重试延迟）
-tokio = { version = "1", features = ["time"] }
-
-# 加密和签名
+async-trait.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+tokio = { workspace = true, features = ["time"] }
+futures.workspace = true
 hmac = "0.12"
-sha2 = "0.10"
-hex = "0.4"
-
-# 时间和 UUID
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
-
-# URL 编码
-urlencoding = "2.1"
-
-# 日志
-log = "0.4"
+sha2.workspace = true
+hex.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+urlencoding.workspace = true
+log.workspace = true
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-uuid = { version = "1", features = ["v4"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
+[lints]
+workspace = true

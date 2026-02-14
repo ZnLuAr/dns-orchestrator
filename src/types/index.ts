@@ -13,7 +13,7 @@ export interface ApiResponse<T> {
   error?: ApiError
 }
 
-/** 后端错误码 */
+/** 后端错误码（对应 CoreError 枚举变体） */
 export type DnsErrorCode =
   | "ProviderNotFound"
   | "AccountNotFound"
@@ -28,6 +28,10 @@ export type DnsErrorCode =
   | "ImportExportError"
   | "NoAccountsSelected" // 导出时没有选中账号
   | "UnsupportedFileVersion" // 导入时版本不支持
+  | "StorageError" // 存储层错误
+  | "NetworkError" // 网络错误
+  | "MigrationRequired" // 凭证格式需要迁移
+  | "MigrationFailed" // 迁移失败
   | "Provider" // ProviderError 变体
 
 /** 凭证验证错误详情 */

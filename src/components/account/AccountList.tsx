@@ -67,6 +67,7 @@ export function AccountList({
               )}
             >
               <button
+                type="button"
                 onClick={() => !hasError && onSelect(selectedId === account.id ? null : account.id)}
                 disabled={hasError}
                 className={cn(
