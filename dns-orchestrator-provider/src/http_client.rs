@@ -95,7 +95,10 @@ impl HttpUtils {
                 detail: format!("Failed to read response body: {e}"),
             })?;
 
-        log::debug!("[{provider_name}] Response Body: {}", truncate_for_log(&response_text));
+        log::debug!(
+            "[{provider_name}] Response Body: {}",
+            truncate_for_log(&response_text)
+        );
 
         Ok((status_code, response_text))
     }
@@ -118,7 +121,10 @@ impl HttpUtils {
     {
         serde_json::from_str(response_text).map_err(|e| {
             log::error!("[{provider_name}] JSON parse failed: {e}");
-            log::error!("[{provider_name}] Raw response: {}", truncate_for_log(response_text));
+            log::error!(
+                "[{provider_name}] Raw response: {}",
+                truncate_for_log(response_text)
+            );
             ProviderError::ParseError {
                 provider: provider_name.to_string(),
                 detail: e.to_string(),

@@ -63,7 +63,10 @@ impl HuaweicloudProvider {
             "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{hashed_payload}"
         );
 
-        log::debug!("CanonicalRequest:\n{}", truncate_for_log(&canonical_request));
+        log::debug!(
+            "CanonicalRequest:\n{}",
+            truncate_for_log(&canonical_request)
+        );
 
         // 6. Construct the string to be signed (3-line format)
         let hashed_canonical_request = hex::encode(Sha256::digest(canonical_request.as_bytes()));

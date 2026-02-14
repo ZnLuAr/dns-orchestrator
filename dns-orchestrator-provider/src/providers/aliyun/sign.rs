@@ -30,7 +30,10 @@ impl AliyunProvider {
             "POST\n/\n{query_string}\n{canonical_headers}\n{signed_headers}\n{EMPTY_BODY_SHA256}"
         );
 
-        log::debug!("CanonicalRequest:\n{}", truncate_for_log(&canonical_request));
+        log::debug!(
+            "CanonicalRequest:\n{}",
+            truncate_for_log(&canonical_request)
+        );
 
         // 3. Construct the string to be signed
         let hashed_canonical_request = hex::encode(Sha256::digest(canonical_request.as_bytes()));

@@ -158,7 +158,7 @@ pub fn relative_to_full_name(relative_name: &str, zone_name: &str) -> String {
 /// Parse SRV record data from string
 ///
 /// Format: `"priority weight port target"`
-/// Aliyun, DNSPod, and Huaweicloud all use this format.
+/// Aliyun, `DNSPod`, and Huaweicloud all use this format.
 pub fn parse_srv_from_string(value: &str, provider: &str) -> Result<RecordData> {
     let parts: Vec<&str> = value.splitn(4, ' ').collect();
     if parts.len() == 4 {
@@ -190,7 +190,7 @@ pub fn parse_srv_from_string(value: &str, provider: &str) -> Result<RecordData> 
 /// Parse CAA record data from string
 ///
 /// Format: `"flags tag value"` (value can be quoted)
-/// Aliyun, DNSPod, and Huaweicloud all use this format.
+/// Aliyun, `DNSPod`, and Huaweicloud all use this format.
 pub fn parse_caa_from_string(value: &str, provider: &str) -> Result<RecordData> {
     let parts: Vec<&str> = value.splitn(3, ' ').collect();
     if parts.len() >= 3 {

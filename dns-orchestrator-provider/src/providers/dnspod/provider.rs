@@ -40,7 +40,7 @@ impl DnspodProvider {
         }
     }
 
-    /// Parse `DNSPod` record as RecordData (use mx field as priority)
+    /// Parse `DNSPod` record as `RecordData` (use mx field as priority)
     fn parse_record_data(record_type: &str, value: String, mx: Option<u16>) -> Result<RecordData> {
         parse_record_data_with_priority(record_type, value, mx, "dnspod")
     }
@@ -161,7 +161,7 @@ impl DnsProvider for DnspodProvider {
     }
 
     /// Use `DescribeDomain` API to directly obtain domain name information
-    /// Note: DNSPod API requires a domain name. If a numeric ID is passed in, it will fallback to the list to find it.
+    /// Note: `DNSPod` API requires a domain name. If a numeric ID is passed in, it will fallback to the list to find it.
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
         // If domain_id contains '.', it is considered to be the domain name and the API is called directly
         if domain_id.contains('.') {

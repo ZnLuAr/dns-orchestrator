@@ -6,6 +6,19 @@
 /// Maximum number of characters to include in truncated log output.
 const TRUNCATE_LIMIT: usize = 256;
 
+/// MSRV-compatible replacement for `str::floor_char_boundary` (stable since 1.91.0).
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        s.len()
+    } else {
+        let mut i = index;
+        while i > 0 && !s.is_char_boundary(i) {
+            i -= 1;
+        }
+        i
+    }
+}
+
 /// Truncate a string for safe logging.
 ///
 /// Returns the original string if it's within the limit,
@@ -17,7 +30,7 @@ pub fn truncate_for_log(s: &str) -> String {
     } else {
         format!(
             "{}... [truncated, total {} bytes]",
-            &s[..s.floor_char_boundary(TRUNCATE_LIMIT)],
+            &s[..floor_char_boundary(s, TRUNCATE_LIMIT)],
             s.len()
         )
     }

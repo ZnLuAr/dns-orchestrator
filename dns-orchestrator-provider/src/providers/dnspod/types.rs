@@ -38,7 +38,7 @@ pub struct DomainCountInfo {
     pub all_total: Option<u32>,
 }
 
-/// Domain item returned by DNSPod domain APIs.
+/// Domain item returned by `DNSPod` domain APIs.
 #[derive(Debug, Deserialize)]
 pub struct DnspodDomain {
     #[serde(rename = "DomainId")]
@@ -95,7 +95,7 @@ pub struct RecordCountInfo {
     pub total_count: Option<u32>,
 }
 
-/// DNS record item returned by DNSPod record APIs.
+/// DNS record item returned by `DNSPod` record APIs.
 #[derive(Debug, Deserialize)]
 pub struct DnspodRecord {
     #[serde(rename = "RecordId")]

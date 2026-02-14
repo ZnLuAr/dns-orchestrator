@@ -1,6 +1,6 @@
 //! Credential format migration service (v1.7.0)
 //!
-//! Responsible for migrating old format credentials (HashMap<String, `HashMap`<String, String>>) to new format (ProviderCredentials)
+//! Responsible for migrating old format credentials (`HashMap`<String, `HashMap`<String, String>>) to new format (`ProviderCredentials`)
 
 use dns_orchestrator_provider::{ProviderCredentials, ProviderType};
 use std::collections::HashMap;

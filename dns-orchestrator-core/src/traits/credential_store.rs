@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use crate::error::CoreResult;
 
-/// Credential mapping type: `account_id` -> ProviderCredentials (type safe)
+/// Credential mapping type: `account_id` -> `ProviderCredentials` (type safe)
 pub type CredentialsMap = HashMap<String, ProviderCredentials>;
 
 /// Old format credential mapping (used during migration)

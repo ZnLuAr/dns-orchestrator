@@ -15,11 +15,11 @@ pub(crate) use types::{
     RecordListResponse, TencentError, TencentResponse,
 };
 
-/// Tencent Cloud DNSPod API host.
+/// Tencent Cloud `DNSPod` API host.
 pub(crate) const DNSPOD_API_HOST: &str = "dnspod.tencentcloudapi.com";
 /// Tencent Cloud service name used in TC3 signing scope.
 pub(crate) const DNSPOD_SERVICE: &str = "dnspod";
-/// Tencent Cloud DNSPod API version.
+/// Tencent Cloud `DNSPod` API version.
 pub(crate) const DNSPOD_VERSION: &str = "2021-03-23";
 /// `DNSPod` API maximum number of records in a single page
 pub(crate) const MAX_PAGE_SIZE: u32 = 100;

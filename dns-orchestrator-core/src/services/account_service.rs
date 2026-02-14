@@ -1,7 +1,7 @@
 //! Unified account service
 //!
-//! Merge the original AccountMetadataService, CredentialManagementService,
-//! AccountLifecycleService, AccountBootstrapService four services.
+//! Merge the original `AccountMetadataService`, `CredentialManagementService`,
+//! `AccountLifecycleService`, `AccountBootstrapService` four services.
 
 use std::sync::Arc;
 
@@ -682,7 +682,10 @@ mod tests {
 
         // Account metadata still exists (irreversible operations are not performed)
         let still_exists = account_repo.find_by_id(&id).await.unwrap();
-        assert!(still_exists.is_some(), "account should still exist when credential deletion fails");
+        assert!(
+            still_exists.is_some(),
+            "account should still exist when credential deletion fails"
+        );
 
         // The credentials also still exist
         let creds = credential_store.get(&id).await.unwrap();
