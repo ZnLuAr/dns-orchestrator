@@ -24,7 +24,7 @@ dns-orchestrator-app = { workspace = true, features = ["keyring-store", "sqlite-
 rmcp = { version = "0.15", features = ["server", "transport-io"] }
 
 # Async runtime
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
 
 # Serialization
 serde.workspace = true
