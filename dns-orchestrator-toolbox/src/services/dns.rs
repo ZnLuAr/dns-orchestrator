@@ -344,6 +344,7 @@ async fn lookup_ptr(resolver: &TokioResolver, domain: &str, records: &mut Vec<Dn
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -390,7 +391,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_a_record_real() {
         let result = dns_lookup("google.com", "A", None).await;
         assert!(result.is_ok());
@@ -400,7 +401,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_mx_record_real() {
         let result = dns_lookup("google.com", "MX", None).await;
         assert!(result.is_ok());
@@ -413,7 +414,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_ns_record_real() {
         let result = dns_lookup("google.com", "NS", None).await;
         assert!(result.is_ok());
@@ -422,14 +423,14 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_txt_record_real() {
         let result = dns_lookup("google.com", "TXT", None).await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_soa_record_real() {
         let result = dns_lookup("google.com", "SOA", None).await;
         assert!(result.is_ok());
@@ -439,7 +440,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_with_custom_nameserver() {
         let result = dns_lookup("google.com", "A", Some("8.8.8.8")).await;
         assert!(result.is_ok());
@@ -449,7 +450,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_lookup_all_types_real() {
         let result = dns_lookup("google.com", "ALL", None).await;
         assert!(result.is_ok());

@@ -190,6 +190,7 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -216,7 +217,7 @@ mod tests {
     // NOTE: These tests depend on the ipwho.is external API; failures may be due to rate limiting or network issues
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_ip_lookup_ipv4_real() {
         let result = ip_lookup("8.8.8.8").await;
         let info =
@@ -229,7 +230,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_ip_lookup_domain_real() {
         let result = ip_lookup("google.com").await;
         let info =
@@ -240,7 +241,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_ip_lookup_ipv6_real() {
         let result = ip_lookup("2606:4700:4700::1111").await;
         let info =

@@ -399,6 +399,7 @@ fn matches_domain(query: &str, pattern: &str) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -493,7 +494,7 @@ mod tests {
     // NOTE: These tests depend on external networks; failures may be due to firewall/proxy issues
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_ssl_check_https_site_real() {
         let result = ssl_check("google.com", None).await;
         let check = result.unwrap_or_else(|e| panic!("SSL check failed: {e}"));
@@ -518,7 +519,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_ssl_check_custom_port_real() {
         let result = ssl_check("google.com", Some(443)).await;
         let check = result.unwrap_or_else(|e| panic!("SSL check with custom port failed: {e}"));
@@ -526,7 +527,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_ssl_check_invalid_domain_real() {
         let result = ssl_check("this-domain-does-not-exist-12345.com", None).await;
         let check = result.unwrap_or_else(|e| panic!("SSL check on invalid domain failed: {e}"));

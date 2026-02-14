@@ -20,6 +20,7 @@ pub enum ToolboxError {
 pub type ToolboxResult<T> = std::result::Result<T, ToolboxError>;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

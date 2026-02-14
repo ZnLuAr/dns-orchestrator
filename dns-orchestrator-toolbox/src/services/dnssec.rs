@@ -324,6 +324,7 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, clippy::unreadable_literal)]
 mod tests {
     use super::*;
 
@@ -445,7 +446,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dnssec_check_cloudflare_real() {
         // cloudflare.com has DNSSEC enabled
         let result = dnssec_check("cloudflare.com", Some("8.8.8.8")).await;
@@ -457,7 +458,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dnssec_check_no_dnssec_real() {
         // Many domains don't have DNSSEC, use system default
         let result = dnssec_check("example.com", None).await;

@@ -153,6 +153,7 @@ fn extract_status(text: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -366,7 +367,7 @@ Created: 2000-01-01";
     // ==================== integration tests ====================
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_whois_lookup_real() {
         let whois_servers = include_str!("whois_servers.json");
         let result = whois_lookup("google.com", whois_servers).await;

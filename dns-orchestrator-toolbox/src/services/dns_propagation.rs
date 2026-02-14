@@ -223,6 +223,7 @@ pub async fn dns_propagation_check(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::similar_names)]
 mod tests {
     use super::*;
     use crate::types::DnsLookupRecord;
@@ -408,7 +409,7 @@ mod tests {
     // ==================== integration tests ====================
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_dns_propagation_check_real() {
         let result = dns_propagation_check("google.com", "A").await;
         assert!(result.is_ok());

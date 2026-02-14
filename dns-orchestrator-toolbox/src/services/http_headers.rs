@@ -267,6 +267,7 @@ fn get_recommendation(header_name: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -444,7 +445,7 @@ mod tests {
     // NOTE: These tests depend on external networks; failures may be due to network issues, not code bugs
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_http_header_check_real() {
         let request = HttpHeaderCheckRequest {
             url: "https://httpbin.org/get".to_string(),
@@ -462,7 +463,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_http_header_check_head_method_real() {
         let request = HttpHeaderCheckRequest {
             url: "https://httpbin.org/get".to_string(),
@@ -476,7 +477,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_http_header_check_auto_https_prefix() {
         let request = HttpHeaderCheckRequest {
             url: "httpbin.org/get".to_string(),
@@ -496,7 +497,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_http_header_check_custom_headers_real() {
         let request = HttpHeaderCheckRequest {
             url: "https://httpbin.org/get".to_string(),
@@ -519,7 +520,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires network access"]
     async fn test_http_header_check_with_body_real() {
         let request = HttpHeaderCheckRequest {
             url: "https://httpbin.org/post".to_string(),

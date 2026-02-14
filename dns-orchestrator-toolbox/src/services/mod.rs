@@ -139,6 +139,7 @@ impl ToolboxService {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::validate_domain;
     use crate::error::ToolboxError;
