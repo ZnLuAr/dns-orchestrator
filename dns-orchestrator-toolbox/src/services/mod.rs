@@ -1,12 +1,13 @@
-//! Stateless service façade exposing all toolbox operations.
+//! Stateless service facade exposing all toolbox operations.
 //!
-//! Every method on [`ToolboxService`] is an async associated function — no instance needed.
+//! Every method on [`ToolboxService`] is an async associated function -- no instance needed.
 
 mod dns;
 mod dns_propagation;
 mod dnssec;
 mod http_headers;
 mod ip;
+mod resolver;
 mod ssl;
 mod whois;
 
@@ -44,12 +45,12 @@ fn validate_domain(domain: &str) -> ToolboxResult<String> {
     Ok(ascii_domain)
 }
 
-/// Embedded WHOIS server mapping (TLD → server).
+/// Embedded WHOIS server mapping (TLD -> server).
 const WHOIS_SERVERS: &str = include_str!("whois_servers.json");
 
 /// Entry point for all network diagnostic operations.
 ///
-/// All methods are stateless associated functions — call them directly on the type.
+/// All methods are stateless associated functions -- call them directly on the type.
 ///
 /// ```rust,no_run
 /// use dns_orchestrator_toolbox::ToolboxService;
@@ -76,6 +77,10 @@ impl ToolboxService {
     /// `"SOA"`, `"SRV"`, `"CAA"`, `"PTR"`, or `"ALL"`.
     ///
     /// Pass `None` for `nameserver` to use the system default resolver.
+    ///
+    /// Notes:
+    /// - This is a best-effort lookup. Resolver/network errors are currently logged and result in
+    ///   an empty `records` list, rather than a `ToolboxError::NetworkError`.
     pub async fn dns_lookup(
         domain: &str,
         record_type: &str,
@@ -96,6 +101,9 @@ impl ToolboxService {
     ///
     /// Defaults to port 443 when `port` is `None`.
     /// Returns connection status (`"https"`, `"http"`, or `"failed"`) and certificate details.
+    ///
+    /// Most connection/TLS failures are reported via the returned `SslCheckResult` fields
+    /// (`connection_status` and `error`), rather than as a `ToolboxError`.
     pub async fn ssl_check(
         domain: &str,
         port: Option<u16>,
@@ -195,5 +203,42 @@ mod tests {
             validate_domain("not a valid domain!!!"),
             Err(ToolboxError::ValidationError(_))
         ));
+    }
+
+    #[test]
+    fn test_validate_domain_max_length_253() {
+        // Build a domain that is exactly 253 characters after IDNA processing.
+        // "a]" labels of 63 chars each: "aaa...aaa.aaa...aaa.aaa...aaa.aaa...aaa" = 63*4 + 3 dots = 255
+        // We need exactly 253, so: 63 + 1 + 63 + 1 + 63 + 1 + 59 = 251 ... let's just compute it.
+        // 4 labels: 62.62.62.63 = 62+1+62+1+62+1+63 = 252. Need 253.
+        // 63.63.63.61 = 63+1+63+1+63+1+61 = 253. Perfect.
+        let label_a = "a".repeat(63);
+        let label_b = "a".repeat(63);
+        let label_c = "a".repeat(63);
+        let label_d = "a".repeat(61);
+        let domain = format!("{label_a}.{label_b}.{label_c}.{label_d}");
+        assert_eq!(domain.len(), 253);
+        // This should pass validation (all ASCII, no IDNA transformation needed)
+        let result = validate_domain(&domain);
+        assert!(
+            result.is_ok(),
+            "A 253-char domain should be valid, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_validate_domain_over_max_length() {
+        // 254 characters: one more than the max
+        let label_a = "a".repeat(63);
+        let label_b = "a".repeat(63);
+        let label_c = "a".repeat(63);
+        let label_d = "a".repeat(62);
+        let domain = format!("{label_a}.{label_b}.{label_c}.{label_d}");
+        assert_eq!(domain.len(), 254);
+        let result = validate_domain(&domain);
+        assert!(
+            matches!(result, Err(ToolboxError::ValidationError(_))),
+            "A 254-char domain should fail validation, got: {result:?}"
+        );
     }
 }

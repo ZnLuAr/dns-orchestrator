@@ -2,18 +2,25 @@
 //!
 //! Provides stateless, independent utility functions for common network diagnostics:
 //!
-//! - **WHOIS lookup** — query domain registration info with structured field parsing
-//! - **DNS lookup** — resolve any record type (A, AAAA, MX, TXT, NS, CNAME, SOA, SRV, CAA, PTR)
+//! - **WHOIS lookup** -- query domain registration info with structured field parsing
+//! - **DNS lookup** -- resolve any record type (A, AAAA, MX, TXT, NS, CNAME, SOA, SRV, CAA, PTR)
 //!   with optional custom nameserver
-//! - **DNS propagation check** — test record consistency across 13 global DNS servers
-//! - **DNSSEC validation** — verify DNSSEC deployment and validation status
-//! - **IP geolocation** — look up country, region, city, ISP, ASN for IPs or domains
-//! - **SSL certificate check** — inspect certificate chain, validity, SAN, expiration via rustls
-//! - **HTTP header analysis** — send requests with any method/headers and get security header
+//! - **DNS propagation check** -- test record consistency across 13 global DNS servers
+//! - **DNSSEC validation** -- verify DNSSEC deployment and validation status
+//! - **IP geolocation** -- look up country, region, city, ISP, ASN for IPs or domains
+//! - **SSL certificate check** -- inspect certificate chain, validity, SAN, expiration via rustls
+//! - **HTTP header analysis** -- send requests with any method/headers and get security header
 //!   recommendations
 //!
-//! All functions are stateless — no shared state, no business logic dependencies.
+//! All functions are stateless -- no shared state, no business logic dependencies.
 //! Every public method lives on [`ToolboxService`] as an async associated function.
+//!
+//! # Notes
+//!
+//! - `ToolboxService::dns_lookup` uses the host system DNS configuration by default; pass a
+//!   nameserver IP to query a specific resolver.
+//! - `ToolboxService::ip_lookup` uses the public ipwho.is API for geolocation and may be
+//!   rate-limited.
 //!
 //! # Quick start
 //!

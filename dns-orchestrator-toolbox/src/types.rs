@@ -33,6 +33,14 @@ pub struct DnsLookupRecord {
     /// Record name (owner).
     pub name: String,
     /// Record value / rdata.
+    ///
+    /// Notes:
+    /// - For `NS`, `CNAME`, `MX`, `SRV`, `SOA`, and `PTR` records, trailing dots are removed from
+    ///   domain names.
+    /// - For some record types the value is returned in a human-readable, space-separated form:
+    ///   - `SOA`: `mname rname serial refresh retry expire minimum`
+    ///   - `SRV`: `weight port target`
+    ///   - `CAA`: `flags tag "value"`
     pub value: String,
     /// Time-to-live in seconds.
     pub ttl: u32,
@@ -45,6 +53,9 @@ pub struct DnsLookupRecord {
 #[serde(rename_all = "camelCase")]
 pub struct DnsLookupResult {
     /// DNS resolver used for this query.
+    ///
+    /// When a custom nameserver is provided, this will be that IP address.
+    /// Otherwise, this is a best-effort, human-readable label for the system DNS configuration.
     pub nameserver: String,
     /// Returned records.
     pub records: Vec<DnsLookupRecord>,
@@ -82,7 +93,7 @@ pub struct IpGeoInfo {
     pub as_name: Option<String>,
 }
 
-/// IP geolocation result — may contain multiple IPs when a domain is queried.
+/// IP geolocation result -- may contain multiple IPs when a domain is queried.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IpLookupResult {
@@ -98,15 +109,17 @@ pub struct IpLookupResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SslCertInfo {
-    /// Domain the certificate was checked for.
+    /// Primary domain name derived from the certificate (CN or first SAN entry).
+    ///
+    /// This may differ from the queried host in [`SslCheckResult::domain`].
     pub domain: String,
     /// Certificate issuer (e.g. `"CN=R11, O=Let's Encrypt"`).
     pub issuer: String,
     /// Certificate subject.
     pub subject: String,
-    /// Not-before date (ISO 8601).
+    /// Not-before date (RFC 3339 / ISO 8601, UTC).
     pub valid_from: String,
-    /// Not-after date (ISO 8601).
+    /// Not-after date (RFC 3339 / ISO 8601, UTC).
     pub valid_to: String,
     /// Days until expiration (negative if expired).
     pub days_remaining: i64,
@@ -250,7 +263,7 @@ pub struct HttpHeaderCheckResult {
     pub headers: Vec<HttpHeader>,
     /// Per-header security analysis.
     pub security_analysis: Vec<SecurityHeaderAnalysis>,
-    /// `Content-Length` value if present.
+    /// Response body length in bytes (computed).
     pub content_length: Option<u64>,
     /// Reconstructed raw request for debugging.
     pub raw_request: String,
@@ -268,7 +281,7 @@ pub struct DnsPropagationServer {
     pub ip: String,
     /// Geographic region.
     pub region: String,
-    /// ISO country code.
+    /// ISO country code (or a region code like `"EU"` for shared resolvers).
     pub country_code: String,
 }
 
@@ -309,7 +322,7 @@ pub struct DnsPropagationResult {
     pub results: Vec<DnsPropagationServerResult>,
     /// Total wall-clock time in milliseconds.
     pub total_time_ms: u64,
-    /// Percentage of servers returning consistent answers (0–100).
+    /// Percentage of servers returning consistent answers (0-100).
     pub consistency_percentage: f32,
     /// Distinct answer values observed across all servers.
     pub unique_values: Vec<String>,
@@ -367,9 +380,9 @@ pub struct RrsigRecord {
     pub labels: u8,
     /// Original TTL of the covered `RRset`.
     pub original_ttl: u32,
-    /// Signature expiration (ISO 8601).
+    /// Signature expiration (RFC 3339 / ISO 8601, UTC).
     pub signature_expiration: String,
-    /// Signature inception (ISO 8601).
+    /// Signature inception (RFC 3339 / ISO 8601, UTC).
     pub signature_inception: String,
     /// Key tag of the signing DNSKEY.
     pub key_tag: u16,

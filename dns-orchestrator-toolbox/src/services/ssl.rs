@@ -26,7 +26,7 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
 /// Initialize the rustls `CryptoProvider` (once).
 ///
 /// If a provider is already installed (by another part of the application),
-/// this is a no-op — `install_default` returns `Err` only to indicate that
+/// this is a no-op -- `install_default` returns `Err` only to indicate that
 /// a provider was already set, which is perfectly fine.
 fn ensure_crypto_provider() {
     // Ignore the error: Err means a provider is already installed.
@@ -149,7 +149,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
         }
         Ok(Err(e)) => {
             warn!("[SSL] TLS handshake failed: {e}");
-            // TLS handshake failed — check if plain HTTP is available
+            // TLS handshake failed -- check if plain HTTP is available
             trace!("[SSL] Checking if HTTP connection...");
             if check_http_connection(&domain, port).await {
                 debug!(
@@ -284,14 +284,22 @@ fn parse_certificate(
 ) -> SslCertInfo {
     let subject = cert.subject().to_string();
     let issuer = cert.issuer().to_string();
-    let valid_from = cert.validity().not_before.to_rfc2822().unwrap_or_default();
-    let valid_to = cert.validity().not_after.to_rfc2822().unwrap_or_default();
+    let not_before_ts = cert.validity().not_before.timestamp();
+    let not_after_ts = cert.validity().not_after.timestamp();
+
+    let valid_from = chrono::DateTime::<chrono::Utc>::from_timestamp(not_before_ts, 0).map_or_else(
+        || format!("Invalid ({not_before_ts})"),
+        |dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+    );
+
+    let valid_to = chrono::DateTime::<chrono::Utc>::from_timestamp(not_after_ts, 0).map_or_else(
+        || format!("Invalid ({not_after_ts})"),
+        |dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+    );
 
     // Calculate days remaining
     let now = chrono::Utc::now();
-    let not_after = chrono::DateTime::parse_from_rfc2822(&valid_to)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
-        .unwrap_or(now);
+    let not_after = chrono::DateTime::<chrono::Utc>::from_timestamp(not_after_ts, 0).unwrap_or(now);
     let days_remaining = (not_after - now).num_days();
     let is_expired = days_remaining < 0;
 
@@ -538,5 +546,48 @@ mod tests {
             check.connection_status
         );
         assert!(check.error.is_some());
+    }
+
+    // ==================== additional matches_domain edge cases ====================
+
+    #[test]
+    fn test_matches_domain_empty_strings() {
+        // Both empty -- exact match
+        assert!(matches_domain("", ""));
+        // One empty, one not
+        assert!(!matches_domain("", "example.com"));
+        assert!(!matches_domain("example.com", ""));
+    }
+
+    #[test]
+    fn test_matches_domain_wildcard_only() {
+        // Pattern "*." with no suffix after the dot
+        assert!(!matches_domain("example.com", "*."));
+        assert!(!matches_domain("com", "*."));
+        // "a." with pattern "*." actually matches: strip_prefix("*.") = "",
+        // "a.".strip_suffix("") = "a.", ends_with('.') and no inner dot => match
+        assert!(matches_domain("a.", "*."));
+    }
+
+    #[test]
+    fn test_check_domain_match_multiple_sans() {
+        // Match should succeed on the second SAN entry
+        assert!(check_domain_match(
+            "api.example.com",
+            None,
+            &["www.example.com".to_string(), "api.example.com".to_string()],
+        ));
+        // First SAN doesn't match, second does via wildcard
+        assert!(check_domain_match(
+            "staging.example.com",
+            None,
+            &["www.other.com".to_string(), "*.example.com".to_string()],
+        ));
+        // None of the SANs match
+        assert!(!check_domain_match(
+            "evil.com",
+            None,
+            &["www.example.com".to_string(), "api.example.com".to_string()],
+        ));
     }
 }

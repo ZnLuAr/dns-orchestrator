@@ -86,7 +86,14 @@ async fn http_header_check_inner(
     // Build request
     let mut req_builder = client.request(method.clone(), &url);
 
-    // Add custom headers
+    // Add custom request headers
+    for header in &request.custom_headers {
+        if !header.name.is_empty() && !header.value.is_empty() {
+            req_builder = req_builder.header(header.name.as_str(), header.value.as_str());
+        }
+    }
+
+    // Attach request body and Content-Type
     if let Some(body) = &request.body {
         if let Some(content_type) = &request.content_type {
             req_builder = req_builder.header("Content-Type", content_type);
@@ -123,7 +130,7 @@ async fn http_header_check_inner(
         .await
         .map_err(|e| ToolboxError::NetworkError(format!("Failed to read response body: {e}")))?;
 
-    // Content-Length — compute actual size
+    // Content-Length -- compute actual size
     let content_length = Some(body_bytes.len() as u64);
 
     // Convert body bytes to string (for raw_response)

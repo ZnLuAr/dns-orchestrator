@@ -1,7 +1,6 @@
 //! DNS record lookup module.
 
 use std::net::IpAddr;
-use std::sync::LazyLock;
 
 use hickory_resolver::{
     TokioResolver,
@@ -12,28 +11,7 @@ use hickory_resolver::{
 use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{DnsLookupRecord, DnsLookupResult};
 
-/// Shared default DNS resolver (system configuration).
-static DEFAULT_RESOLVER: LazyLock<TokioResolver> = LazyLock::new(|| {
-    let provider = TokioConnectionProvider::default();
-    TokioResolver::builder_with_config(ResolverConfig::default(), provider)
-        .with_options(ResolverOpts::default())
-        .build()
-});
-
-/// Cached description of the system default DNS servers.
-static SYSTEM_DNS_LABEL: LazyLock<String> = LazyLock::new(|| {
-    let config = ResolverConfig::default();
-    let servers: Vec<String> = config
-        .name_servers()
-        .iter()
-        .map(|ns| ns.socket_addr.ip().to_string())
-        .collect();
-    if servers.is_empty() {
-        "System Default".to_string()
-    } else {
-        servers.join(", ")
-    }
-});
+use super::resolver::{DEFAULT_RESOLVER, SYSTEM_DNS_LABEL};
 
 /// Extract the TTL from the first record in a lookup response.
 fn first_record_ttl(lookup: &hickory_resolver::lookup::Lookup) -> u32 {
@@ -68,7 +46,7 @@ pub async fn dns_lookup(
             .build();
         (custom, ns.to_string())
     } else {
-        // Return a clone — TokioResolver is cheaply cloneable (Arc internals)
+        // Return a clone -- TokioResolver is cheaply cloneable (Arc internals)
         (DEFAULT_RESOLVER.clone(), SYSTEM_DNS_LABEL.clone())
     };
 

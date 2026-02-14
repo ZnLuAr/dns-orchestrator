@@ -2,26 +2,15 @@
 
 use std::sync::LazyLock;
 
-use hickory_resolver::{
-    TokioResolver,
-    config::{ResolverConfig, ResolverOpts},
-    name_server::TokioConnectionProvider,
-};
 use serde::Deserialize;
 
 use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{IpGeoInfo, IpLookupResult};
 
+use super::resolver::DEFAULT_RESOLVER;
+
 /// Shared HTTP client for ipwho.is API calls.
 static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
-
-/// Shared default DNS resolver for domain-to-IP resolution.
-static DEFAULT_RESOLVER: LazyLock<TokioResolver> = LazyLock::new(|| {
-    let provider = TokioConnectionProvider::default();
-    TokioResolver::builder_with_config(ResolverConfig::default(), provider)
-        .with_options(ResolverOpts::default())
-        .build()
-});
 
 /// Response structure from ipwho.is API.
 #[derive(Deserialize)]
@@ -140,7 +129,7 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
         });
     }
 
-    // Treat as domain — resolve A and AAAA records
+    // Treat as domain -- resolve A and AAAA records
     let resolver = &*DEFAULT_RESOLVER;
 
     let mut ips: Vec<String> = Vec::new();
@@ -248,5 +237,118 @@ mod tests {
             result.unwrap_or_else(|e| panic!("IPv6 lookup failed (ipwho.is unreachable?): {e}"));
         assert!(!info.is_domain);
         assert_eq!(info.results.len(), 1);
+    }
+
+    // ==================== IpWhoisResponse deserialization tests ====================
+
+    #[test]
+    fn test_ipwhois_response_success_deserialization() {
+        let json = r#"{
+            "ip": "8.8.8.8",
+            "success": true,
+            "message": null,
+            "type": "IPv4",
+            "country": "United States",
+            "country_code": "US",
+            "region": "California",
+            "city": "Mountain View",
+            "latitude": 37.386,
+            "longitude": -122.0838,
+            "timezone": { "id": "America/Los_Angeles" },
+            "connection": { "asn": 15169, "org": "Google LLC", "isp": "Google LLC" }
+        }"#;
+        let resp: IpWhoisResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.ip, "8.8.8.8");
+        assert_eq!(resp.ip_type.as_deref(), Some("IPv4"));
+        assert_eq!(resp.country.as_deref(), Some("United States"));
+        assert_eq!(resp.country_code.as_deref(), Some("US"));
+        assert_eq!(resp.region.as_deref(), Some("California"));
+        assert_eq!(resp.city.as_deref(), Some("Mountain View"));
+        assert!((resp.latitude.unwrap() - 37.386).abs() < 0.001);
+        assert!((resp.longitude.unwrap() - (-122.0838)).abs() < 0.001);
+        let tz = resp.timezone.unwrap();
+        assert_eq!(tz.id.as_deref(), Some("America/Los_Angeles"));
+        let conn = resp.connection.unwrap();
+        assert_eq!(conn.asn, Some(15169));
+        assert_eq!(conn.org.as_deref(), Some("Google LLC"));
+        assert_eq!(conn.isp.as_deref(), Some("Google LLC"));
+    }
+
+    #[test]
+    fn test_ipwhois_response_failure_deserialization() {
+        let json = r#"{
+            "ip": "invalid",
+            "success": false,
+            "message": "Invalid IP address",
+            "type": null,
+            "country": null,
+            "country_code": null,
+            "region": null,
+            "city": null,
+            "latitude": null,
+            "longitude": null,
+            "timezone": null,
+            "connection": null
+        }"#;
+        let resp: IpWhoisResponse = serde_json::from_str(json).unwrap();
+        assert!(!resp.success);
+        assert_eq!(resp.message.as_deref(), Some("Invalid IP address"));
+        assert!(resp.ip_type.is_none());
+        assert!(resp.country.is_none());
+        assert!(resp.timezone.is_none());
+        assert!(resp.connection.is_none());
+    }
+
+    #[test]
+    fn test_ipwhois_response_minimal_fields() {
+        let json = r#"{
+            "ip": "10.0.0.1",
+            "success": true,
+            "message": null,
+            "type": null,
+            "country": null,
+            "country_code": null,
+            "region": null,
+            "city": null,
+            "latitude": null,
+            "longitude": null,
+            "timezone": null,
+            "connection": null
+        }"#;
+        let resp: IpWhoisResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.ip, "10.0.0.1");
+        assert!(resp.ip_type.is_none());
+        assert!(resp.country.is_none());
+        assert!(resp.latitude.is_none());
+        assert!(resp.longitude.is_none());
+        assert!(resp.timezone.is_none());
+        assert!(resp.connection.is_none());
+    }
+
+    #[test]
+    fn test_ip_version_fallback_ipv4() {
+        // When ip_type is None, the fallback logic checks if the IP parses as IPv6.
+        // "1.2.3.4" does NOT parse as IPv6, so fallback should be "IPv4".
+        let ip_str = "1.2.3.4";
+        let ip_version = if ip_str.parse::<std::net::Ipv6Addr>().is_ok() {
+            "IPv6"
+        } else {
+            "IPv4"
+        };
+        assert_eq!(ip_version, "IPv4");
+    }
+
+    #[test]
+    fn test_ip_version_fallback_ipv6() {
+        // "::1" parses as IPv6, so fallback should be "IPv6".
+        let ip_str = "::1";
+        let ip_version = if ip_str.parse::<std::net::Ipv6Addr>().is_ok() {
+            "IPv6"
+        } else {
+            "IPv4"
+        };
+        assert_eq!(ip_version, "IPv6");
     }
 }
