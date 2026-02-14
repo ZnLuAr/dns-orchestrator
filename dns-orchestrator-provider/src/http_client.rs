@@ -57,6 +57,34 @@ impl HttpUtils {
         let status_code = response.status().as_u16();
         log::debug!("[{provider_name}] Response Status: {status_code}");
 
+        // 提取 Retry-After header（在消费 response body 前）
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
+
+        // 对 HTTP 429 返回 RateLimited 错误
+        if status_code == 429 {
+            let body = response.text().await.unwrap_or_default();
+            log::warn!("[{provider_name}] Rate limited (HTTP 429), retry_after={retry_after:?}");
+            return Err(ProviderError::RateLimited {
+                provider: provider_name.to_string(),
+                retry_after,
+                raw_message: Some(body),
+            });
+        }
+
+        // 对 502/503/504 返回 NetworkError（可重试）
+        if matches!(status_code, 502..=504) {
+            let body = response.text().await.unwrap_or_default();
+            log::warn!("[{provider_name}] Server error (HTTP {status_code})");
+            return Err(ProviderError::NetworkError {
+                provider: provider_name.to_string(),
+                detail: format!("HTTP {status_code}: {body}"),
+            });
+        }
+
         // 读取响应体
         let response_text = response
             .text()
@@ -153,7 +181,7 @@ impl HttpUtils {
             match Self::execute_request(req, provider_name, method_name, url_or_action).await {
                 Ok(resp) => return Ok(resp),
                 Err(e) if attempt < max_retries && is_retryable(&e) => {
-                    let delay = backoff_delay(attempt);
+                    let delay = retry_delay(&e, attempt);
                     log::warn!(
                         "[{}] Request failed (attempt {}/{}), retrying in {:.1}s: {}",
                         provider_name,
@@ -188,12 +216,29 @@ fn is_retryable(error: &ProviderError) -> bool {
     )
 }
 
+/// 计算重试延迟
+///
+/// 当错误是 `RateLimited` 且包含 `retry_after` 时，使用该值（上限 30s）。
+/// 否则使用指数退避。
+fn retry_delay(error: &ProviderError, attempt: u32) -> Duration {
+    if let ProviderError::RateLimited {
+        retry_after: Some(secs),
+        ..
+    } = error
+    {
+        Duration::from_secs((*secs).min(30))
+    } else {
+        backoff_delay(attempt)
+    }
+}
+
 /// 计算指数退避延迟
 ///
 /// 退避策略：100ms, 200ms, 400ms, 800ms, 1.6s, ...
 /// 最大延迟限制为 10 秒
 fn backoff_delay(attempt: u32) -> Duration {
-    let delay_ms = 100 * 2_u64.pow(attempt);
+    let capped_attempt = attempt.min(20); // 防止 2^attempt 溢出
+    let delay_ms = 100_u64.saturating_mul(1_u64 << capped_attempt);
     let delay_ms = delay_ms.min(10_000); // 最大 10 秒
     Duration::from_millis(delay_ms)
 }

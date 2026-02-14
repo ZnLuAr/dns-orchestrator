@@ -108,10 +108,7 @@ impl DnsProvider for AliyunProvider {
         {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
-            Err(e) => {
-                log::warn!("Credential validation failed: {e}");
-                Ok(false)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -127,9 +124,10 @@ impl DnsProvider for AliyunProvider {
             page_size: u32,
         }
 
+        let params = params.validated(MAX_PAGE_SIZE);
         let req = DescribeDomainsRequest {
             page_number: params.page,
-            page_size: params.page_size.min(MAX_PAGE_SIZE),
+            page_size: params.page_size,
         };
 
         let response: DescribeDomainsResponse = self
@@ -212,11 +210,12 @@ impl DnsProvider for AliyunProvider {
             record_type: Option<String>,
         }
 
+        let params = params.validated(MAX_PAGE_SIZE);
         // 阿里云的 domain_id 就是域名名称，可以直接使用
         let req = DescribeDomainRecordsRequest {
             domain_name: domain_id.to_string(),
             page_number: params.page,
-            page_size: params.page_size.min(MAX_PAGE_SIZE),
+            page_size: params.page_size,
             rr_keyword: params.keyword.clone().filter(|k| !k.is_empty()),
             record_type: params
                 .record_type

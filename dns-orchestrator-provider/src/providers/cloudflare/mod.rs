@@ -7,7 +7,7 @@ mod types;
 
 use reqwest::Client;
 
-use crate::providers::common::create_http_client;
+use crate::providers::common::{DomainCache, create_http_client};
 
 pub(crate) use types::{
     CloudflareCaaData, CloudflareDnsRecord, CloudflareResponse, CloudflareSrvData, CloudflareZone,
@@ -40,6 +40,7 @@ pub struct CloudflareProvider {
     pub(crate) client: Client,
     pub(crate) api_token: String,
     pub(crate) max_retries: u32,
+    pub(crate) domain_cache: DomainCache,
 }
 
 /// Builder for [`CloudflareProvider`] with configurable retry behavior.
@@ -68,6 +69,7 @@ impl CloudflareProviderBuilder {
             client: create_http_client(),
             api_token: self.api_token,
             max_retries: self.max_retries,
+            domain_cache: DomainCache::new(),
         }
     }
 }

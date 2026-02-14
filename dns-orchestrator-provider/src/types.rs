@@ -28,6 +28,20 @@ impl Default for PaginationParams {
     }
 }
 
+impl PaginationParams {
+    /// Clamp pagination values to valid ranges.
+    ///
+    /// - `page` is clamped to `>= 1`
+    /// - `page_size` is clamped to `1..=max_page_size`
+    #[must_use]
+    pub fn validated(&self, max_page_size: u32) -> Self {
+        Self {
+            page: self.page.max(1),
+            page_size: self.page_size.clamp(1, max_page_size),
+        }
+    }
+}
+
 /// Query parameters for DNS record listing, with optional search and filtering.
 ///
 /// Extends basic pagination with keyword search and record type filtering.
@@ -67,6 +81,21 @@ impl RecordQueryParams {
         PaginationParams {
             page: self.page,
             page_size: self.page_size,
+        }
+    }
+
+    /// Clamp pagination values to valid ranges.
+    ///
+    /// - `page` is clamped to `>= 1`
+    /// - `page_size` is clamped to `1..=max_page_size`
+    /// - `keyword` and `record_type` are preserved as-is
+    #[must_use]
+    pub fn validated(&self, max_page_size: u32) -> Self {
+        Self {
+            page: self.page.max(1),
+            page_size: self.page_size.clamp(1, max_page_size),
+            keyword: self.keyword.clone(),
+            record_type: self.record_type.clone(),
         }
     }
 }
@@ -968,5 +997,64 @@ mod tests {
             .display_value(),
             "le.org"
         );
+    }
+
+    // ============ PaginationParams::validated 测试 ============
+
+    #[test]
+    fn pagination_validated_clamps_page_zero() {
+        let p = PaginationParams {
+            page: 0,
+            page_size: 20,
+        };
+        let v = p.validated(100);
+        assert_eq!(v.page, 1);
+        assert_eq!(v.page_size, 20);
+    }
+
+    #[test]
+    fn pagination_validated_clamps_page_size_over_max() {
+        let p = PaginationParams {
+            page: 1,
+            page_size: 9999,
+        };
+        let v = p.validated(100);
+        assert_eq!(v.page_size, 100);
+    }
+
+    #[test]
+    fn pagination_validated_clamps_page_size_zero() {
+        let p = PaginationParams {
+            page: 1,
+            page_size: 0,
+        };
+        let v = p.validated(100);
+        assert_eq!(v.page_size, 1);
+    }
+
+    #[test]
+    fn pagination_validated_normal_values_unchanged() {
+        let p = PaginationParams {
+            page: 3,
+            page_size: 50,
+        };
+        let v = p.validated(100);
+        assert_eq!(v.page, 3);
+        assert_eq!(v.page_size, 50);
+    }
+
+    #[test]
+    fn record_query_validated_preserves_filters() {
+        let p = RecordQueryParams {
+            page: 0,
+            page_size: 9999,
+            keyword: Some("test".to_string()),
+            record_type: Some(DnsRecordType::A),
+        };
+        let v = p.validated(100);
+        assert_eq!(v.page, 1);
+        assert_eq!(v.page_size, 100);
+        assert_eq!(v.keyword.as_deref(), Some("test"));
+        assert_eq!(v.record_type, Some(DnsRecordType::A));
     }
 }

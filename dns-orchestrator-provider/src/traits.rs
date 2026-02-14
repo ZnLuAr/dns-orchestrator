@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures::stream::{self, StreamExt};
 
 use crate::error::{ProviderError, Result};
 use crate::types::{
@@ -7,6 +8,9 @@ use crate::types::{
     PaginatedResponse, PaginationParams, ProviderDomain, ProviderMetadata, RecordQueryParams,
     UpdateDnsRecordRequest,
 };
+
+/// 批量操作默认并发数
+const DEFAULT_BATCH_CONCURRENCY: usize = 5;
 
 /// 原始 API 错误（内部使用）
 #[derive(Debug, Clone)]
@@ -160,13 +164,23 @@ pub trait DnsProvider: Send + Sync {
         &self,
         requests: &[CreateDnsRecordRequest],
     ) -> Result<BatchCreateResult> {
-        let futures: Vec<_> = requests.iter().map(|req| self.create_record(req)).collect();
-        let results = futures::future::join_all(futures).await;
+        let indexed_requests: Vec<_> = requests
+            .iter()
+            .enumerate()
+            .map(|(i, req)| (i, req.clone()))
+            .collect();
+
+        let results: Vec<(usize, std::result::Result<DnsRecord, ProviderError>)> =
+            stream::iter(indexed_requests)
+                .map(|(i, req)| async move { (i, self.create_record(&req).await) })
+                .buffer_unordered(DEFAULT_BATCH_CONCURRENCY)
+                .collect()
+                .await;
 
         let mut created_records = Vec::new();
         let mut failures = Vec::new();
 
-        for (i, result) in results.into_iter().enumerate() {
+        for (i, result) in results {
             match result {
                 Ok(record) => created_records.push(record),
                 Err(e) => failures.push(BatchCreateFailure {
@@ -191,16 +205,25 @@ pub trait DnsProvider: Send + Sync {
     /// concurrently for each item and collects successes/failures.
     /// Providers may override this with a native batch API for better performance.
     async fn batch_update_records(&self, updates: &[BatchUpdateItem]) -> Result<BatchUpdateResult> {
-        let futures: Vec<_> = updates
+        let indexed_updates: Vec<_> = updates
             .iter()
-            .map(|item| self.update_record(&item.record_id, &item.request))
+            .enumerate()
+            .map(|(i, item)| (i, item.record_id.clone(), item.request.clone()))
             .collect();
-        let results = futures::future::join_all(futures).await;
+
+        let results: Vec<(usize, std::result::Result<DnsRecord, ProviderError>)> =
+            stream::iter(indexed_updates)
+                .map(|(i, record_id, req)| async move {
+                    (i, self.update_record(&record_id, &req).await)
+                })
+                .buffer_unordered(DEFAULT_BATCH_CONCURRENCY)
+                .collect()
+                .await;
 
         let mut updated_records = Vec::new();
         let mut failures = Vec::new();
 
-        for (i, result) in results.into_iter().enumerate() {
+        for (i, result) in results {
             match result {
                 Ok(record) => updated_records.push(record),
                 Err(e) => failures.push(BatchUpdateFailure {
@@ -228,16 +251,27 @@ pub trait DnsProvider: Send + Sync {
         domain_id: &str,
         record_ids: &[String],
     ) -> Result<BatchDeleteResult> {
-        let futures: Vec<_> = record_ids
+        let indexed_ids: Vec<_> = record_ids
             .iter()
-            .map(|id| self.delete_record(id, domain_id))
+            .enumerate()
+            .map(|(i, id)| (i, id.clone()))
             .collect();
-        let results = futures::future::join_all(futures).await;
+        let domain_id_owned = domain_id.to_string();
+
+        let results: Vec<(usize, std::result::Result<(), ProviderError>)> =
+            stream::iter(indexed_ids)
+                .map(|(i, id)| {
+                    let domain_id = &domain_id_owned;
+                    async move { (i, self.delete_record(&id, domain_id).await) }
+                })
+                .buffer_unordered(DEFAULT_BATCH_CONCURRENCY)
+                .collect()
+                .await;
 
         let mut success_count = 0;
         let mut failures = Vec::new();
 
-        for (i, result) in results.into_iter().enumerate() {
+        for (i, result) in results {
             match result {
                 Ok(()) => success_count += 1,
                 Err(e) => failures.push(BatchDeleteFailure {

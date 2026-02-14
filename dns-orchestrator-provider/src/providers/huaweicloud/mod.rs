@@ -8,7 +8,7 @@ pub(crate) mod types;
 
 use reqwest::Client;
 
-use crate::providers::common::create_http_client;
+use crate::providers::common::{DomainCache, create_http_client};
 
 pub(crate) const HUAWEICLOUD_DNS_HOST: &str = "dns.myhuaweicloud.com";
 /// 华为云 API 单页最大记录数
@@ -33,6 +33,7 @@ pub struct HuaweicloudProvider {
     pub(crate) access_key_id: String,
     pub(crate) secret_access_key: String,
     pub(crate) max_retries: u32,
+    pub(crate) domain_cache: DomainCache,
 }
 
 /// Builder for [`HuaweicloudProvider`] with configurable retry behavior.
@@ -64,6 +65,7 @@ impl HuaweicloudProviderBuilder {
             access_key_id: self.access_key_id,
             secret_access_key: self.secret_access_key,
             max_retries: self.max_retries,
+            domain_cache: DomainCache::new(),
         }
     }
 }

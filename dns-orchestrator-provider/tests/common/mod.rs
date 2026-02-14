@@ -1,5 +1,7 @@
 //! 共享测试工具和辅助函数
 
+#![allow(dead_code)]
+
 use std::env;
 use std::sync::Arc;
 

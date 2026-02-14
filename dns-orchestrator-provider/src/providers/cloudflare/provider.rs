@@ -16,10 +16,20 @@ use crate::types::{
 
 use super::{
     CloudflareCaaData, CloudflareDnsRecord, CloudflareProvider, CloudflareSrvData, CloudflareZone,
-    MAX_PAGE_SIZE_RECORDS,
+    MAX_PAGE_SIZE_RECORDS, MAX_PAGE_SIZE_ZONES,
 };
 
 impl CloudflareProvider {
+    /// 获取域名信息（优先使用缓存）
+    async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
+        if let Some(domain) = self.domain_cache.get(domain_id) {
+            return Ok(domain);
+        }
+        let domain = self.get_domain(domain_id).await?;
+        self.domain_cache.insert(domain_id, &domain);
+        Ok(domain)
+    }
+
     /// 将 Cloudflare zone 转换为 `ProviderDomain`
     /// Cloudflare 状态：active, pending, initializing, moved
     pub(crate) fn zone_to_domain(zone: CloudflareZone) -> ProviderDomain {
@@ -288,7 +298,10 @@ impl DnsProvider for CloudflareProvider {
             .await
         {
             Ok(resp) => Ok(resp.status == "active"),
-            Err(_) => Ok(false),
+            Err(
+                ProviderError::InvalidCredentials { .. } | ProviderError::PermissionDenied { .. },
+            ) => Ok(false),
+            Err(e) => Err(e),
         }
     }
 
@@ -296,8 +309,9 @@ impl DnsProvider for CloudflareProvider {
         &self,
         params: &PaginationParams,
     ) -> Result<PaginatedResponse<ProviderDomain>> {
+        let params = params.validated(MAX_PAGE_SIZE_ZONES);
         let (zones, total_count): (Vec<CloudflareZone>, u32) = self
-            .get_paginated("/zones", params, ErrorContext::default())
+            .get_paginated("/zones", &params, ErrorContext::default())
             .await?;
         let domains = zones.into_iter().map(Self::zone_to_domain).collect();
         Ok(PaginatedResponse::new(
@@ -322,16 +336,15 @@ impl DnsProvider for CloudflareProvider {
         domain_id: &str,
         params: &RecordQueryParams,
     ) -> Result<PaginatedResponse<DnsRecord>> {
+        let params = params.validated(MAX_PAGE_SIZE_RECORDS);
         let ctx = ErrorContext {
             domain: Some(domain_id.to_string()),
             ..Default::default()
         };
 
-        // 先获取 zone 信息以获取域名
-        let zone: CloudflareZone = self
-            .get(&format!("/zones/{domain_id}"), ctx.clone())
-            .await?;
-        let zone_name = zone.name;
+        // 先获取 zone 信息以获取域名（使用缓存）
+        let domain_info = self.get_domain_cached(domain_id).await?;
+        let zone_name = domain_info.name;
 
         // 构建查询 URL，包含搜索参数
         let mut url = format!(
@@ -356,13 +369,22 @@ impl DnsProvider for CloudflareProvider {
 
         let (cf_records, total_count) = self.get_records(&url, ctx).await?;
 
-        let records: Result<Vec<DnsRecord>> = cf_records
+        let records: Vec<DnsRecord> = cf_records
             .into_iter()
-            .map(|r| self.cf_record_to_dns_record(r, domain_id, &zone_name))
+            .filter_map(
+                |r| match self.cf_record_to_dns_record(r, domain_id, &zone_name) {
+                    Ok(record) => Some(record),
+                    Err(ProviderError::UnsupportedRecordType { .. }) => None,
+                    Err(e) => {
+                        log::warn!("[cloudflare] Skipping record due to parse error: {e}");
+                        None
+                    }
+                },
+            )
             .collect();
 
         Ok(PaginatedResponse::new(
-            records?,
+            records,
             params.page,
             params.page_size,
             total_count,
@@ -376,11 +398,9 @@ impl DnsProvider for CloudflareProvider {
             ..Default::default()
         };
 
-        // 先获取 zone 信息
-        let zone: CloudflareZone = self
-            .get(&format!("/zones/{}", req.domain_id), ctx.clone())
-            .await?;
-        let zone_name = zone.name;
+        // 获取 zone 信息（使用缓存）
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
+        let zone_name = domain_info.name;
 
         let full_name = relative_to_full_name(&req.name, &zone_name);
         let body = Self::build_create_body(&full_name, req.ttl, &req.data, req.proxied);
@@ -403,11 +423,9 @@ impl DnsProvider for CloudflareProvider {
             domain: Some(req.domain_id.clone()),
         };
 
-        // 先获取 zone 信息
-        let zone: CloudflareZone = self
-            .get(&format!("/zones/{}", req.domain_id), ctx.clone())
-            .await?;
-        let zone_name = zone.name;
+        // 获取 zone 信息（使用缓存）
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
+        let zone_name = domain_info.name;
 
         let full_name = relative_to_full_name(&req.name, &zone_name);
         let body = Self::build_create_body(&full_name, req.ttl, &req.data, req.proxied);

@@ -1,14 +1,15 @@
 //! Provider 公共工具函数
 
-use std::sync::OnceLock;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use hmac::{Hmac, Mac};
 use reqwest::Client;
 use sha2::Sha256;
 
 use crate::error::{ProviderError, Result};
-use crate::types::{DnsRecordType, RecordData};
+use crate::types::{DnsRecordType, ProviderDomain, RecordData};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -37,6 +38,55 @@ pub fn create_http_client() -> Client {
                 .expect("Failed to create HTTP client: TLS backend unavailable")
         })
         .clone()
+}
+
+// ============ Domain 缓存 ============
+
+/// 域名信息缓存，减少重复 API 调用
+///
+/// 使用 `std::sync::Mutex` 而非 `tokio::sync`，因为临界区极短且无异步操作。
+/// TTL 为 5 分钟。
+pub struct DomainCache {
+    cache: Mutex<HashMap<String, (ProviderDomain, Instant)>>,
+    ttl: Duration,
+}
+
+impl Default for DomainCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DomainCache {
+    pub fn new() -> Self {
+        Self {
+            cache: Mutex::new(HashMap::new()),
+            ttl: Duration::from_secs(300), // 5 分钟
+        }
+    }
+
+    /// 获取缓存的域名信息（如果未过期）
+    pub fn get(&self, domain_id: &str) -> Option<ProviderDomain> {
+        let cache = self
+            .cache
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((domain, inserted_at)) = cache.get(domain_id)
+            && inserted_at.elapsed() < self.ttl
+        {
+            return Some(domain.clone());
+        }
+        None
+    }
+
+    /// 插入域名信息到缓存
+    pub fn insert(&self, domain_id: &str, domain: &ProviderDomain) {
+        let mut cache = self
+            .cache
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        cache.insert(domain_id.to_string(), (domain.clone(), Instant::now()));
+    }
 }
 
 // ============ 记录类型转换 ============

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{ProviderError, Result};
+use crate::error::Result;
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 use crate::types::PaginationParams;
@@ -13,18 +13,6 @@ use super::{
 
 impl CloudflareProvider {
     // ==================== 辅助方法 ====================
-
-    /// 检查 HTTP 429 限流状态码，返回 `RateLimited` 错误
-    fn check_rate_limit(&self, status: u16, response_text: &str) -> Result<()> {
-        if status == 429 {
-            return Err(ProviderError::RateLimited {
-                provider: self.provider_name().to_string(),
-                retry_after: None,
-                raw_message: Some(response_text.to_string()),
-            });
-        }
-        Ok(())
-    }
 
     /// 检查 Cloudflare 响应中的错误字段，失败则返回映射后的错误
     fn check_cf_errors<T>(
@@ -107,7 +95,7 @@ impl CloudflareProvider {
             .header("Authorization", format!("Bearer {}", self.api_token))
             .json(body);
 
-        let (status, response_text) = HttpUtils::execute_request_with_retry(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             method.as_str(),
@@ -116,7 +104,6 @@ impl CloudflareProvider {
         )
         .await?;
 
-        self.check_rate_limit(status, &response_text)?;
         self.handle_cf_response(&response_text, ctx)
     }
 
@@ -135,7 +122,7 @@ impl CloudflareProvider {
             .get(&url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (status, response_text) = HttpUtils::execute_request_with_retry(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "GET",
@@ -144,7 +131,6 @@ impl CloudflareProvider {
         )
         .await?;
 
-        self.check_rate_limit(status, &response_text)?;
         self.handle_cf_response(&response_text, ctx)
     }
 
@@ -168,7 +154,7 @@ impl CloudflareProvider {
             .get(&url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (status, response_text) = HttpUtils::execute_request_with_retry(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "GET",
@@ -177,7 +163,6 @@ impl CloudflareProvider {
         )
         .await?;
 
-        self.check_rate_limit(status, &response_text)?;
         self.handle_cf_response_paginated(&response_text, ctx)
     }
 
@@ -194,7 +179,7 @@ impl CloudflareProvider {
             .get(&full_url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (status, response_text) = HttpUtils::execute_request_with_retry(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "GET",
@@ -203,7 +188,6 @@ impl CloudflareProvider {
         )
         .await?;
 
-        self.check_rate_limit(status, &response_text)?;
         self.handle_cf_response_paginated(&response_text, ctx)
     }
 
@@ -238,7 +222,7 @@ impl CloudflareProvider {
             .delete(&url)
             .header("Authorization", format!("Bearer {}", self.api_token));
 
-        let (status, response_text) = HttpUtils::execute_request_with_retry(
+        let (_status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "DELETE",
@@ -246,8 +230,6 @@ impl CloudflareProvider {
             self.max_retries,
         )
         .await?;
-
-        self.check_rate_limit(status, &response_text)?;
 
         // DELETE 响应只需检查是否成功，不需要返回数据
         let cf_response: CloudflareResponse<serde_json::Value> =

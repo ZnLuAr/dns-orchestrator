@@ -20,6 +20,16 @@ use super::{
 };
 
 impl DnspodProvider {
+    /// 获取域名信息（优先使用缓存）
+    async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
+        if let Some(domain) = self.domain_cache.get(domain_id) {
+            return Ok(domain);
+        }
+        let domain = self.get_domain(domain_id).await?;
+        self.domain_cache.insert(domain_id, &domain);
+        Ok(domain)
+    }
+
     /// 将 `DNSPod` 域名状态转换为内部状态
     pub(crate) fn convert_domain_status(status: &str, dns_status: &str) -> DomainStatus {
         match (status, dns_status) {
@@ -96,10 +106,7 @@ impl DnsProvider for DnspodProvider {
         {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
-            Err(e) => {
-                log::warn!("Credential validation failed: {e}");
-                Ok(false)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -115,11 +122,12 @@ impl DnsProvider for DnspodProvider {
             limit: u32,
         }
 
+        let params = params.validated(MAX_PAGE_SIZE);
         // 将 page/page_size 转换为 offset/limit
         let offset = (params.page - 1) * params.page_size;
         let req = DescribeDomainListRequest {
             offset,
-            limit: params.page_size.min(MAX_PAGE_SIZE),
+            limit: params.page_size,
         };
 
         let response: DomainListResponse = self
@@ -185,22 +193,28 @@ impl DnsProvider for DnspodProvider {
             });
         }
 
-        // Fallback: 数字 ID，从列表中查找
-        let params = PaginationParams {
-            page: 1,
-            page_size: 100,
-        };
-        let response = self.list_domains(&params).await?;
+        // Fallback: 数字 ID，分页查找
+        let mut page = 1u32;
+        let page_size = 100u32;
+        loop {
+            let params = PaginationParams { page, page_size };
+            let response = self.list_domains(&params).await?;
 
-        response
-            .items
-            .into_iter()
-            .find(|d| d.id == domain_id)
-            .ok_or_else(|| ProviderError::DomainNotFound {
-                provider: self.provider_name().to_string(),
-                domain: domain_id.to_string(),
-                raw_message: None,
-            })
+            if let Some(found) = response.items.into_iter().find(|d| d.id == domain_id) {
+                return Ok(found);
+            }
+
+            if !response.has_more {
+                break;
+            }
+            page += 1;
+        }
+
+        Err(ProviderError::DomainNotFound {
+            provider: self.provider_name().to_string(),
+            domain: domain_id.to_string(),
+            raw_message: None,
+        })
     }
 
     async fn list_records(
@@ -222,13 +236,14 @@ impl DnsProvider for DnspodProvider {
             record_type: Option<String>,
         }
 
-        let domain_info = self.get_domain(domain_id).await?;
+        let params = params.validated(MAX_PAGE_SIZE);
+        let domain_info = self.get_domain_cached(domain_id).await?;
 
         let offset = (params.page - 1) * params.page_size;
         let req = DescribeRecordListRequest {
             domain: domain_info.name,
             offset,
-            limit: params.page_size.min(MAX_PAGE_SIZE),
+            limit: params.page_size,
             keyword: params.keyword.clone().filter(|k| !k.is_empty()),
             record_type: params
                 .record_type
@@ -314,7 +329,7 @@ impl DnsProvider for DnspodProvider {
             mx: Option<u16>,
         }
 
-        let domain_info = self.get_domain(&req.domain_id).await?;
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
         // 从 RecordData 提取 value 和 mx
         let (value, mx) = Self::record_data_to_api(&req.data);
@@ -384,7 +399,7 @@ impl DnsProvider for DnspodProvider {
                 raw_message: None,
             })?;
 
-        let domain_info = self.get_domain(&req.domain_id).await?;
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
         // 从 RecordData 提取 value 和 mx
         let (value, mx) = Self::record_data_to_api(&req.data);
@@ -442,7 +457,7 @@ impl DnsProvider for DnspodProvider {
                 raw_message: None,
             })?;
 
-        let domain_info = self.get_domain(domain_id).await?;
+        let domain_info = self.get_domain_cached(domain_id).await?;
 
         let api_req = DeleteRecordRequest {
             domain: domain_info.name,

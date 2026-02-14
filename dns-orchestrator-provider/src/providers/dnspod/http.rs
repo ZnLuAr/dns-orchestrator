@@ -7,7 +7,7 @@ use crate::error::{ProviderError, Result};
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 
-use super::{DNSPOD_API_HOST, DNSPOD_VERSION, DnspodProvider, TencentResponse};
+use super::{DNSPOD_API_HOST, DNSPOD_VERSION, DnspodProvider, TencentError, TencentResponse};
 
 impl DnspodProvider {
     /// 执行腾讯云 API 请求
@@ -52,20 +52,23 @@ impl DnspodProvider {
         )
         .await?;
 
-        // 4. 解析响应
-        let tc_response: TencentResponse<T> =
+        // 4. 解析外层包装
+        let tc_response: TencentResponse =
             HttpUtils::parse_json(&response_text, self.provider_name())?;
+        let response_value = tc_response.response;
 
-        // 5. 处理错误
-        if let Some(error) = tc_response.response.error {
+        // 5. 检查错误
+        if let Some(error_value) = response_value.get("Error") {
+            let error: TencentError = serde_json::from_value(error_value.clone())
+                .map_err(|e| self.parse_error(format!("Failed to parse error: {e}")))?;
             log::error!("API error: {} - {}", error.code, error.message);
             return Err(self.map_error(RawApiError::with_code(&error.code, &error.message), ctx));
         }
 
-        // 6. 提取数据
-        tc_response
-            .response
-            .data
-            .ok_or_else(|| self.parse_error("Missing data in response"))
+        // 6. 反序列化为目标类型
+        serde_json::from_value(response_value).map_err(|e| ProviderError::ParseError {
+            provider: self.provider_name().to_string(),
+            detail: e.to_string(),
+        })
     }
 }

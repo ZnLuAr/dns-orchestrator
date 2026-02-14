@@ -5,17 +5,9 @@ use serde::Deserialize;
 // ============ 腾讯云 API 响应结构 ============
 
 #[derive(Debug, Deserialize)]
-pub struct TencentResponse<T> {
+pub struct TencentResponse {
     #[serde(rename = "Response")]
-    pub response: TencentResponseInner<T>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TencentResponseInner<T> {
-    #[serde(flatten)]
-    pub data: Option<T>,
-    #[serde(rename = "Error")]
-    pub error: Option<TencentError>,
+    pub response: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]

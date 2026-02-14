@@ -225,7 +225,7 @@ mod desktop {
 mod android {
     use super::{
         async_trait, CoreError, CoreResult, CredentialStore, CredentialsMap, HashMap,
-        LegacyCredentialsMap, ProviderCredentials, StorageFormat,
+        ProviderCredentials, StorageFormat,
     };
     use std::sync::Arc;
     use tauri::AppHandle;

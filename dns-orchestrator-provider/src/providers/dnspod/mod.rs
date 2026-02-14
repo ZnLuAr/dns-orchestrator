@@ -8,11 +8,11 @@ mod types;
 
 use reqwest::Client;
 
-use crate::providers::common::create_http_client;
+use crate::providers::common::{DomainCache, create_http_client};
 
 pub(crate) use types::{
     CreateRecordResponse, DescribeDomainResponse, DomainListResponse, ModifyRecordResponse,
-    RecordListResponse, TencentResponse,
+    RecordListResponse, TencentError, TencentResponse,
 };
 
 pub(crate) const DNSPOD_API_HOST: &str = "dnspod.tencentcloudapi.com";
@@ -40,6 +40,7 @@ pub struct DnspodProvider {
     pub(crate) secret_id: String,
     pub(crate) secret_key: String,
     pub(crate) max_retries: u32,
+    pub(crate) domain_cache: DomainCache,
 }
 
 /// Builder for [`DnspodProvider`] with configurable retry behavior.
@@ -71,6 +72,7 @@ impl DnspodProviderBuilder {
             secret_id: self.secret_id,
             secret_key: self.secret_key,
             max_retries: self.max_retries,
+            domain_cache: DomainCache::new(),
         }
     }
 }

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use dns_orchestrator_provider::ProviderError;
+use futures::stream::{self, StreamExt};
 
 use crate::error::CoreResult;
 use crate::services::ServiceContext;
@@ -97,29 +98,27 @@ impl DnsService {
     ) -> CoreResult<BatchDeleteResult> {
         let provider = self.ctx.get_provider(account_id).await?;
 
+        let domain_id = request.domain_id;
+        let results: Vec<Result<String, (String, ProviderError)>> =
+            stream::iter(request.record_ids)
+                .map(|record_id| {
+                    let provider = provider.clone();
+                    let domain_id = domain_id.clone();
+                    async move {
+                        match provider.delete_record(&record_id, &domain_id).await {
+                            Ok(()) => Ok(record_id),
+                            Err(e) => Err((record_id, e)),
+                        }
+                    }
+                })
+                .buffer_unordered(5)
+                .collect()
+                .await;
+
         let mut success_count = 0;
         let mut failures = Vec::new();
-
-        // 并行删除所有记录
-        let delete_futures: Vec<_> = request
-            .record_ids
-            .iter()
-            .map(|record_id| {
-                let provider = provider.clone();
-                let domain_id = request.domain_id.clone();
-                let record_id = record_id.clone();
-                async move {
-                    match provider.delete_record(&record_id, &domain_id).await {
-                        Ok(()) => Ok(record_id),
-                        Err(e) => Err((record_id, e)),
-                    }
-                }
-            })
-            .collect();
-
-        let results = futures::future::join_all(delete_futures).await;
-
         let mut account_marked_invalid = false;
+
         for result in results {
             match result {
                 Ok(_) => success_count += 1,

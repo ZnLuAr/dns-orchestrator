@@ -23,6 +23,16 @@ use super::types::{
 use super::{HuaweicloudProvider, MAX_PAGE_SIZE};
 
 impl HuaweicloudProvider {
+    /// 获取域名信息（优先使用缓存）
+    async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
+        if let Some(domain) = self.domain_cache.get(domain_id) {
+            return Ok(domain);
+        }
+        let domain = self.get_domain(domain_id).await?;
+        self.domain_cache.insert(domain_id, &domain);
+        Ok(domain)
+    }
+
     /// 将华为云域名状态转换为内部状态
     /// 华为云状态：ACTIVE, `PENDING_CREATE`, `PENDING_UPDATE`, `PENDING_DELETE`,
     /// `PENDING_FREEZE`, FREEZE, ILLEGAL, POLICE, `PENDING_DISABLE`, DISABLE, ERROR
@@ -95,10 +105,7 @@ impl DnsProvider for HuaweicloudProvider {
         {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
-            Err(e) => {
-                log::warn!("Credential validation failed: {e}");
-                Ok(false)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -106,9 +113,10 @@ impl DnsProvider for HuaweicloudProvider {
         &self,
         params: &PaginationParams,
     ) -> Result<PaginatedResponse<ProviderDomain>> {
+        let params = params.validated(MAX_PAGE_SIZE);
         // 华为云使用 offset/limit 分页
         let offset = (params.page - 1) * params.page_size;
-        let limit = params.page_size.min(MAX_PAGE_SIZE);
+        let limit = params.page_size;
         let query = format!("type=public&offset={offset}&limit={limit}");
 
         let response: ListZonesResponse = self
@@ -161,12 +169,13 @@ impl DnsProvider for HuaweicloudProvider {
         domain_id: &str,
         params: &RecordQueryParams,
     ) -> Result<PaginatedResponse<DnsRecord>> {
-        // 获取域名信息以获取域名名称
-        let domain_info = self.get_domain(domain_id).await?;
+        let params = params.validated(MAX_PAGE_SIZE);
+        // 获取域名信息以获取域名名称（使用缓存）
+        let domain_info = self.get_domain_cached(domain_id).await?;
 
         // 华为云使用 offset/limit 分页
         let offset = (params.page - 1) * params.page_size;
-        let limit = params.page_size.min(MAX_PAGE_SIZE);
+        let limit = params.page_size;
         let mut query = format!("offset={offset}&limit={limit}");
 
         // 添加搜索关键词（华为云支持 name 参数模糊匹配）
@@ -201,7 +210,17 @@ impl DnsProvider for HuaweicloudProvider {
                     return None;
                 }
 
-                let value = r.records.as_ref()?.first()?.clone();
+                // TODO: 华为云 recordset 可含多条 records（round-robin），
+                // 当前数据模型仅支持单值记录，故只取第一条。
+                let records = r.records.as_ref()?;
+                if records.len() > 1 {
+                    log::debug!(
+                        "[huaweicloud] Record '{}' has {} values, only the first is used",
+                        r.name,
+                        records.len()
+                    );
+                }
+                let value = records.first()?.clone();
                 let data = Self::parse_record_data(&r.record_type, value).ok()?;
 
                 Some(DnsRecord {
@@ -243,8 +262,8 @@ impl DnsProvider for HuaweicloudProvider {
             ttl: u32,
         }
 
-        // 获取域名信息
-        let domain_info = self.get_domain(&req.domain_id).await?;
+        // 获取域名信息（使用缓存）
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
         // 构造完整的记录名称（华为云需要末尾带点）
         let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));
@@ -295,8 +314,8 @@ impl DnsProvider for HuaweicloudProvider {
             ttl: u32,
         }
 
-        // 获取域名信息
-        let domain_info = self.get_domain(&req.domain_id).await?;
+        // 获取域名信息（使用缓存）
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
         // 构造完整的记录名称（华为云需要末尾带点）
         let full_name = format!("{}.", relative_to_full_name(&req.name, &domain_info.name));

@@ -162,6 +162,28 @@ pub enum ProviderError {
     },
 }
 
+impl ProviderError {
+    /// 是否为预期行为（用户输入、资源不存在等），用于日志分级。
+    ///
+    /// 返回 `true` 时应使用 `warn` 级别，`false` 时使用 `error` 级别。
+    /// **新增变体时请同步更新此方法。**
+    #[must_use]
+    pub fn is_expected(&self) -> bool {
+        matches!(
+            self,
+            Self::InvalidCredentials { .. }
+                | Self::RecordExists { .. }
+                | Self::RecordNotFound { .. }
+                | Self::InvalidParameter { .. }
+                | Self::UnsupportedRecordType { .. }
+                | Self::QuotaExceeded { .. }
+                | Self::DomainNotFound { .. }
+                | Self::DomainLocked { .. }
+                | Self::PermissionDenied { .. }
+        )
+    }
+}
+
 impl std::fmt::Display for ProviderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

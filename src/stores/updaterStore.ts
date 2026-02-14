@@ -45,6 +45,7 @@ interface AndroidUpdate {
   version: string
   notes: string
   url: string // APK 下载 URL
+  signature: string // minisign 签名
 }
 
 /** 下载进度事件 */
@@ -308,6 +309,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
           // 下载 APK
           apkPath = await invoke<string>("download_apk", {
             url: available.url,
+            signature: available.signature,
             onProgress,
           })
           logger.debug("APK downloaded to:", apkPath)

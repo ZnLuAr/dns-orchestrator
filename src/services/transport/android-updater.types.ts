@@ -10,6 +10,7 @@ export interface AndroidUpdate {
   version: string
   notes: string
   url: string
+  signature: string
 }
 
 /** 下载进度事件 */
@@ -28,7 +29,7 @@ export interface AndroidUpdaterCommandMap {
     result: AndroidUpdate | null
   }
   download_apk: {
-    args: { url: string; onProgress: Channel<DownloadProgress> }
+    args: { url: string; signature: string; onProgress: Channel<DownloadProgress> }
     result: string
   }
   install_apk: {

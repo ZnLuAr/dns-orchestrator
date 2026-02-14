@@ -2,8 +2,8 @@
 //!
 //! 仅在 Android 平台编译，提供应用内更新功能：
 //! 1. 检查更新 - 解析 latest.json
-//! 2. 下载 APK - 带进度回调
-//! 3. 安装 APK - 触发系统安装器
+//! 2. 下载 APK - 带进度回调 + 签名验证
+//! 3. 安装 APK - 触发系统安装器（仅允许缓存目录）
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,12 +12,16 @@ use tauri::Manager;
 const LATEST_JSON_URL: &str =
     "https://github.com/AptS-1547/dns-orchestrator/releases/latest/download/latest.json";
 
+/// APK 更新签名验证用的公钥（编译时从 tauri.conf.json plugins.updater.pubkey 提取）
+const APK_UPDATER_PUBKEY: &str = include_str!(concat!(env!("OUT_DIR"), "/updater_pubkey.txt"));
+
 /// Android 更新信息
 #[derive(Debug, Clone, Serialize)]
 pub struct AndroidUpdate {
     pub version: String,
     pub notes: String,
     pub url: String,
+    pub signature: String,
 }
 
 /// latest.json 结构
@@ -32,6 +36,7 @@ struct LatestJson {
 #[derive(Debug, Deserialize)]
 struct Platform {
     url: String,
+    signature: Option<String>,
 }
 
 /// 下载进度事件
@@ -66,6 +71,24 @@ fn is_newer_version(current: &str, remote: &str) -> bool {
         }
     }
     false
+}
+
+/// 验证 APK 文件的 minisign 签名
+fn verify_apk_signature(apk_path: &std::path::Path, signature_str: &str) -> Result<(), String> {
+    use minisign_verify::{PublicKey, Signature};
+
+    let pubkey = PublicKey::decode(APK_UPDATER_PUBKEY)
+        .map_err(|e| format!("Failed to decode updater pubkey: {e}"))?;
+
+    let signature = Signature::decode(signature_str)
+        .map_err(|e| format!("Failed to decode APK signature: {e}"))?;
+
+    let data =
+        std::fs::read(apk_path).map_err(|e| format!("Failed to read APK for verification: {e}"))?;
+
+    pubkey.verify(&data, &signature, false).map_err(|_| {
+        "APK signature verification failed: file may have been tampered with".to_string()
+    })
 }
 
 /// 检查 Android 更新
@@ -109,6 +132,12 @@ pub async fn check_android_update(
         return Ok(None); // 没有 Android 平台的更新
     };
 
+    // 签名必须存在且不能为 "none"
+    let signature = match &platform.signature {
+        Some(sig) if !sig.is_empty() && sig != "none" => sig.clone(),
+        _ => return Err("Android update has no valid signature, refusing update".to_string()),
+    };
+
     // 比较版本
     if !is_newer_version(&current_version, &latest.version) {
         return Ok(None); // 当前已是最新版本
@@ -118,18 +147,25 @@ pub async fn check_android_update(
         version: latest.version,
         notes: latest.notes.unwrap_or_default(),
         url: platform.url.clone(),
+        signature,
     }))
 }
 
-/// 下载 APK 文件到缓存目录
+/// 下载 APK 文件到缓存目录并验证签名
 #[tauri::command]
 pub async fn download_apk(
     app: tauri::AppHandle,
     url: String,
+    signature: String,
     on_progress: tauri::ipc::Channel<DownloadProgress>,
 ) -> Result<String, String> {
     use futures::StreamExt;
     use std::io::Write;
+
+    // 签名不能为空
+    if signature.is_empty() || signature == "none" {
+        return Err("Cannot download APK without a valid signature".to_string());
+    }
 
     let client = reqwest::Client::builder()
         .user_agent("DNS-Orchestrator-Updater")
@@ -185,7 +221,17 @@ pub async fn download_apk(
         });
     }
 
-    // 发送完成事件
+    // 关闭文件确保写入完成
+    drop(file);
+
+    // 验证签名
+    if let Err(e) = verify_apk_signature(&apk_path, &signature) {
+        // 删除不可信文件
+        let _ = std::fs::remove_file(&apk_path);
+        return Err(e);
+    }
+
+    // 发送完成事件（签名验证通过后才发送）
     let _ = on_progress.send(DownloadProgress::Finished);
 
     Ok(apk_path.to_string_lossy().to_string())
@@ -194,9 +240,29 @@ pub async fn download_apk(
 /// 触发 APK 安装
 ///
 /// 使用自定义插件通过 FileProvider 正确处理 URI 转换
+/// 仅允许安装位于应用缓存目录下的 APK 文件
 #[tauri::command]
 pub async fn install_apk(app: tauri::AppHandle, path: String) -> Result<(), String> {
     use tauri_plugin_apk_installer::ApkInstallerExt;
+
+    // 路径白名单：只允许安装缓存目录下的文件
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Failed to get cache dir: {}", e))?;
+
+    let apk_path = std::path::Path::new(&path);
+
+    let canonical_path = apk_path
+        .canonicalize()
+        .map_err(|e| format!("Invalid APK path: {}", e))?;
+    let canonical_cache = cache_dir
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve cache dir: {}", e))?;
+
+    if !canonical_path.starts_with(&canonical_cache) {
+        return Err("Rejected: APK path is outside app cache directory".to_string());
+    }
 
     app.apk_installer()
         .install_apk(path)
@@ -216,5 +282,12 @@ mod tests {
         assert!(!is_newer_version("1.0.1", "1.0.0"));
         assert!(!is_newer_version("1.0.0", "1.0.0"));
         assert!(is_newer_version("1.0.7", "1.0.8"));
+    }
+
+    #[test]
+    fn test_pubkey_decode() {
+        use minisign_verify::PublicKey;
+        // 确保编译时内嵌的公钥格式正确
+        PublicKey::decode(APK_UPDATER_PUBKEY).expect("Embedded pubkey should be valid");
     }
 }

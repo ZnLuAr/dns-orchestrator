@@ -48,7 +48,7 @@ impl AliyunProvider {
             .header("x-acs-content-sha256", EMPTY_BODY_SHA256)
             .header("Authorization", authorization);
 
-        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+        let (status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "POST",
@@ -56,6 +56,25 @@ impl AliyunProvider {
             self.max_retries,
         )
         .await?;
+
+        // 对 HTTP 4xx/5xx 错误，尝试解析 JSON 错误体
+        if status >= 400 {
+            // 尝试解析为 Value 并提取 Code/Message
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&response_text)
+                && let (Some(code), Some(message)) = (
+                    value.get("Code").and_then(|v| v.as_str()),
+                    value.get("Message").and_then(|v| v.as_str()),
+                )
+            {
+                log::error!("API error: {code} - {message}");
+                return Err(self.map_error(RawApiError::with_code(code, message), ctx));
+            }
+            // 无法解析为结构化错误，返回通用 NetworkError
+            return Err(ProviderError::NetworkError {
+                provider: self.provider_name().to_string(),
+                detail: format!("HTTP {status}: {response_text}"),
+            });
+        }
 
         // 5. 解析为 Value（只做一次字符串解析）
         let value: serde_json::Value = HttpUtils::parse_json(&response_text, self.provider_name())?;
