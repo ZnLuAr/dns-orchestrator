@@ -91,7 +91,11 @@ export function DomainSelectorPage() {
       const [accountId, domainId] = key.split("::")
       const domains = getDomainsForAccount(accountId)
       const domain = domains.find((d) => d.id === domainId)
-      domain?.metadata?.tags?.forEach((tag) => tagsSet.add(tag))
+      if (domain?.metadata?.tags) {
+        for (const tag of domain.metadata.tags) {
+          tagsSet.add(tag)
+        }
+      }
     })
     return Array.from(tagsSet).sort()
   }, [selectedDomainKeys, getDomainsForAccount])

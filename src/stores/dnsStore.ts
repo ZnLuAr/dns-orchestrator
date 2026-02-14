@@ -110,6 +110,7 @@ export const useDnsStore = create<DnsState>((set, get) => ({
     set({ recordType })
   },
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: fetch with search/filter/pagination state management
   fetchRecords: async (accountId, domainId, keyword, recordType) => {
     const { currentDomainId: prevDomainId } = get()
     const isDomainChange = prevDomainId !== domainId
@@ -208,6 +209,7 @@ export const useDnsStore = create<DnsState>((set, get) => ({
     }
   },
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page jump with validation and error handling
   jumpToPage: async (accountId, domainId, targetPage) => {
     const { keyword, recordType, totalCount, pageSize } = get()
 

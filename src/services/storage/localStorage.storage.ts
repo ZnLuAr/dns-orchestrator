@@ -106,7 +106,9 @@ class LocalStorageAdapter implements IStorage {
       }
     }
 
-    keysToRemove.forEach((key) => localStorage.removeItem(key))
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key)
+    }
     logger.debug(`[Storage] Cleared ${keysToRemove.length} keys`)
   }
 }

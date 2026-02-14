@@ -21,22 +21,14 @@ function CopyableTextComponent({ value, children, className = "" }: CopyableText
     copyToClipboard(value)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      handleClick()
-    }
-  }
-
   return (
-    <span
+    <button
+      type="button"
       className={`cursor-pointer hover:underline ${className}`}
       onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      role="button"
-      tabIndex={0}
     >
       {children ?? value}
-    </span>
+    </button>
   )
 }
 

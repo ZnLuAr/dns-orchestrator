@@ -146,6 +146,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
 
   setShowUpdateDialog: (show: boolean) => set({ showUpdateDialog: show }),
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-platform update check logic
   checkForUpdates: async () => {
     set({ checking: true, error: null, upToDate: false, isPlatformUnsupported: false })
 
@@ -247,6 +248,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
     }
   },
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-platform download with retry logic
   downloadAndInstall: async () => {
     const { available } = get()
     if (!available) return
@@ -290,6 +292,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             event: "Started" | "Progress" | "Finished"
             data: { content_length?: number; chunk_length?: number }
           }>()
+          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: progress event handler
           onProgress.onmessage = (event) => {
             if (event.event === "Started") {
               contentLength = event.data.content_length ?? 0
