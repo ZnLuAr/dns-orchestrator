@@ -1,18 +1,31 @@
 //! HTTP header inspection and security analysis module.
 
 use std::fmt::Write;
+use std::sync::LazyLock;
 use std::time::Instant;
 
 use log::debug;
 use reqwest::{Client, Method};
+use tokio::time::timeout;
 use url::Url;
 
 use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{
     HttpHeader, HttpHeaderCheckRequest, HttpHeaderCheckResult, HttpMethod, SecurityHeaderAnalysis,
+    SecurityHeaderStatus,
 };
 
 const REQUEST_TIMEOUT_SECS: u64 = 10;
+const OVERALL_TIMEOUT_SECS: u64 = 15;
+
+/// Shared HTTP client with configured timeout and redirect policy.
+static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .unwrap_or_default()
+});
 
 /// Required security headers.
 const REQUIRED_SECURITY_HEADERS: &[&str] = &[
@@ -30,6 +43,21 @@ const RECOMMENDED_SECURITY_HEADERS: &[&str] =
 pub async fn http_header_check(
     request: &HttpHeaderCheckRequest,
 ) -> ToolboxResult<HttpHeaderCheckResult> {
+    timeout(
+        std::time::Duration::from_secs(OVERALL_TIMEOUT_SECS),
+        http_header_check_inner(request),
+    )
+    .await
+    .map_err(|_| {
+        ToolboxError::NetworkError(format!(
+            "HTTP header check timed out ({OVERALL_TIMEOUT_SECS}s)"
+        ))
+    })?
+}
+
+async fn http_header_check_inner(
+    request: &HttpHeaderCheckRequest,
+) -> ToolboxResult<HttpHeaderCheckResult> {
     debug!("[HTTP] Checking headers for {}", request.url);
     let start = Instant::now();
 
@@ -42,14 +70,7 @@ pub async fn http_header_check(
 
     debug!("[HTTP] Normalized URL: {url}");
 
-    // Build HTTP client
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .build()
-        .map_err(|e| {
-            ToolboxError::NetworkError(format!("HTTP client initialization failed: {e}"))
-        })?;
+    let client = &*HTTP_CLIENT;
 
     // Map HttpMethod to reqwest::Method
     let method = match request.method {
@@ -193,9 +214,9 @@ fn analyze_security_headers(headers: &[HttpHeader]) -> Vec<SecurityHeaderAnalysi
             present: found.is_some(),
             value: found.map(|h| h.value.clone()),
             status: if found.is_some() {
-                "good".to_string()
+                SecurityHeaderStatus::Good
             } else {
-                "missing".to_string()
+                SecurityHeaderStatus::Missing
             },
             recommendation: if found.is_none() {
                 Some(get_recommendation(header_name))
@@ -216,9 +237,9 @@ fn analyze_security_headers(headers: &[HttpHeader]) -> Vec<SecurityHeaderAnalysi
             present: found.is_some(),
             value: found.map(|h| h.value.clone()),
             status: if found.is_some() {
-                "good".to_string()
+                SecurityHeaderStatus::Good
             } else {
-                "warning".to_string()
+                SecurityHeaderStatus::Warning
             },
             recommendation: if found.is_none() {
                 Some(get_recommendation(header_name))
@@ -308,7 +329,12 @@ mod tests {
         // All should be present and "good"
         for item in &analysis {
             assert!(item.present, "Header {} should be present", item.name);
-            assert_eq!(item.status, "good", "Header {} should be good", item.name);
+            assert_eq!(
+                item.status,
+                SecurityHeaderStatus::Good,
+                "Header {} should be good",
+                item.name
+            );
             assert!(
                 item.recommendation.is_none(),
                 "Header {} should have no recommendation",
@@ -343,7 +369,7 @@ mod tests {
             .filter(|a| required_names.contains(&a.name.as_str()))
         {
             assert!(!item.present);
-            assert_eq!(item.status, "missing");
+            assert_eq!(item.status, SecurityHeaderStatus::Missing);
             assert!(item.recommendation.is_some());
             assert!(item.value.is_none());
         }
@@ -355,7 +381,7 @@ mod tests {
             .filter(|a| recommended_names.contains(&a.name.as_str()))
         {
             assert!(!item.present);
-            assert_eq!(item.status, "warning");
+            assert_eq!(item.status, SecurityHeaderStatus::Warning);
             assert!(item.recommendation.is_some());
         }
     }
@@ -380,7 +406,7 @@ mod tests {
             .find(|a| a.name == "strict-transport-security")
             .unwrap();
         assert!(hsts.present);
-        assert_eq!(hsts.status, "good");
+        assert_eq!(hsts.status, SecurityHeaderStatus::Good);
         assert_eq!(hsts.value.as_deref(), Some("max-age=31536000"));
 
         let xfo = analysis
@@ -388,7 +414,7 @@ mod tests {
             .find(|a| a.name == "x-frame-options")
             .unwrap();
         assert!(!xfo.present);
-        assert_eq!(xfo.status, "missing");
+        assert_eq!(xfo.status, SecurityHeaderStatus::Missing);
     }
 
     #[test]
@@ -404,7 +430,7 @@ mod tests {
             .find(|a| a.name == "strict-transport-security")
             .unwrap();
         assert!(hsts.present);
-        assert_eq!(hsts.status, "good");
+        assert_eq!(hsts.status, SecurityHeaderStatus::Good);
     }
 
     #[test]

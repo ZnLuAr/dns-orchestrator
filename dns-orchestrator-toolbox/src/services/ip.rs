@@ -1,5 +1,7 @@
 //! IP geolocation lookup module.
 
+use std::sync::LazyLock;
+
 use hickory_resolver::{
     TokioResolver,
     config::{ResolverConfig, ResolverOpts},
@@ -9,6 +11,17 @@ use serde::Deserialize;
 
 use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{IpGeoInfo, IpLookupResult};
+
+/// Shared HTTP client for ipwho.is API calls.
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
+
+/// Shared default DNS resolver for domain-to-IP resolution.
+static DEFAULT_RESOLVER: LazyLock<TokioResolver> = LazyLock::new(|| {
+    let provider = TokioConnectionProvider::default();
+    TokioResolver::builder_with_config(ResolverConfig::default(), provider)
+        .with_options(ResolverOpts::default())
+        .build()
+});
 
 /// Response structure from ipwho.is API.
 #[derive(Deserialize)]
@@ -71,7 +84,7 @@ async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> ToolboxResult<I
     }
 
     let ip_version = response.ip_type.unwrap_or_else(|| {
-        if response.ip.contains(':') {
+        if response.ip.parse::<std::net::Ipv6Addr>().is_ok() {
             "IPv6"
         } else {
             "IPv4"
@@ -115,11 +128,11 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
         ));
     }
 
-    let client = reqwest::Client::new();
+    let client = &*HTTP_CLIENT;
 
     // Check if the query is an IP address
     if query.parse::<std::net::IpAddr>().is_ok() {
-        let result = lookup_single_ip(&query, &client).await?;
+        let result = lookup_single_ip(&query, client).await?;
         return Ok(IpLookupResult {
             query,
             is_domain: false,
@@ -128,10 +141,7 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
     }
 
     // Treat as domain — resolve A and AAAA records
-    let provider = TokioConnectionProvider::default();
-    let resolver = TokioResolver::builder_with_config(ResolverConfig::default(), provider)
-        .with_options(ResolverOpts::default())
-        .build();
+    let resolver = &*DEFAULT_RESOLVER;
 
     let mut ips: Vec<String> = Vec::new();
 
@@ -158,7 +168,7 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
     // Geolocate each resolved IP
     let mut results = Vec::new();
     for ip in ips {
-        match lookup_single_ip(&ip, &client).await {
+        match lookup_single_ip(&ip, client).await {
             Ok(info) => results.push(info),
             Err(e) => {
                 log::warn!("Failed to look up IP {ip}: {e}");

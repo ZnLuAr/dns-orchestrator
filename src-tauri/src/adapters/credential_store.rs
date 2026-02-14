@@ -108,12 +108,18 @@ mod desktop {
     #[async_trait]
     impl CredentialStore for TauriCredentialStore {
         async fn load_all(&self) -> CoreResult<CredentialsMap> {
-            // 先检查缓存
+            // 先检查缓存（读锁）
             {
                 let cache = self.cache.read().await;
                 if let Some(ref creds) = *cache {
                     return Ok(creds.clone());
                 }
+            }
+
+            // 缓存为空，拿写锁加载（double-check）
+            let mut cache = self.cache.write().await;
+            if let Some(ref creds) = *cache {
+                return Ok(creds.clone());
             }
 
             // 从 Keychain 加载
@@ -127,9 +133,7 @@ mod desktop {
             // 处理迁移错误：向上传递
             let credentials = credentials?;
 
-            // 更新缓存
-            self.update_cache(credentials.clone()).await;
-
+            *cache = Some(credentials.clone());
             log::info!("Loaded {} accounts from Keychain", credentials.len());
             Ok(credentials)
         }
@@ -153,19 +157,49 @@ mod desktop {
         }
 
         async fn set(&self, account_id: &str, credentials: &ProviderCredentials) -> CoreResult<()> {
-            let mut all_creds = self.load_all().await?;
-            all_creds.insert(account_id.to_string(), credentials.clone());
-            self.save_all(&all_creds).await?;
+            let mut cache = self.cache.write().await;
 
+            // 从缓存或 Keychain 加载
+            let mut all_creds = match cache.take() {
+                Some(creds) => creds,
+                None => tokio::task::spawn_blocking(Self::read_all_sync)
+                    .await
+                    .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??,
+            };
+
+            all_creds.insert(account_id.to_string(), credentials.clone());
+
+            // 写入 Keychain
+            let creds_for_save = all_creds.clone();
+            tokio::task::spawn_blocking(move || Self::write_all_sync(&creds_for_save))
+                .await
+                .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??;
+
+            *cache = Some(all_creds);
             log::info!("Credentials saved for account: {account_id}");
             Ok(())
         }
 
         async fn remove(&self, account_id: &str) -> CoreResult<()> {
-            let mut all_creds = self.load_all().await?;
-            all_creds.remove(account_id);
-            self.save_all(&all_creds).await?;
+            let mut cache = self.cache.write().await;
 
+            // 从缓存或 Keychain 加载
+            let mut all_creds = match cache.take() {
+                Some(creds) => creds,
+                None => tokio::task::spawn_blocking(Self::read_all_sync)
+                    .await
+                    .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??,
+            };
+
+            all_creds.remove(account_id);
+
+            // 写入 Keychain
+            let creds_for_save = all_creds.clone();
+            tokio::task::spawn_blocking(move || Self::write_all_sync(&creds_for_save))
+                .await
+                .map_err(|e| CoreError::CredentialError(format!("Task join error: {e}")))??;
+
+            *cache = Some(all_creds);
             log::info!("Credentials deleted for account: {account_id}");
             Ok(())
         }
@@ -280,7 +314,7 @@ mod android {
     #[async_trait]
     impl CredentialStore for TauriCredentialStore {
         async fn load_all(&self) -> CoreResult<CredentialsMap> {
-            // 先检查缓存
+            // 先检查缓存（读锁）
             {
                 let cache = self.cache.read().await;
                 if let Some(ref creds) = *cache {
@@ -288,12 +322,14 @@ mod android {
                 }
             }
 
-            // 从 Store 加载
+            // 缓存为空，拿写锁加载（double-check）
+            let mut cache = self.cache.write().await;
+            if let Some(ref creds) = *cache {
+                return Ok(creds.clone());
+            }
+
             let credentials = self.load_from_store()?;
-
-            // 更新缓存
-            self.update_cache(credentials.clone()).await;
-
+            *cache = Some(credentials.clone());
             log::info!("Loaded {} accounts from Store", credentials.len());
             Ok(credentials)
         }
@@ -314,19 +350,35 @@ mod android {
         }
 
         async fn set(&self, account_id: &str, credentials: &ProviderCredentials) -> CoreResult<()> {
-            let mut all_creds = self.load_all().await?;
-            all_creds.insert(account_id.to_string(), credentials.clone());
-            self.save_all(&all_creds).await?;
+            let mut cache = self.cache.write().await;
 
+            // 从缓存或 Store 加载
+            let mut all_creds = match cache.take() {
+                Some(creds) => creds,
+                None => self.load_from_store()?,
+            };
+
+            all_creds.insert(account_id.to_string(), credentials.clone());
+            self.save_to_store(&all_creds)?;
+
+            *cache = Some(all_creds);
             log::info!("Credentials saved for account: {account_id}");
             Ok(())
         }
 
         async fn remove(&self, account_id: &str) -> CoreResult<()> {
-            let mut all_creds = self.load_all().await?;
-            all_creds.remove(account_id);
-            self.save_all(&all_creds).await?;
+            let mut cache = self.cache.write().await;
 
+            // 从缓存或 Store 加载
+            let mut all_creds = match cache.take() {
+                Some(creds) => creds,
+                None => self.load_from_store()?,
+            };
+
+            all_creds.remove(account_id);
+            self.save_to_store(&all_creds)?;
+
+            *cache = Some(all_creds);
             log::info!("Credentials deleted for account: {account_id}");
             Ok(())
         }

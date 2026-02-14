@@ -64,12 +64,26 @@ impl TauriAccountRepository {
         log::debug!("Saved {} accounts to store", accounts.len());
         Ok(())
     }
+
+    /// 确保写锁内的缓存已初始化，返回可变引用
+    fn ensure_cache_loaded<'a>(
+        &self,
+        cache: &'a mut Option<Vec<Account>>,
+    ) -> CoreResult<&'a mut Vec<Account>> {
+        if cache.is_none() {
+            let loaded = self.load_from_store()?;
+            *cache = Some(loaded);
+        }
+        // SAFETY: `is_none()` 检查后立即填充，此处一定是 `Some`
+        #[allow(clippy::unwrap_used)]
+        Ok(cache.as_mut().unwrap())
+    }
 }
 
 #[async_trait]
 impl AccountRepository for TauriAccountRepository {
     async fn find_all(&self) -> CoreResult<Vec<Account>> {
-        // 先检查缓存
+        // 先检查缓存（读锁）
         {
             let cache = self.cache.read().await;
             if let Some(ref accounts) = *cache {
@@ -77,15 +91,14 @@ impl AccountRepository for TauriAccountRepository {
             }
         }
 
-        // 从 Store 加载
-        let accounts = self.load_from_store()?;
-
-        // 更新缓存
-        {
-            let mut cache = self.cache.write().await;
-            *cache = Some(accounts.clone());
+        // 缓存为空，拿写锁加载（double-check）
+        let mut cache = self.cache.write().await;
+        if let Some(ref accounts) = *cache {
+            return Ok(accounts.clone());
         }
 
+        let accounts = self.load_from_store()?;
+        *cache = Some(accounts.clone());
         Ok(accounts)
     }
 
@@ -95,44 +108,32 @@ impl AccountRepository for TauriAccountRepository {
     }
 
     async fn save(&self, account: &Account) -> CoreResult<()> {
-        let mut accounts_vec = self.find_all().await?;
+        let mut cache = self.cache.write().await;
+        let accounts = self.ensure_cache_loaded(&mut cache)?;
 
         // 查找是否已存在
-        if let Some(pos) = accounts_vec.iter().position(|a| a.id == account.id) {
-            accounts_vec[pos] = account.clone();
+        if let Some(pos) = accounts.iter().position(|a| a.id == account.id) {
+            accounts[pos] = account.clone();
         } else {
-            accounts_vec.push(account.clone());
+            accounts.push(account.clone());
         }
 
-        self.save_to_store(&accounts_vec)?;
-
-        // 更新缓存
-        {
-            let mut cache = self.cache.write().await;
-            *cache = Some(accounts_vec);
-        }
-
+        self.save_to_store(accounts)?;
         Ok(())
     }
 
     async fn delete(&self, id: &str) -> CoreResult<()> {
-        let mut accounts_vec = self.find_all().await?;
+        let mut cache = self.cache.write().await;
+        let accounts = self.ensure_cache_loaded(&mut cache)?;
 
-        let initial_len = accounts_vec.len();
-        accounts_vec.retain(|a| a.id != id);
+        let initial_len = accounts.len();
+        accounts.retain(|a| a.id != id);
 
-        if accounts_vec.len() == initial_len {
+        if accounts.len() == initial_len {
             return Err(CoreError::AccountNotFound(id.to_string()));
         }
 
-        self.save_to_store(&accounts_vec)?;
-
-        // 更新缓存
-        {
-            let mut cache = self.cache.write().await;
-            *cache = Some(accounts_vec);
-        }
-
+        self.save_to_store(accounts)?;
         log::info!("Deleted account {id} from store");
         Ok(())
     }
@@ -140,12 +141,8 @@ impl AccountRepository for TauriAccountRepository {
     async fn save_all(&self, accounts: &[Account]) -> CoreResult<()> {
         self.save_to_store(accounts)?;
 
-        // 更新缓存
-        {
-            let mut cache = self.cache.write().await;
-            *cache = Some(accounts.to_vec());
-        }
-
+        let mut cache = self.cache.write().await;
+        *cache = Some(accounts.to_vec());
         Ok(())
     }
 
@@ -155,9 +152,10 @@ impl AccountRepository for TauriAccountRepository {
         status: AccountStatus,
         error: Option<String>,
     ) -> CoreResult<()> {
-        let mut accounts_vec = self.find_all().await?;
+        let mut cache = self.cache.write().await;
+        let accounts = self.ensure_cache_loaded(&mut cache)?;
 
-        let account = accounts_vec
+        let account = accounts
             .iter_mut()
             .find(|a| a.id == id)
             .ok_or_else(|| CoreError::AccountNotFound(id.to_string()))?;
@@ -166,14 +164,7 @@ impl AccountRepository for TauriAccountRepository {
         account.error = error;
         account.updated_at = chrono::Utc::now();
 
-        self.save_to_store(&accounts_vec)?;
-
-        // 更新缓存
-        {
-            let mut cache = self.cache.write().await;
-            *cache = Some(accounts_vec);
-        }
-
+        self.save_to_store(accounts)?;
         Ok(())
     }
 }

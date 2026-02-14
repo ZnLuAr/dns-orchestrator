@@ -14,7 +14,7 @@ use hickory_resolver::{
 };
 
 use crate::error::{ToolboxError, ToolboxResult};
-use crate::types::{DnskeyRecord, DnssecResult, DsRecord, RrsigRecord};
+use crate::types::{DnskeyRecord, DnssecResult, DnssecValidationStatus, DsRecord, RrsigRecord};
 
 /// Get algorithm name from algorithm number (RFC 8624)
 fn get_algorithm_name(algorithm: u8) -> String {
@@ -282,30 +282,28 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
     // Therefore, successfully retrieving DNSSEC records means validation passed or DNSSEC is not enabled.
     let validation_status = if dnssec_enabled {
         if !dnskey_records.is_empty() && !ds_records.is_empty() {
-            // Full DNSSEC records present and query succeeded (validation passed)
             log::debug!(
                 "DNSSEC validation for {}: Found DNSKEY ({}) and DS ({}) records, validation passed",
                 domain,
                 dnskey_records.len(),
                 ds_records.len()
             );
-            "secure".to_string()
+            DnssecValidationStatus::Secure
         } else if !dnskey_records.is_empty() || !ds_records.is_empty() {
-            // Only partial DNSSEC records found
             log::debug!(
                 "DNSSEC validation for {}: Partial DNSSEC records (DNSKEY: {}, DS: {})",
                 domain,
                 dnskey_records.len(),
                 ds_records.len()
             );
-            "indeterminate".to_string()
+            DnssecValidationStatus::Indeterminate
         } else {
             log::debug!("DNSSEC validation for {domain}: No DNSSEC records found");
-            "insecure".to_string()
+            DnssecValidationStatus::Insecure
         }
     } else {
         log::debug!("DNSSEC validation for {domain}: DNSSEC not enabled");
-        "insecure".to_string()
+        DnssecValidationStatus::Insecure
     };
 
     // u128 -> u64: elapsed millis for a DNSSEC check will never exceed u64::MAX

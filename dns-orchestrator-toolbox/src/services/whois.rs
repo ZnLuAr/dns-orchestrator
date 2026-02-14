@@ -71,13 +71,19 @@ fn parse_whois_response(domain: &str, raw: &str) -> WhoisResult {
 /// Try multiple regex patterns and return the first match.
 fn extract_field(text: &str, patterns: &[&str]) -> Option<String> {
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern)
-            && let Some(caps) = re.captures(text)
-            && let Some(m) = caps.get(1)
-        {
-            let value = m.as_str().trim().to_string();
-            if !value.is_empty() {
-                return Some(value);
+        match Regex::new(pattern) {
+            Ok(re) => {
+                if let Some(caps) = re.captures(text)
+                    && let Some(m) = caps.get(1)
+                {
+                    let value = m.as_str().trim().to_string();
+                    if !value.is_empty() {
+                        return Some(value);
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to compile WHOIS regex pattern '{pattern}': {e}");
             }
         }
     }
@@ -94,14 +100,19 @@ fn extract_name_servers(text: &str) -> Vec<String> {
     ];
 
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            for caps in re.captures_iter(text) {
-                if let Some(m) = caps.get(1) {
-                    let server = m.as_str().trim().to_lowercase();
-                    if !server.is_empty() && !servers.contains(&server) {
-                        servers.push(server);
+        match Regex::new(pattern) {
+            Ok(re) => {
+                for caps in re.captures_iter(text) {
+                    if let Some(m) = caps.get(1) {
+                        let server = m.as_str().trim().to_lowercase();
+                        if !server.is_empty() && !servers.contains(&server) {
+                            servers.push(server);
+                        }
                     }
                 }
+            }
+            Err(e) => {
+                log::warn!("Failed to compile WHOIS regex pattern '{pattern}': {e}");
             }
         }
     }
@@ -119,19 +130,21 @@ fn extract_status(text: &str) -> Vec<String> {
     ];
 
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            for caps in re.captures_iter(text) {
-                if let Some(m) = caps.get(1) {
-                    let status = m.as_str().trim().to_string();
-                    let status = status
-                        .split_whitespace()
-                        .next()
-                        .unwrap_or(&status)
-                        .to_string();
-                    if !status.is_empty() && !statuses.contains(&status) {
-                        statuses.push(status);
+        match Regex::new(pattern) {
+            Ok(re) => {
+                for caps in re.captures_iter(text) {
+                    if let Some(m) = caps.get(1) {
+                        let raw = m.as_str().trim();
+                        // Take only the first token (strip trailing URL or description)
+                        let status = raw.split_whitespace().next().unwrap_or("").to_string();
+                        if !status.is_empty() && !statuses.contains(&status) {
+                            statuses.push(status);
+                        }
                     }
                 }
+            }
+            Err(e) => {
+                log::warn!("Failed to compile WHOIS regex pattern '{pattern}': {e}");
             }
         }
     }

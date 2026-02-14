@@ -15,8 +15,8 @@ use tokio::time::timeout;
 use tokio_rustls::TlsConnector;
 use x509_parser::prelude::*;
 
-use crate::error::ToolboxResult;
-use crate::types::{CertChainItem, SslCertInfo, SslCheckResult};
+use crate::error::{ToolboxError, ToolboxResult};
+use crate::types::{CertChainItem, ConnectionStatus, SslCertInfo, SslCheckResult};
 
 // Timeout constants
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -93,7 +93,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             return Ok(SslCheckResult {
                 domain,
                 port,
-                connection_status: "failed".to_string(),
+                connection_status: ConnectionStatus::Failed,
                 cert_info: None,
                 error: Some(format!("Connection failed: {e}")),
             });
@@ -106,7 +106,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             return Ok(SslCheckResult {
                 domain,
                 port,
-                connection_status: "failed".to_string(),
+                connection_status: ConnectionStatus::Failed,
                 cert_info: None,
                 error: Some("Connection timed out".to_string()),
             });
@@ -128,7 +128,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
         return Ok(SslCheckResult {
             domain,
             port,
-            connection_status: "failed".to_string(),
+            connection_status: ConnectionStatus::Failed,
             cert_info: None,
             error: Some("Invalid domain name".to_string()),
         });
@@ -159,7 +159,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 return Ok(SslCheckResult {
                     domain,
                     port,
-                    connection_status: "http".to_string(),
+                    connection_status: ConnectionStatus::Http,
                     cert_info: None,
                     error: None,
                 });
@@ -167,7 +167,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             return Ok(SslCheckResult {
                 domain,
                 port,
-                connection_status: "failed".to_string(),
+                connection_status: ConnectionStatus::Failed,
                 cert_info: None,
                 error: Some(format!("TLS handshake failed: {e}")),
             });
@@ -184,7 +184,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 return Ok(SslCheckResult {
                     domain,
                     port,
-                    connection_status: "http".to_string(),
+                    connection_status: ConnectionStatus::Http,
                     cert_info: None,
                     error: None,
                 });
@@ -192,7 +192,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             return Ok(SslCheckResult {
                 domain,
                 port,
-                connection_status: "failed".to_string(),
+                connection_status: ConnectionStatus::Failed,
                 cert_info: None,
                 error: Some("TLS handshake timed out".to_string()),
             });
@@ -212,14 +212,17 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             return Ok(SslCheckResult {
                 domain,
                 port,
-                connection_status: "https".to_string(),
+                connection_status: ConnectionStatus::Https,
                 cert_info: None,
                 error: Some("No certificate found".to_string()),
             });
         }
     };
 
-    let cert_der = certs[0].as_ref();
+    let cert_der = certs
+        .first()
+        .ok_or_else(|| ToolboxError::NetworkError("No certificate in chain".to_string()))?
+        .as_ref();
 
     // 5. Parse leaf certificate
     trace!("[SSL] Parsing certificate...");
@@ -230,7 +233,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             return Ok(SslCheckResult {
                 domain,
                 port,
-                connection_status: "https".to_string(),
+                connection_status: ConnectionStatus::Https,
                 cert_info: None,
                 error: Some(format!("Certificate parsing failed: {e}")),
             });
@@ -267,7 +270,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
     Ok(SslCheckResult {
         domain: domain.clone(),
         port,
-        connection_status: "https".to_string(),
+        connection_status: ConnectionStatus::Https,
         cert_info: Some(cert_info),
         error: None,
     })
@@ -495,7 +498,7 @@ mod tests {
         let result = ssl_check("google.com", None).await;
         let check = result.unwrap_or_else(|e| panic!("SSL check failed: {e}"));
         // Network issues may cause connection failure; only verify cert if connected
-        if check.connection_status == "https" {
+        if check.connection_status == ConnectionStatus::Https {
             let cert = check
                 .cert_info
                 .expect("cert_info should be Some when connection_status is https");
@@ -528,7 +531,8 @@ mod tests {
         let result = ssl_check("this-domain-does-not-exist-12345.com", None).await;
         let check = result.unwrap_or_else(|e| panic!("SSL check on invalid domain failed: {e}"));
         assert_eq!(
-            check.connection_status, "failed",
+            check.connection_status,
+            ConnectionStatus::Failed,
             "Invalid domain should fail, got: {}",
             check.connection_status
         );

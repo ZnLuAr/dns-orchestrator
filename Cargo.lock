@@ -1861,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "dns-orchestrator-tauri"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1894,13 +1894,14 @@ dependencies = [
 
 [[package]]
 name = "dns-orchestrator-toolbox"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures",
  "hex",
  "hickory-resolver",
+ "idna 1.1.0",
  "log",
  "regex",
  "reqwest 0.12.28",
@@ -1919,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "dns-orchestrator-web"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "actix-service",
  "actix-web",

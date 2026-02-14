@@ -1,6 +1,6 @@
 [package]
 name = "dns-orchestrator-toolbox"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 description = "Network diagnostic toolbox: WHOIS, DNS lookup, IP geolocation, SSL certificate check, HTTP headers, DNSSEC validation"
@@ -39,6 +39,7 @@ hickory-resolver = { version = "0.25", features = ["dnssec-ring"] }
 
 # URL
 url = "2.5.8"
+idna = "1"
 
 # Time
 chrono.workspace = true

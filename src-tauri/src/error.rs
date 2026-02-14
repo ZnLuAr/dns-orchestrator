@@ -14,7 +14,43 @@ impl std::fmt::Display for AppError {
 
 impl From<CoreError> for AppError {
     fn from(err: CoreError) -> Self {
-        log::error!("AppError: {err}");
+        match &err {
+            // 预期行为（用户输入、资源不存在等），用 warn
+            CoreError::AccountNotFound(_)
+            | CoreError::DomainNotFound(_)
+            | CoreError::RecordNotFound(_)
+            | CoreError::ProviderNotFound(_)
+            | CoreError::ValidationError(_)
+            | CoreError::NoAccountsSelected
+            | CoreError::UnsupportedFileVersion
+            | CoreError::CredentialValidation(_)
+            | CoreError::InvalidCredentials(_) => {
+                log::warn!("AppError: {err}");
+            }
+            // 真正的错误
+            _ => {
+                log::error!("AppError: {err}");
+            }
+        }
         Self(err)
+    }
+}
+
+impl From<dns_orchestrator_toolbox::ToolboxError> for AppError {
+    fn from(err: dns_orchestrator_toolbox::ToolboxError) -> Self {
+        use dns_orchestrator_toolbox::ToolboxError;
+        let core_err = match err {
+            ToolboxError::ValidationError(msg) => {
+                let e = CoreError::ValidationError(msg);
+                log::warn!("ToolboxError: {e}");
+                e
+            }
+            ToolboxError::NetworkError(msg) => {
+                let e = CoreError::NetworkError(msg);
+                log::error!("ToolboxError: {e}");
+                e
+            }
+        };
+        Self(core_err)
     }
 }

@@ -122,6 +122,9 @@ pub fn run() {
     }
 
     // Android 启用 Stronghold 和 APK Installer
+    // TODO: `stronghold_salt.txt` 使用相对路径，依赖 Stronghold plugin 内部基于 app data dir 解析。
+    // 若后续发现 Android 上凭证存储异常，应排查此路径是否正确解析。
+    // Plugin 注册发生在 builder 阶段（setup 之前），此时无法通过 app.path() 获取绝对路径。
     #[cfg(target_os = "android")]
     {
         builder = builder
@@ -281,95 +284,63 @@ pub fn run() {
         Ok(())
     });
 
+    /// 生成包含公共命令和可选平台特定命令的 `invoke_handler`。
+    /// 避免桌面端和 Android 端的命令注册重复。
+    macro_rules! build_invoke_handler {
+        ($($extra:path),* $(,)?) => {
+            tauri::generate_handler![
+                // Account commands
+                account::list_accounts,
+                account::create_account,
+                account::update_account,
+                account::delete_account,
+                account::batch_delete_accounts,
+                account::list_providers,
+                account::export_accounts,
+                account::preview_import,
+                account::import_accounts,
+                account::is_restore_completed,
+                // Domain commands
+                domain::list_domains,
+                domain::get_domain,
+                // Domain metadata commands
+                domain_metadata::get_domain_metadata,
+                domain_metadata::toggle_domain_favorite,
+                domain_metadata::list_account_favorite_domain_keys,
+                domain_metadata::add_domain_tag,
+                domain_metadata::remove_domain_tag,
+                domain_metadata::set_domain_tags,
+                domain_metadata::find_domains_by_tag,
+                domain_metadata::list_all_domain_tags,
+                domain_metadata::batch_add_domain_tags,
+                domain_metadata::batch_remove_domain_tags,
+                domain_metadata::batch_set_domain_tags,
+                domain_metadata::update_domain_metadata,
+                // DNS commands
+                dns::list_dns_records,
+                dns::create_dns_record,
+                dns::update_dns_record,
+                dns::delete_dns_record,
+                dns::batch_delete_dns_records,
+                // Toolbox commands
+                toolbox::whois_lookup,
+                toolbox::dns_lookup,
+                toolbox::ip_lookup,
+                toolbox::ssl_check,
+                toolbox::http_header_check,
+                toolbox::dns_propagation_check,
+                toolbox::dnssec_check,
+                // Platform-specific commands
+                $($extra,)*
+            ]
+        };
+    }
+
     #[cfg(not(target_os = "android"))]
-    let builder = builder.invoke_handler(tauri::generate_handler![
-        // Account commands
-        account::list_accounts,
-        account::create_account,
-        account::update_account,
-        account::delete_account,
-        account::batch_delete_accounts,
-        account::list_providers,
-        account::export_accounts,
-        account::preview_import,
-        account::import_accounts,
-        account::is_restore_completed,
-        // Domain commands
-        domain::list_domains,
-        domain::get_domain,
-        // Domain metadata commands
-        domain_metadata::get_domain_metadata,
-        domain_metadata::toggle_domain_favorite,
-        domain_metadata::list_account_favorite_domain_keys,
-        domain_metadata::add_domain_tag,
-        domain_metadata::remove_domain_tag,
-        domain_metadata::set_domain_tags,
-        domain_metadata::find_domains_by_tag,
-        domain_metadata::list_all_domain_tags,
-        domain_metadata::batch_add_domain_tags,
-        domain_metadata::batch_remove_domain_tags,
-        domain_metadata::batch_set_domain_tags,
-        domain_metadata::update_domain_metadata,
-        // DNS commands
-        dns::list_dns_records,
-        dns::create_dns_record,
-        dns::update_dns_record,
-        dns::delete_dns_record,
-        dns::batch_delete_dns_records,
-        // Toolbox commands
-        toolbox::whois_lookup,
-        toolbox::dns_lookup,
-        toolbox::ip_lookup,
-        toolbox::ssl_check,
-        toolbox::http_header_check,
-        toolbox::dns_propagation_check,
-        toolbox::dnssec_check,
-    ]);
+    let builder = builder.invoke_handler(build_invoke_handler![]);
 
     #[cfg(target_os = "android")]
-    let builder = builder.invoke_handler(tauri::generate_handler![
-        // Account commands
-        account::list_accounts,
-        account::create_account,
-        account::update_account,
-        account::delete_account,
-        account::batch_delete_accounts,
-        account::list_providers,
-        account::export_accounts,
-        account::preview_import,
-        account::import_accounts,
-        account::is_restore_completed,
-        // Domain commands
-        domain::list_domains,
-        domain::get_domain,
-        // Domain metadata commands
-        domain_metadata::get_domain_metadata,
-        domain_metadata::toggle_domain_favorite,
-        domain_metadata::list_account_favorite_domain_keys,
-        domain_metadata::add_domain_tag,
-        domain_metadata::remove_domain_tag,
-        domain_metadata::set_domain_tags,
-        domain_metadata::find_domains_by_tag,
-        domain_metadata::list_all_domain_tags,
-        domain_metadata::batch_add_domain_tags,
-        domain_metadata::batch_remove_domain_tags,
-        domain_metadata::batch_set_domain_tags,
-        domain_metadata::update_domain_metadata,
-        // DNS commands
-        dns::list_dns_records,
-        dns::create_dns_record,
-        dns::update_dns_record,
-        dns::delete_dns_record,
-        dns::batch_delete_dns_records,
-        // Toolbox commands
-        toolbox::whois_lookup,
-        toolbox::dns_lookup,
-        toolbox::ip_lookup,
-        toolbox::ssl_check,
-        toolbox::http_header_check,
-        toolbox::dns_propagation_check,
-        toolbox::dnssec_check,
-        // Android updater commands
+    let builder = builder.invoke_handler(build_invoke_handler![
         updater::check_android_update,
         updater::download_apk,
         updater::install_apk,

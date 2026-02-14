@@ -10,11 +10,39 @@ mod ip;
 mod ssl;
 mod whois;
 
-use crate::error::ToolboxResult;
+use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{
     DnsLookupResult, DnsPropagationResult, DnssecResult, HttpHeaderCheckResult, IpLookupResult,
     WhoisResult,
 };
+
+/// Validate and normalise a domain name or IP address input.
+///
+/// Trims whitespace, passes through valid IP addresses unchanged, converts
+/// internationalised domain names (IDN) to ASCII via IDNA 2008, and rejects
+/// empty or overlong inputs.
+fn validate_domain(domain: &str) -> ToolboxResult<String> {
+    let domain = domain.trim();
+    if domain.is_empty() {
+        return Err(ToolboxError::ValidationError(
+            "Domain name is required".to_string(),
+        ));
+    }
+    // If it's a valid IP address, pass through without IDNA processing.
+    if domain.parse::<std::net::IpAddr>().is_ok() {
+        return Ok(domain.to_string());
+    }
+    // IDNA processing: converts Unicode labels to Punycode and validates.
+    let ascii_domain = idna::domain_to_ascii_strict(domain)
+        .map_err(|_| ToolboxError::ValidationError(format!("Invalid domain name: {domain}")))?;
+    if ascii_domain.len() > 253 {
+        return Err(ToolboxError::ValidationError(format!(
+            "Domain name exceeds maximum length of 253 characters (got {})",
+            ascii_domain.len()
+        )));
+    }
+    Ok(ascii_domain)
+}
 
 /// Embedded WHOIS server mapping (TLD → server).
 const WHOIS_SERVERS: &str = include_str!("whois_servers.json");
@@ -38,7 +66,8 @@ impl ToolboxService {
     /// Returns structured registration data (registrar, dates, name servers, status)
     /// parsed from the raw WHOIS response.
     pub async fn whois_lookup(domain: &str) -> ToolboxResult<WhoisResult> {
-        whois::whois_lookup(domain, WHOIS_SERVERS).await
+        let domain = validate_domain(domain)?;
+        whois::whois_lookup(&domain, WHOIS_SERVERS).await
     }
 
     /// Resolve DNS records for a domain.
@@ -52,7 +81,8 @@ impl ToolboxService {
         record_type: &str,
         nameserver: Option<&str>,
     ) -> ToolboxResult<DnsLookupResult> {
-        dns::dns_lookup(domain, record_type, nameserver).await
+        let domain = validate_domain(domain)?;
+        dns::dns_lookup(&domain, record_type, nameserver).await
     }
 
     /// Look up geolocation data for an IP address or domain.
@@ -70,7 +100,8 @@ impl ToolboxService {
         domain: &str,
         port: Option<u16>,
     ) -> ToolboxResult<crate::types::SslCheckResult> {
-        ssl::ssl_check(domain, port).await
+        let domain = validate_domain(domain)?;
+        ssl::ssl_check(&domain, port).await
     }
 
     /// Send an HTTP request and analyse the response headers.
@@ -90,7 +121,8 @@ impl ToolboxService {
         domain: &str,
         record_type: &str,
     ) -> ToolboxResult<DnsPropagationResult> {
-        dns_propagation::dns_propagation_check(domain, record_type).await
+        let domain = validate_domain(domain)?;
+        dns_propagation::dns_propagation_check(&domain, record_type).await
     }
 
     /// Validate DNSSEC deployment for a domain.
@@ -101,6 +133,66 @@ impl ToolboxService {
         domain: &str,
         nameserver: Option<&str>,
     ) -> ToolboxResult<DnssecResult> {
-        dnssec::dnssec_check(domain, nameserver).await
+        let domain = validate_domain(domain)?;
+        dnssec::dnssec_check(&domain, nameserver).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_domain;
+    use crate::error::ToolboxError;
+
+    #[test]
+    fn test_validate_domain_normal() {
+        assert_eq!(validate_domain("example.com").unwrap(), "example.com");
+    }
+
+    #[test]
+    fn test_validate_domain_idn() {
+        assert_eq!(validate_domain("münchen.de").unwrap(), "xn--mnchen-3ya.de");
+    }
+
+    #[test]
+    fn test_validate_domain_ipv4_passthrough() {
+        assert_eq!(validate_domain("1.2.3.4").unwrap(), "1.2.3.4");
+    }
+
+    #[test]
+    fn test_validate_domain_ipv6_passthrough() {
+        assert_eq!(validate_domain("::1").unwrap(), "::1");
+        assert_eq!(
+            validate_domain("2606:4700::1111").unwrap(),
+            "2606:4700::1111"
+        );
+    }
+
+    #[test]
+    fn test_validate_domain_trims_whitespace() {
+        assert_eq!(validate_domain("  example.com  ").unwrap(), "example.com");
+    }
+
+    #[test]
+    fn test_validate_domain_empty() {
+        assert!(matches!(
+            validate_domain(""),
+            Err(ToolboxError::ValidationError(_))
+        ));
+    }
+
+    #[test]
+    fn test_validate_domain_whitespace_only() {
+        assert!(matches!(
+            validate_domain("   "),
+            Err(ToolboxError::ValidationError(_))
+        ));
+    }
+
+    #[test]
+    fn test_validate_domain_invalid() {
+        assert!(matches!(
+            validate_domain("not a valid domain!!!"),
+            Err(ToolboxError::ValidationError(_))
+        ));
     }
 }

@@ -57,8 +57,9 @@ mod types;
 pub use error::{ToolboxError, ToolboxResult};
 pub use services::ToolboxService;
 pub use types::{
-    CertChainItem, DnsLookupRecord, DnsLookupResult, DnsPropagationResult, DnsPropagationServer,
-    DnsPropagationServerResult, DnskeyRecord, DnssecResult, DsRecord, HttpHeader,
-    HttpHeaderCheckRequest, HttpHeaderCheckResult, HttpMethod, IpGeoInfo, IpLookupResult,
-    RrsigRecord, SecurityHeaderAnalysis, SslCertInfo, SslCheckResult, WhoisResult,
+    CertChainItem, ConnectionStatus, DnsLookupRecord, DnsLookupResult, DnsPropagationResult,
+    DnsPropagationServer, DnsPropagationServerResult, DnskeyRecord, DnssecResult,
+    DnssecValidationStatus, DsRecord, HttpHeader, HttpHeaderCheckRequest, HttpHeaderCheckResult,
+    HttpMethod, IpGeoInfo, IpLookupResult, PropagationStatus, RrsigRecord, SecurityHeaderAnalysis,
+    SecurityHeaderStatus, SslCertInfo, SslCheckResult, WhoisResult,
 };

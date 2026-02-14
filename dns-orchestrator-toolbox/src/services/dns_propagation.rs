@@ -7,7 +7,9 @@ use futures::future::join_all;
 use tokio::time::{Duration, timeout};
 
 use crate::error::ToolboxResult;
-use crate::types::{DnsPropagationResult, DnsPropagationServer, DnsPropagationServerResult};
+use crate::types::{
+    DnsPropagationResult, DnsPropagationServer, DnsPropagationServerResult, PropagationStatus,
+};
 
 use super::dns::dns_lookup;
 
@@ -104,7 +106,10 @@ fn get_global_dns_servers() -> Vec<DnsPropagationServer> {
 
 /// Calculate consistency percentage and unique answer sets.
 fn calculate_consistency(results: &[DnsPropagationServerResult]) -> (f32, Vec<String>) {
-    let successful_results: Vec<_> = results.iter().filter(|r| r.status == "success").collect();
+    let successful_results: Vec<_> = results
+        .iter()
+        .filter(|r| r.status == PropagationStatus::Success)
+        .collect();
 
     if successful_results.is_empty() {
         return (0.0, vec![]);
@@ -174,21 +179,21 @@ pub async fn dns_propagation_check(
                 match result {
                     Ok(Ok(lookup_result)) => DnsPropagationServerResult {
                         server,
-                        status: "success".to_string(),
+                        status: PropagationStatus::Success,
                         records: lookup_result.records,
                         error: None,
                         response_time_ms: elapsed,
                     },
                     Ok(Err(e)) => DnsPropagationServerResult {
                         server,
-                        status: "error".to_string(),
+                        status: PropagationStatus::Error,
                         records: vec![],
                         error: Some(e.to_string()),
                         response_time_ms: elapsed,
                     },
                     Err(_) => DnsPropagationServerResult {
                         server,
-                        status: "timeout".to_string(),
+                        status: PropagationStatus::Timeout,
                         records: vec![],
                         error: Some(format!("Query timeout ({QUERY_TIMEOUT_SECS}s)")),
                         response_time_ms: elapsed,
@@ -287,7 +292,7 @@ mod tests {
     fn make_success_result(values: &[&str]) -> DnsPropagationServerResult {
         DnsPropagationServerResult {
             server: make_server(),
-            status: "success".to_string(),
+            status: PropagationStatus::Success,
             records: values.iter().map(|v| make_record(v)).collect(),
             error: None,
             response_time_ms: 10,
@@ -297,7 +302,7 @@ mod tests {
     fn make_error_result() -> DnsPropagationServerResult {
         DnsPropagationServerResult {
             server: make_server(),
-            status: "error".to_string(),
+            status: PropagationStatus::Error,
             records: vec![],
             error: Some("timeout".to_string()),
             response_time_ms: 5000,

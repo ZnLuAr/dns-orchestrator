@@ -70,13 +70,19 @@ impl TauriDomainMetadataRepository {
         Ok(())
     }
 
-    /// 加载或初始化缓存（延迟加载）
+    /// 加载或初始化缓存（延迟加载，double-check locking）
     async fn ensure_cache(&self) -> CoreResult<()> {
-        let cache = self.cache.read().await;
+        // 快速路径：读锁检查
+        {
+            let cache = self.cache.read().await;
+            if cache.is_some() {
+                return Ok(());
+            }
+        }
+        // 慢路径：写锁 + double-check
+        let mut cache = self.cache.write().await;
         if cache.is_none() {
-            drop(cache);
             let data = self.load_from_store()?;
-            let mut cache = self.cache.write().await;
             *cache = Some(data);
         }
         Ok(())

@@ -124,6 +124,25 @@ pub struct SslCertInfo {
     pub certificate_chain: Vec<CertChainItem>,
 }
 
+/// SSL/TLS connection status.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectionStatus {
+    Https,
+    Http,
+    Failed,
+}
+
+impl std::fmt::Display for ConnectionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Https => write!(f, "https"),
+            Self::Http => write!(f, "http"),
+            Self::Failed => write!(f, "failed"),
+        }
+    }
+}
+
 /// SSL connection check result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,8 +151,8 @@ pub struct SslCheckResult {
     pub domain: String,
     /// Port that was checked.
     pub port: u16,
-    /// `"https"`, `"http"`, or `"failed"`.
-    pub connection_status: String,
+    /// Connection status.
+    pub connection_status: ConnectionStatus,
     /// Certificate info (present only when the connection succeeded over HTTPS).
     pub cert_info: Option<SslCertInfo>,
     /// Error message when the connection failed.
@@ -190,6 +209,15 @@ pub struct HttpHeaderCheckRequest {
     pub content_type: Option<String>,
 }
 
+/// Status of a security header check.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SecurityHeaderStatus {
+    Good,
+    Warning,
+    Missing,
+}
+
 /// Security header analysis for a single header.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -200,8 +228,8 @@ pub struct SecurityHeaderAnalysis {
     pub present: bool,
     /// Header value if present.
     pub value: Option<String>,
-    /// `"good"`, `"warning"`, or `"missing"`.
-    pub status: String,
+    /// Check status.
+    pub status: SecurityHeaderStatus,
     /// Actionable recommendation.
     pub recommendation: Option<String>,
 }
@@ -244,14 +272,23 @@ pub struct DnsPropagationServer {
     pub country_code: String,
 }
 
+/// DNS propagation query status for a single server.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PropagationStatus {
+    Success,
+    Timeout,
+    Error,
+}
+
 /// Result from a single DNS propagation server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsPropagationServerResult {
     /// Server that was queried.
     pub server: DnsPropagationServer,
-    /// `"success"`, `"timeout"`, or `"error"`.
-    pub status: String,
+    /// Query status.
+    pub status: PropagationStatus,
     /// Records returned on success.
     pub records: Vec<DnsLookupRecord>,
     /// Error message on failure.
@@ -342,6 +379,27 @@ pub struct RrsigRecord {
     pub signature: String,
 }
 
+/// DNSSEC validation status.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DnssecValidationStatus {
+    Secure,
+    Insecure,
+    Bogus,
+    Indeterminate,
+}
+
+impl std::fmt::Display for DnssecValidationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Secure => write!(f, "secure"),
+            Self::Insecure => write!(f, "insecure"),
+            Self::Bogus => write!(f, "bogus"),
+            Self::Indeterminate => write!(f, "indeterminate"),
+        }
+    }
+}
+
 /// DNSSEC validation result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -356,8 +414,8 @@ pub struct DnssecResult {
     pub ds_records: Vec<DsRecord>,
     /// RRSIG records.
     pub rrsig_records: Vec<RrsigRecord>,
-    /// `"secure"`, `"insecure"`, `"bogus"`, or `"indeterminate"`.
-    pub validation_status: String,
+    /// Validation status.
+    pub validation_status: DnssecValidationStatus,
     /// DNS resolver used.
     pub nameserver: String,
     /// Query round-trip time in milliseconds.
@@ -476,7 +534,7 @@ mod tests {
         let result = SslCheckResult {
             domain: "example.com".to_string(),
             port: 443,
-            connection_status: "https".to_string(),
+            connection_status: ConnectionStatus::Https,
             cert_info: None,
             error: None,
         };
@@ -525,7 +583,7 @@ mod tests {
             name: "strict-transport-security".to_string(),
             present: true,
             value: Some("max-age=31536000".to_string()),
-            status: "good".to_string(),
+            status: SecurityHeaderStatus::Good,
             recommendation: None,
         };
         let json = serde_json::to_value(&analysis).unwrap();
@@ -554,7 +612,7 @@ mod tests {
             dnskey_records: vec![],
             ds_records: vec![],
             rrsig_records: vec![],
-            validation_status: "secure".to_string(),
+            validation_status: DnssecValidationStatus::Secure,
             nameserver: "8.8.8.8".to_string(),
             response_time_ms: 42,
             error: None,
