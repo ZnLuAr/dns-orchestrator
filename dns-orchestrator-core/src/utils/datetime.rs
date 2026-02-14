@@ -42,9 +42,9 @@ where
             parse_unix_timestamp(ts).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
         }
         TimestampOrString::U64(ts) => {
-            // u64 -> i64: Unix timestamps in practice are well within i64 range
-            #[allow(clippy::cast_possible_wrap)]
-            parse_unix_timestamp(ts as i64).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
+            // The `cast_signed` method explicitly performs a wrapping cast from u64 to i64.
+            // This is safe for timestamps, which are not expected to exceed i64::MAX.
+            parse_unix_timestamp(ts.cast_signed()).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
         }
     }
 }
@@ -85,9 +85,9 @@ pub mod option {
                 .map(Some)
                 .ok_or_else(|| Error::custom("Invalid Unix timestamp")),
             Some(OptionalTimestamp::U64(ts)) => {
-                // u64 -> i64: Unix timestamps in practice are well within i64 range
-                #[allow(clippy::cast_possible_wrap)]
-                parse_unix_timestamp(ts as i64)
+                // The `cast_signed` method explicitly performs a wrapping cast from u64 to i64.
+                // This is safe for timestamps, which are not expected to exceed i64::MAX.
+                parse_unix_timestamp(ts.cast_signed())
                     .map(Some)
                     .ok_or_else(|| Error::custom("Invalid Unix timestamp"))
             }
