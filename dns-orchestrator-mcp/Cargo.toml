@@ -1,10 +1,13 @@
 [package]
 name = "dns-orchestrator-mcp"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 license = "MIT"
 description = "MCP Server for DNS Orchestrator - AI agent interface"
-authors = ["AptS-1547 <apts-1547@esaps.net>"]
+authors = [
+    "AptS-1547 <apts-1547@esaps.net>",
+    "YewFence <88962785+YewFence@users.noreply.github.com>",
+]
 repository = "https://github.com/AptS-1547/dns-orchestrator"
 homepage = "https://github.com/AptS-1547/dns-orchestrator"
 keywords = ["dns", "mcp", "ai", "agent"]
@@ -13,8 +16,13 @@ rust-version = "1.89"
 
 [dependencies]
 # DNS Orchestrator crates
-dns-orchestrator-core = { path = "../dns-orchestrator-core", default-features = false, features = ["rustls"] }
-dns-orchestrator-provider = { path = "../dns-orchestrator-provider", default-features = false, features = ["all-providers", "rustls"] }
+dns-orchestrator-core = { path = "../dns-orchestrator-core", default-features = false, features = [
+    "rustls",
+] }
+dns-orchestrator-provider = { path = "../dns-orchestrator-provider", default-features = false, features = [
+    "all-providers",
+    "rustls",
+] }
 dns-orchestrator-toolbox = { path = "../dns-orchestrator-toolbox" }
 
 # MCP SDK
