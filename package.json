@@ -3,6 +3,10 @@
   "private": true,
   "version": "1.9.0",
   "author": "AptS:1547 (Yuhan Bian / 卞雨涵 <apts-1547@esaps.net>)",
+  "contributors": [
+    "AptS:1547 (Yuhan Bian / 卞雨涵 <apts-1547@esaps.net>)",
+    "AptS:1548 (Yingyin Cai / 蔡颖茵 <apts-1548@esaps.net>)"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
