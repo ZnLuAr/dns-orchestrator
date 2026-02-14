@@ -3,7 +3,6 @@ mod commands;
 mod error;
 mod types;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 #[cfg(target_os = "android")]
@@ -13,75 +12,52 @@ use tauri::Manager;
 use tauri_plugin_log::{Target, TargetKind};
 
 use adapters::{TauriAccountRepository, TauriCredentialStore, TauriDomainMetadataRepository};
-use dns_orchestrator_core::services::{
-    AccountService, DnsService, DomainMetadataService, DomainService, ImportExportService,
-    MigrationResult, MigrationService, ProviderMetadataService, ServiceContext,
-};
-use dns_orchestrator_core::traits::InMemoryProviderRegistry;
+use dns_orchestrator_app::{AppState, AppStateBuilder, StartupHooks};
 
-/// 应用全局状态
-pub struct AppState {
-    /// 服务上下文
-    pub ctx: Arc<ServiceContext>,
-    /// 统一账户服务
-    pub account_service: Arc<AccountService>,
-    /// Provider 元数据服务
-    pub provider_metadata_service: ProviderMetadataService,
-    /// 导入导出服务
-    pub import_export_service: ImportExportService,
-    /// 域名服务
-    pub domain_service: DomainService,
-    /// 域名元数据服务
-    pub domain_metadata_service: Arc<DomainMetadataService>,
-    /// DNS 服务
-    pub dns_service: DnsService,
-    /// 账户恢复是否完成
-    pub restore_completed: AtomicBool,
+/// Tauri-specific startup hooks for credential backup.
+struct TauriStartupHooks {
+    app_handle: tauri::AppHandle,
 }
 
-impl AppState {
-    pub fn new(app_handle: tauri::AppHandle) -> Self {
-        // 创建适配器（Android 版本需要 AppHandle）
-        #[cfg(not(target_os = "android"))]
-        let credential_store = Arc::new(TauriCredentialStore::new());
+#[async_trait::async_trait]
+impl StartupHooks for TauriStartupHooks {
+    async fn backup_credentials(&self, raw_json: &str) -> Option<String> {
+        let data_dir = match self.app_handle.path().app_data_dir() {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Failed to get data dir for backup: {e}");
+                return None;
+            }
+        };
 
-        #[cfg(target_os = "android")]
-        let credential_store = Arc::new(TauriCredentialStore::new(app_handle.clone()));
-
-        let account_repository = Arc::new(TauriAccountRepository::new(app_handle.clone()));
-        let provider_registry = Arc::new(InMemoryProviderRegistry::new());
-        let domain_metadata_repository = Arc::new(TauriDomainMetadataRepository::new(app_handle));
-
-        // 创建服务上下文
-        let ctx = Arc::new(ServiceContext::new(
-            credential_store.clone(),
-            account_repository.clone(),
-            provider_registry.clone(),
-            domain_metadata_repository.clone(),
-        ));
-
-        // 创建统一账户服务
-        let account_service = Arc::new(AccountService::new(Arc::clone(&ctx)));
-        let provider_metadata_service = ProviderMetadataService::new();
-
-        // 创建其他服务
-        let import_export_service = ImportExportService::new(Arc::clone(&account_service));
-        let domain_metadata_service =
-            Arc::new(DomainMetadataService::new(domain_metadata_repository));
-        let domain_service =
-            DomainService::new(Arc::clone(&ctx), Arc::clone(&domain_metadata_service));
-        let dns_service = DnsService::new(Arc::clone(&ctx));
-
-        Self {
-            ctx,
-            account_service,
-            provider_metadata_service,
-            import_export_service,
-            domain_service,
-            domain_metadata_service,
-            dns_service,
-            restore_completed: AtomicBool::new(false),
+        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+            log::warn!("Failed to create data dir for backup: {e}");
+            return None;
         }
+
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let backup_path = data_dir.join(format!("credentials.backup.{timestamp}.json"));
+
+        if let Err(e) = std::fs::write(&backup_path, raw_json.as_bytes()) {
+            log::warn!("Failed to write backup: {e}");
+            return None;
+        }
+
+        let path_str = backup_path.display().to_string();
+        log::info!("凭证已备份到: {path_str}");
+        Some(path_str)
+    }
+
+    async fn cleanup_backup(&self, backup_info: &str) {
+        if let Err(e) = std::fs::remove_file(backup_info) {
+            log::warn!("删除备份文件失败: {e}");
+        } else {
+            log::info!("已删除备份文件");
+        }
+    }
+
+    async fn preserve_backup(&self, backup_info: &str, error: &str) {
+        log::error!("迁移失败，备份文件保留在: {backup_info}，请手动检查 (error: {error})");
     }
 }
 
@@ -138,147 +114,43 @@ pub fn run() {
     }
 
     let builder = builder.setup(|app| {
-        // 创建 AppState（需要 AppHandle）
-        let state = AppState::new(app.handle().clone());
+        let app_handle = app.handle().clone();
+
+        // 创建平台适配器
+        #[cfg(not(target_os = "android"))]
+        let credential_store = Arc::new(TauriCredentialStore::new());
+
+        #[cfg(target_os = "android")]
+        let credential_store = Arc::new(TauriCredentialStore::new(app_handle.clone()));
+
+        let account_repository = Arc::new(TauriAccountRepository::new(app_handle.clone()));
+        let domain_metadata_repository =
+            Arc::new(TauriDomainMetadataRepository::new(app_handle.clone()));
+
+        // 通过 AppStateBuilder 构建 AppState
+        let state = AppStateBuilder::new()
+            .credential_store(credential_store)
+            .account_repository(account_repository)
+            .domain_metadata_repository(domain_metadata_repository)
+            .build()
+            .map_err(|e| e.to_string())?;
+
         app.manage(state);
 
         // 执行凭证迁移（v1.7.0 - 阻塞操作，确保迁移完成后再恢复账户）
-        let app_handle = app.handle().clone();
+        let hooks = TauriStartupHooks {
+            app_handle: app_handle.clone(),
+        };
+        let app_handle_for_migration = app_handle.clone();
         tauri::async_runtime::block_on(async move {
-            let state = app_handle.state::<AppState>();
-
-            // 1. 备份凭证（迁移前）
-            let backup_result = async {
-                let raw_json = state.ctx.credential_store().load_raw_json().await?;
-
-                let data_dir = app_handle.path().app_data_dir().map_err(|e| {
-                    dns_orchestrator_core::error::CoreError::StorageError(format!(
-                        "Failed to get data dir: {e}"
-                    ))
-                })?;
-
-                std::fs::create_dir_all(&data_dir).map_err(|e| {
-                    dns_orchestrator_core::error::CoreError::StorageError(format!(
-                        "Failed to create data dir: {e}"
-                    ))
-                })?;
-
-                let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-                let backup_path = data_dir.join(format!("credentials.backup.{timestamp}.json"));
-
-                std::fs::write(&backup_path, raw_json.as_bytes()).map_err(|e| {
-                    dns_orchestrator_core::error::CoreError::StorageError(format!(
-                        "Failed to write backup: {e}"
-                    ))
-                })?;
-
-                log::info!("凭证已备份到: {}", backup_path.display());
-                Ok::<_, dns_orchestrator_core::error::CoreError>(backup_path)
-            }
-            .await;
-
-            // 保存备份路径（用于后续清理）
-            let backup_path_opt = match &backup_result {
-                Ok(path) => {
-                    log::info!("备份成功: {}", path.display());
-                    Some(path.clone())
-                }
-                Err(e) => {
-                    log::warn!("备份失败（继续迁移）: {e}");
-                    None
-                }
-            };
-
-            // 2. 创建迁移服务
-            let migration_service = MigrationService::new(
-                Arc::clone(state.ctx.credential_store()),
-                Arc::clone(state.ctx.account_repository()),
-            );
-
-            // 3. 执行迁移
-            match migration_service.migrate_if_needed().await {
-                Ok(MigrationResult::NotNeeded) => {
-                    log::info!("凭证格式检查：无需迁移");
-                    // 删除备份文件（无需迁移）
-                    if let Some(backup_path) = &backup_path_opt {
-                        if let Err(e) = std::fs::remove_file(backup_path) {
-                            log::warn!("删除备份文件失败: {e}");
-                        } else {
-                            log::info!("已删除备份文件");
-                        }
-                    }
-                }
-                Ok(MigrationResult::Success {
-                    migrated_count,
-                    failed_accounts,
-                }) => {
-                    log::info!("凭证迁移成功：{migrated_count} 个账户已迁移");
-                    if !failed_accounts.is_empty() {
-                        log::warn!(
-                            "部分账户迁移失败 ({} 个): {:?}",
-                            failed_accounts.len(),
-                            failed_accounts
-                        );
-
-                        // 将失败的账户标记为 Error 状态
-                        for (account_id, error_msg) in &failed_accounts {
-                            if let Err(e) = state
-                                .account_service
-                                .update_status(
-                                    account_id,
-                                    dns_orchestrator_core::types::AccountStatus::Error,
-                                    Some(format!("凭证迁移失败: {error_msg}")),
-                                )
-                                .await
-                            {
-                                log::error!("更新账户 {account_id} 状态失败: {e}");
-                            }
-                        }
-                    }
-
-                    // 删除备份文件（迁移成功）
-                    if let Some(backup_path) = &backup_path_opt {
-                        if let Err(e) = std::fs::remove_file(backup_path) {
-                            log::warn!("删除备份文件失败: {e}");
-                        } else {
-                            log::info!("已删除备份文件（迁移成功）");
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::error!("凭证迁移失败: {e}");
-                    // 保留备份文件供手动恢复
-                    if let Some(backup_path) = &backup_path_opt {
-                        log::error!(
-                            "迁移失败，备份文件保留在: {}，请手动检查",
-                            backup_path.display()
-                        );
-                    }
-                    // 不中断启动，继续尝试恢复（可能会因为格式问题导致部分账户恢复失败）
-                }
-            }
+            let state = app_handle_for_migration.state::<AppState>();
+            state.run_migration(&hooks).await;
         });
 
         // 后台恢复账户，不阻塞启动
-        let app_handle = app.handle().clone();
         tauri::async_runtime::spawn(async move {
             let state = app_handle.state::<AppState>();
-            let result = state.account_service.restore_accounts().await;
-
-            match result {
-                Ok(restore_result) => {
-                    log::info!(
-                        "Account restoration complete: {} succeeded, {} failed",
-                        restore_result.success_count,
-                        restore_result.error_count
-                    );
-                }
-                Err(e) => {
-                    log::error!("Failed to restore accounts: {e}");
-                }
-            }
-
-            state.restore_completed.store(true, Ordering::SeqCst);
+            state.run_account_restore().await;
         });
 
         Ok(())

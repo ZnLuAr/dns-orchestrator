@@ -1818,6 +1818,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dns-orchestrator-app"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "dns-orchestrator-core",
+ "log",
+ "tokio",
+]
+
+[[package]]
 name = "dns-orchestrator-core"
 version = "0.1.0"
 dependencies = [
@@ -1867,6 +1877,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "cocoa",
+ "dns-orchestrator-app",
  "dns-orchestrator-core",
  "dns-orchestrator-toolbox",
  "futures",

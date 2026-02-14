@@ -37,6 +37,7 @@ tauri-plugin-fs = "2"
 urlencoding.workspace = true
 
 # Common deps (all platforms)
+dns-orchestrator-app = { workspace = true, features = ["rustls"] }
 dns-orchestrator-core = { workspace = true, features = ["rustls"] }
 dns-orchestrator-toolbox.workspace = true
 serde.workspace = true

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "dns-orchestrator-app",
     "dns-orchestrator-core",
     "dns-orchestrator-provider",
     "dns-orchestrator-toolbox",
@@ -71,6 +72,7 @@ tauri = "2"
 tauri-build = { version = "2", features = [] }
 
 # Internal crates
+dns-orchestrator-app = { path = "dns-orchestrator-app", default-features = false }
 dns-orchestrator-core = { path = "dns-orchestrator-core", default-features = false }
 dns-orchestrator-provider = { path = "dns-orchestrator-provider", default-features = false }
 dns-orchestrator-toolbox = { path = "dns-orchestrator-toolbox", default-features = false }

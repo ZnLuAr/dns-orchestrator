@@ -1,0 +1,26 @@
+[package]
+name = "dns-orchestrator-app"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Platform-agnostic application bootstrap for DNS Orchestrator"
+authors = ["AptS-1547 <apts-1547@esaps.net>"]
+repository = "https://github.com/AptS-1547/dns-orchestrator"
+homepage = "https://github.com/AptS-1547/dns-orchestrator"
+keywords = ["dns", "orchestrator"]
+categories = ["web-programming"]
+rust-version = "1.89"
+publish = false
+
+[features]
+default = ["rustls"]
+rustls = ["dns-orchestrator-core/rustls"]
+
+[dependencies]
+dns-orchestrator-core = { workspace = true }
+async-trait.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+log.workspace = true
+
+[lints]
+workspace = true

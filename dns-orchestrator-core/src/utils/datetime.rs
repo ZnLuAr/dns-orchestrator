@@ -44,7 +44,8 @@ where
         TimestampOrString::U64(ts) => {
             // The `cast_signed` method explicitly performs a wrapping cast from u64 to i64.
             // This is safe for timestamps, which are not expected to exceed i64::MAX.
-            parse_unix_timestamp(ts.cast_signed()).ok_or_else(|| Error::custom("Invalid Unix timestamp"))
+            parse_unix_timestamp(ts.cast_signed())
+                .ok_or_else(|| Error::custom("Invalid Unix timestamp"))
         }
     }
 }
