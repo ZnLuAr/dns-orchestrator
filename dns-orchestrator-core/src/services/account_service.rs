@@ -536,6 +536,8 @@ mod tests {
 
     #[tokio::test]
     async fn delete_account_cleans_domain_metadata() {
+        use crate::types::{DomainMetadata, DomainMetadataKey};
+
         let (svc, _, _, domain_meta_repo) = create_test_account_service();
 
         let account = svc
@@ -549,11 +551,12 @@ mod tests {
         let id = account.id.clone();
 
         // Add some metadata to the account's domain name
-        use crate::types::{DomainMetadata, DomainMetadataKey};
         let key = DomainMetadataKey::new(id.clone(), "example.com".to_string());
-        let mut meta = DomainMetadata::default();
-        meta.is_favorite = true;
-        meta.favorited_at = Some(chrono::Utc::now());
+        let meta = DomainMetadata {
+            is_favorite: true,
+            favorited_at: Some(chrono::Utc::now()),
+            ..DomainMetadata::default()
+        };
         domain_meta_repo.save(&key, &meta).await.unwrap();
 
         // Delete account

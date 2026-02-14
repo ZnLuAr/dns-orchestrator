@@ -198,22 +198,28 @@ mod tests {
 
     #[test]
     fn metadata_with_favorite_not_empty() {
-        let mut m = DomainMetadata::default();
-        m.is_favorite = true;
+        let m = DomainMetadata {
+            is_favorite: true,
+            ..DomainMetadata::default()
+        };
         assert!(!m.is_empty());
     }
 
     #[test]
     fn metadata_with_tag_not_empty() {
-        let mut m = DomainMetadata::default();
-        m.tags = vec!["important".to_string()];
+        let m = DomainMetadata {
+            tags: vec!["important".to_string()],
+            ..DomainMetadata::default()
+        };
         assert!(!m.is_empty());
     }
 
     #[test]
     fn metadata_with_color_not_empty() {
-        let mut m = DomainMetadata::default();
-        m.color = "red".to_string();
+        let m = DomainMetadata {
+            color: "red".to_string(),
+            ..DomainMetadata::default()
+        };
         assert!(!m.is_empty());
     }
 
@@ -252,9 +258,11 @@ mod tests {
 
     #[test]
     fn apply_to_partial_update() {
-        let mut m = DomainMetadata::default();
-        m.tags = vec!["old".to_string()];
-        m.color = "red".to_string();
+        let mut m = DomainMetadata {
+            tags: vec!["old".to_string()],
+            color: "red".to_string(),
+            ..DomainMetadata::default()
+        };
 
         let update = DomainMetadataUpdate {
             is_favorite: Some(true),
