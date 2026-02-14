@@ -287,7 +287,9 @@ mod tests {
             .unwrap()
             .as_nanos();
         let counter = TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!("dns-orchestrator-mcp-account-repo-{timestamp}-{counter}"))
+        std::env::temp_dir().join(format!(
+            "dns-orchestrator-mcp-account-repo-{timestamp}-{counter}"
+        ))
     }
 
     async fn write_store_json(store_dir: &Path, value: serde_json::Value) {
