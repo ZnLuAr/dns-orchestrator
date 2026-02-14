@@ -62,12 +62,18 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     // 操作提示
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}", texts.hints.keys.arrows_ud), Style::default().fg(Color::Yellow)),
+        Span::styled(
+            format!("  {}", texts.hints.keys.arrows_ud),
+            Style::default().fg(Color::Yellow),
+        ),
         Span::styled(
             format!(" {} | ", texts.hints.actions.move_up_down),
             Style::default().fg(c.muted),
         ),
-        Span::styled(texts.hints.keys.arrows_lr, Style::default().fg(Color::Yellow)),
+        Span::styled(
+            texts.hints.keys.arrows_lr,
+            Style::default().fg(Color::Yellow),
+        ),
         Span::styled(
             format!(" {} | ", texts.hints.actions.switch_option),
             Style::default().fg(c.muted),
@@ -95,7 +101,9 @@ fn render_setting_row<'a>(label: &'a str, value: &'a str, is_selected: bool) -> 
     };
 
     let value_style = if is_selected {
-        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(c.highlight)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(c.highlight)
     };
@@ -110,32 +118,52 @@ fn render_setting_row<'a>(label: &'a str, value: &'a str, is_selected: bool) -> 
     let value_width = value.width();
     let available_space = VALUE_WIDTH.saturating_sub(4); // 减去 "< " 和 " >" 的空间
     let left_padding = (available_space.saturating_sub(value_width)) / 2;
-    let right_padding = available_space.saturating_sub(value_width).saturating_sub(left_padding);
+    let right_padding = available_space
+        .saturating_sub(value_width)
+        .saturating_sub(left_padding);
 
     if is_selected {
         // 选中时显示 < value >
         Line::from(vec![
             Span::styled(prefix, label_style),
-            Span::styled(format!("  {}", label_display), label_style),
-            Span::styled(format!("{:width$}", "", width = label_padding), Style::default()),
+            Span::styled(format!("  {label_display}"), label_style),
+            Span::styled(
+                format!("{:width$}", "", width = label_padding),
+                Style::default(),
+            ),
             Span::styled(": ", Style::default().fg(c.muted)),
             Span::styled("◀ ", Style::default().fg(Color::Yellow)),
-            Span::styled(format!("{:>width$}", "", width = left_padding), Style::default()),
+            Span::styled(
+                format!("{:>width$}", "", width = left_padding),
+                Style::default(),
+            ),
             Span::styled(value_display, value_style),
-            Span::styled(format!("{:width$}", "", width = right_padding), Style::default()),
+            Span::styled(
+                format!("{:width$}", "", width = right_padding),
+                Style::default(),
+            ),
             Span::styled(" ▶", Style::default().fg(Color::Yellow)),
         ])
     } else {
         // 未选中时只显示值，但保持对齐
         Line::from(vec![
             Span::styled(prefix, label_style),
-            Span::styled(format!("  {}", label_display), label_style),
-            Span::styled(format!("{:width$}", "", width = label_padding), Style::default()),
+            Span::styled(format!("  {label_display}"), label_style),
+            Span::styled(
+                format!("{:width$}", "", width = label_padding),
+                Style::default(),
+            ),
             Span::styled(": ", Style::default().fg(c.muted)),
             Span::styled("  ", Style::default()), // 占位符，与 "◀ " 对齐
-            Span::styled(format!("{:>width$}", "", width = left_padding), Style::default()),
+            Span::styled(
+                format!("{:>width$}", "", width = left_padding),
+                Style::default(),
+            ),
             Span::styled(value_display, value_style),
-            Span::styled(format!("{:width$}", "", width = right_padding), Style::default()),
+            Span::styled(
+                format!("{:width$}", "", width = right_padding),
+                Style::default(),
+            ),
             Span::styled("  ", Style::default()), // 占位符，与 " ▶" 对齐
         ])
     }

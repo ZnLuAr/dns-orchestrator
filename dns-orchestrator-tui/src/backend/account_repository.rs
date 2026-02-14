@@ -1,7 +1,7 @@
 //! 账号仓库
 //!
 //! 使用 JSON 文件存储账号元数据
-//! 实现 dns-orchestrator-core 的 AccountRepository trait
+//! 实现 dns-orchestrator-core 的 `AccountRepository` trait
 
 use async_trait::async_trait;
 use dns_orchestrator_core::traits::AccountRepository;
@@ -122,9 +122,9 @@ impl AccountRepository for JsonAccountRepository {
 
     async fn save(&self, account: &Account) -> CoreResult<()> {
         let mut accounts = {
-            let  cache = self.cache.lock().await;
+            let cache = self.cache.lock().await;
             if cache.is_empty() {
-                drop(cache);                        // 释放锁
+                drop(cache); // 释放锁
                 self.load_from_file().await?
             } else {
                 cache.clone()

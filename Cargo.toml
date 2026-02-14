@@ -4,6 +4,7 @@ members = [
     "dns-orchestrator-core",
     "dns-orchestrator-provider",
     "dns-orchestrator-toolbox",
+    "dns-orchestrator-tui",
     "dns-orchestrator-web",
     "dns-orchestrator-web/migration",
     "dns-orchestrator-tauri",

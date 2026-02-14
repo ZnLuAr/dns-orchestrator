@@ -1,6 +1,6 @@
 //! 域名元数据仓库
 //!
-//! 实现 dns-orchestrator-core 的 DomainMetadataRepository trait
+//! 实现 dns-orchestrator-core 的 `DomainMetadataRepository` trait
 //! TUI 使用 JSON 文件存储域名元数据
 
 use async_trait::async_trait;
@@ -81,7 +81,9 @@ impl DomainMetadataRepository for InMemoryDomainMetadataRepository {
         update: &DomainMetadataUpdate,
     ) -> CoreResult<()> {
         let mut store = self.store.lock().await;
-        let metadata = store.entry(key.clone()).or_insert_with(DomainMetadata::default);
+        let metadata = store
+            .entry(key.clone())
+            .or_insert_with(DomainMetadata::default);
 
         if let Some(is_favorite) = update.is_favorite {
             metadata.is_favorite = is_favorite;

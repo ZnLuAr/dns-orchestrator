@@ -92,7 +92,7 @@ fn render_page_content(app: &App, frame: &mut Frame, area: Rect) {
     };
 
     let block = Block::default()
-        .title(format!(" {} ", page_title))
+        .title(format!(" {page_title} "))
         .title_style(Style::default().fg(c.fg).add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
         .border_style(border_style);

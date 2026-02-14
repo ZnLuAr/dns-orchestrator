@@ -6,8 +6,7 @@
 use std::sync::Arc;
 
 use dns_orchestrator_core::services::{
-    AccountBootstrapService, AccountLifecycleService, AccountMetadataService,
-    CredentialManagementService, DnsService, DomainService, ProviderMetadataService,
+    AccountService, DnsService, DomainMetadataService, DomainService, ProviderMetadataService,
     ServiceContext,
 };
 use dns_orchestrator_core::traits::InMemoryProviderRegistry;
@@ -21,12 +20,10 @@ use super::domain_metadata_repository::InMemoryDomainMetadataRepository;
 ///
 /// 持有所有业务服务的实例，提供给 UI 层调用
 pub struct CoreService {
-    /// 服务上下文（供 DomainService/DnsService 使用）
+    /// 服务上下文（供各服务使用）
     ctx: Arc<ServiceContext>,
-    /// 账号元数据服务
-    metadata_service: Arc<AccountMetadataService>,
-    /// 凭证管理服务
-    credential_service: Arc<CredentialManagementService>,
+    /// 域名元数据服务
+    domain_metadata_service: Arc<DomainMetadataService>,
 }
 
 impl CoreService {
@@ -38,25 +35,22 @@ impl CoreService {
         let provider_registry = Arc::new(InMemoryProviderRegistry::new());
         let domain_metadata_repository = Arc::new(InMemoryDomainMetadataRepository::new());
 
-        // 2. 创建 ServiceContext（供 DomainService/DnsService 使用）
-        let ctx = Arc::new(ServiceContext::new(
-            credential_store.clone(),
-            account_repository.clone(),
-            provider_registry.clone(),
-            domain_metadata_repository,
+        // 2. 创建域名元数据服务
+        let domain_metadata_service = Arc::new(DomainMetadataService::new(
+            domain_metadata_repository.clone(),
         ));
 
-        // 3. 创建服务实例
-        let metadata_service = Arc::new(AccountMetadataService::new(account_repository));
-        let credential_service = Arc::new(CredentialManagementService::new(
+        // 3. 创建 ServiceContext（供各服务使用）
+        let ctx = Arc::new(ServiceContext::new(
             credential_store,
+            account_repository,
             provider_registry,
+            domain_metadata_repository,
         ));
 
         Self {
             ctx,
-            metadata_service,
-            credential_service,
+            domain_metadata_service,
         }
     }
 
@@ -64,11 +58,8 @@ impl CoreService {
     ///
     /// 应在应用启动时调用
     pub async fn initialize(&self) -> CoreResult<()> {
-        let bootstrap_service = AccountBootstrapService::new(
-            self.metadata_service.clone(),
-            self.credential_service.clone(),
-        );
-        let result = bootstrap_service.restore_accounts().await?;
+        let account_service = self.account();
+        let result = account_service.restore_accounts().await?;
 
         if result.error_count > 0 {
             log::warn!(
@@ -83,24 +74,16 @@ impl CoreService {
 
     // ========== 账号管理 ==========
 
-    /// 获取账号生命周期服务
-    pub fn account_lifecycle(&self) -> AccountLifecycleService {
-        AccountLifecycleService::new(
-            self.metadata_service.clone(),
-            self.credential_service.clone(),
-        )
-    }
-
-    /// 获取账号元数据服务
-    pub fn account_metadata(&self) -> Arc<AccountMetadataService> {
-        self.metadata_service.clone()
+    /// 获取账号服务
+    pub fn account(&self) -> AccountService {
+        AccountService::new(self.ctx.clone())
     }
 
     // ========== 域名管理 ==========
 
     /// 获取域名服务
     pub fn domain(&self) -> DomainService {
-        DomainService::new(self.ctx.clone())
+        DomainService::new(self.ctx.clone(), self.domain_metadata_service.clone())
     }
 
     // ========== DNS 记录管理 ==========

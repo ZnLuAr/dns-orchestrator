@@ -29,7 +29,6 @@ pub fn colors() -> ThemeColors {
     }
 }
 
-
 /// 主题颜色
 #[derive(Debug, Clone)]
 pub struct ThemeColors {

@@ -29,37 +29,36 @@
 //！│                                           └───────────────────┘           │
 //！└─────────────────────────────────────────────────────────────────────────────┘
 
-
-//! 
+//!
 //! src/event/mod.rs
 //! Event 层：事件处理
 //!
 //! 负责将键盘/鼠标等输入事件转换为 Message。
-//! 
-//! 
+//!
+//!
 //! 有模块结构：
 //!     src/event/mod.rs
 //!         mod handler;        // 事件处理器
 //!         mod keymap;         // 快捷键映射
 //!
-//!         pub use handler::{handle_event , poll_event}; 
-//! 
-//! 
+//!         pub use handler::{handle_event , poll_event};
+//!
+//!
 //!     其中有：
 //!         · poll_event      事件轮询，受 ~/app.rs 调用
 //!             
 //!         pub fn poll_event(timeout: Duration) -> Result<Option<Event>> {
-//! 
+//!
 //!             if event::poll(timeout)? {                  // 此处阻塞以等待事件，最长等待 timeout
 //!                 Ok(Some(event::read()?))
 //!             } else {
 //!                 Ok(None)
 //!             }
 //!         }
-//! 
-//! 
+//!
+//!
 //!         · handle_event    事件分发
-//! 
+//!
 //!         接收以下 Event 类型：
 //!             Event::Key(KeyEvent)                // 键盘事件，发至以下几个函数处理
 //!             Event::Resize(Width , height)       // 终端窗口大小发生变化，重绘终端
@@ -94,8 +93,8 @@
 //!             ←/→         → ModalMessage::PrevProvider / NextProvider
 //!             字符输入     → ModalMessage::Input(c)
 //!             Backspace   → ModalMessage::Backspace
-//! 
-//! 
+//!
+//!
 //!     在 src/event/handler.rs 中，有：
 //!         pub fn handle_event(event: Event , app: &App) -> AppMessage {
 //!             ...                                          ↑↑↑↑↑↑↑↑↑↑
@@ -122,8 +121,8 @@
 //!                                       在此接收参数，执行对应操作
 //!             match msg{...}
 //!         }
-//! 
-//! 
+//!
+//!
 
 mod handler;
 mod keymap;

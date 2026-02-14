@@ -301,10 +301,7 @@ pub enum Modal {
     /// 帮助信息
     Help,
     /// 错误提示
-    Error {
-        title: String,
-        message: String,
-    },
+    Error { title: String, message: String },
 }
 
 impl Modal {

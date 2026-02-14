@@ -1,7 +1,7 @@
 //! 凭证存储服务
 //!
 //! 使用系统钥匙串安全存储 DNS 服务商凭证
-//! 实现 dns-orchestrator-core 的 CredentialStore trait
+//! 实现 dns-orchestrator-core 的 `CredentialStore` trait
 
 use async_trait::async_trait;
 use dns_orchestrator_core::traits::{CredentialStore, CredentialsMap};
@@ -18,7 +18,7 @@ const CREDENTIALS_KEY: &str = "__all_credentials__";
 /// 使用 keyring crate 将凭证安全存储到：
 /// - Windows: Credential Manager
 /// - macOS: Keychain
-/// - Linux: Secret Service (GNOME Keyring / KWallet)
+/// - Linux: Secret Service (GNOME Keyring / `KWallet`)
 pub struct KeyringCredentialStore {
     /// 内存缓存，避免频繁访问钥匙串
     cache: Mutex<CredentialsMap>,
@@ -106,9 +106,7 @@ impl CredentialStore for KeyringCredentialStore {
         match entry.get_password() {
             Ok(json) => Ok(json),
             Err(keyring::Error::NoEntry) => Ok(String::new()),
-            Err(e) => Err(CoreError::CredentialError(format!(
-                "Failed to load: {e}"
-            ))),
+            Err(e) => Err(CoreError::CredentialError(format!("Failed to load: {e}"))),
         }
     }
 

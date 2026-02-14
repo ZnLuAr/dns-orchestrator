@@ -43,39 +43,39 @@ impl ToolboxTab {
     /// 切换到下一个标签页
     pub fn next(&self) -> ToolboxTab {
         match self {
-            ToolboxTab::Whois            => ToolboxTab::DnsLookup,
-            ToolboxTab::DnsLookup        => ToolboxTab::IpLookup,
-            ToolboxTab::IpLookup         => ToolboxTab::SslCheck,
-            ToolboxTab::SslCheck         => ToolboxTab::HttpHeaderCheck,
-            ToolboxTab::HttpHeaderCheck  => ToolboxTab::DnsPropagation,
-            ToolboxTab::DnsPropagation   => ToolboxTab::DnssecCheck,
-            ToolboxTab::DnssecCheck      => ToolboxTab::Whois,
+            ToolboxTab::Whois => ToolboxTab::DnsLookup,
+            ToolboxTab::DnsLookup => ToolboxTab::IpLookup,
+            ToolboxTab::IpLookup => ToolboxTab::SslCheck,
+            ToolboxTab::SslCheck => ToolboxTab::HttpHeaderCheck,
+            ToolboxTab::HttpHeaderCheck => ToolboxTab::DnsPropagation,
+            ToolboxTab::DnsPropagation => ToolboxTab::DnssecCheck,
+            ToolboxTab::DnssecCheck => ToolboxTab::Whois,
         }
     }
 
     /// 切换到上一个标签页
     pub fn prev(&self) -> ToolboxTab {
         match self {
-            ToolboxTab::Whois           => ToolboxTab::DnssecCheck,
-            ToolboxTab::DnsLookup       => ToolboxTab::Whois,
-            ToolboxTab::IpLookup        => ToolboxTab::DnsLookup,
-            ToolboxTab::SslCheck        => ToolboxTab::IpLookup,
+            ToolboxTab::Whois => ToolboxTab::DnssecCheck,
+            ToolboxTab::DnsLookup => ToolboxTab::Whois,
+            ToolboxTab::IpLookup => ToolboxTab::DnsLookup,
+            ToolboxTab::SslCheck => ToolboxTab::IpLookup,
             ToolboxTab::HttpHeaderCheck => ToolboxTab::SslCheck,
-            ToolboxTab::DnsPropagation  => ToolboxTab::HttpHeaderCheck,
-            ToolboxTab::DnssecCheck     => ToolboxTab::DnsPropagation,
+            ToolboxTab::DnsPropagation => ToolboxTab::HttpHeaderCheck,
+            ToolboxTab::DnssecCheck => ToolboxTab::DnsPropagation,
         }
     }
 
     /// 获取标签页的索引
     pub fn index(&self) -> usize {
         match self {
-            ToolboxTab::Whois           => 0,
-            ToolboxTab::DnsLookup       => 1,
-            ToolboxTab::IpLookup        => 2,
-            ToolboxTab::SslCheck        => 3,
+            ToolboxTab::Whois => 0,
+            ToolboxTab::DnsLookup => 1,
+            ToolboxTab::IpLookup => 2,
+            ToolboxTab::SslCheck => 3,
             ToolboxTab::HttpHeaderCheck => 4,
-            ToolboxTab::DnsPropagation  => 5,
-            ToolboxTab::DnssecCheck     => 6,
+            ToolboxTab::DnsPropagation => 5,
+            ToolboxTab::DnssecCheck => 6,
         }
     }
 }
@@ -160,13 +160,13 @@ impl ToolboxState {
     /// 获取当前工具的提示文本
     pub fn placeholder(&self) -> &'static str {
         match self.current_tab {
-            ToolboxTab::Whois            => "Enter domain (e.g., example.com)",
-            ToolboxTab::DnsLookup        => "Enter domain (e.g., example.com)",
-            ToolboxTab::IpLookup         => "Enter IP or domain",
-            ToolboxTab::SslCheck         => "Enter domain (e.g., example.com)",
-            ToolboxTab::HttpHeaderCheck  => "Enter URL (e.g., https://example.com)",
-            ToolboxTab::DnsPropagation   => "Enter domain (e.g., example.com)",
-            ToolboxTab::DnssecCheck      => "Enter domain (e.g., example.com)",
+            ToolboxTab::Whois => "Enter domain (e.g., example.com)",
+            ToolboxTab::DnsLookup => "Enter domain (e.g., example.com)",
+            ToolboxTab::IpLookup => "Enter IP or domain",
+            ToolboxTab::SslCheck => "Enter domain (e.g., example.com)",
+            ToolboxTab::HttpHeaderCheck => "Enter URL (e.g., https://example.com)",
+            ToolboxTab::DnsPropagation => "Enter domain (e.g., example.com)",
+            ToolboxTab::DnssecCheck => "Enter domain (e.g., example.com)",
         }
     }
 }

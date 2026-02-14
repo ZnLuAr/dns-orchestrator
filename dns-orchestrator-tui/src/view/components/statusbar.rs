@@ -26,7 +26,12 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         if i > 0 {
             spans.push(Span::styled(" │ ", Style::default().fg(c.muted)));
         }
-        spans.push(Span::styled(key.to_string(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
+        spans.push(Span::styled(
+            key.to_string(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ));
         spans.push(Span::raw(" "));
         spans.push(Span::styled(desc.to_string(), Style::default().fg(c.muted)));
     }
@@ -39,8 +44,8 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     }
 
     let content = Line::from(spans);
-    let paragraph = Paragraph::new(content)
-        .style(Style::default().bg(c.highlight).fg(c.selected_fg));
+    let paragraph =
+        Paragraph::new(content).style(Style::default().bg(c.highlight).fg(c.selected_fg));
 
     frame.render_widget(paragraph, area);
 }
@@ -59,35 +64,39 @@ fn get_hints(app: &App) -> Vec<(&'static str, &'static str)> {
             hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
             hints.push((texts.hints.keys.enter, texts.common.confirm));
         }
-        FocusPanel::Content => {
-            match &app.current_page {
-                Page::Home => {
-                    hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
-                }
-                Page::Accounts => {
-                    hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
-                    hints.push(("Alt+a", texts.common.add));
-                    hints.push(("Alt+d", texts.common.delete));
-                }
-                Page::Domains => {
-                    hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
-                    hints.push((texts.hints.keys.enter, texts.common.confirm));
-                }
-                Page::DnsRecords { .. } => {
-                    hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
-                    hints.push(("Alt+a", texts.common.add));
-                    hints.push((texts.hints.keys.esc, texts.common.back));
-                }
-                Page::Toolbox => {
-                    hints.push((texts.hints.keys.arrows_lr, texts.hints.actions.switch_option));
-                    hints.push((texts.hints.keys.enter, texts.common.confirm));
-                }
-                Page::Settings => {
-                    hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
-                    hints.push((texts.hints.keys.arrows_lr, texts.hints.actions.switch_option));
-                }
+        FocusPanel::Content => match &app.current_page {
+            Page::Home => {
+                hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
             }
-        }
+            Page::Accounts => {
+                hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
+                hints.push(("Alt+a", texts.common.add));
+                hints.push(("Alt+d", texts.common.delete));
+            }
+            Page::Domains => {
+                hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
+                hints.push((texts.hints.keys.enter, texts.common.confirm));
+            }
+            Page::DnsRecords { .. } => {
+                hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
+                hints.push(("Alt+a", texts.common.add));
+                hints.push((texts.hints.keys.esc, texts.common.back));
+            }
+            Page::Toolbox => {
+                hints.push((
+                    texts.hints.keys.arrows_lr,
+                    texts.hints.actions.switch_option,
+                ));
+                hints.push((texts.hints.keys.enter, texts.common.confirm));
+            }
+            Page::Settings => {
+                hints.push((texts.hints.keys.arrows_ud, texts.hints.actions.move_up_down));
+                hints.push((
+                    texts.hints.keys.arrows_lr,
+                    texts.hints.actions.switch_option,
+                ));
+            }
+        },
     }
 
     // Quit
