@@ -5,6 +5,35 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.9.0] - 2026-02-14
+
+### Added
+- Android APK 更新签名验证（minisign）
+- GitHub Actions CI 流水线（格式检查、Clippy、测试、安全审计）
+- Release 流水线（全平台构建 + Android 签名）
+- 核心库测试辅助模块（MockAccountRepository、MockCredentialStore 等）
+- Provider 集成测试（阿里云、Cloudflare、DNSPod、华为云）
+- 工具箱域名验证单元测试（13 个用例）
+- 各核心库和插件 README 文档
+
+### Changed
+- 重构为 Cargo Workspace，统一依赖管理
+- 工具箱功能拆分为独立 `dns-orchestrator-toolbox` crate
+- `src-tauri` 重命名为 `dns-orchestrator-tauri`
+- 四个账户服务合并为统一的 `account_service`
+- `ServiceContext` 字段私有化，添加 getter 方法
+- 代码注释重构为英文
+- 统一代码格式和 `dns-orchestrator-*` 命名风格
+- 使用 `cast_signed()` 显式方法替代 `as` 类型转换
+- 最小 Rust 版本要求提升至 1.89
+
+### Removed
+- 移除 `src-actix-web` 后端
+
+### Fixed
+- 按钮可访问性问题
+- 错误处理中默认值显示问题
+
 ## [1.8.0] - 2026-01-10
 
 ### Added
@@ -259,6 +288,7 @@
 - DNS 记录 CRUD 操作
 - 跨平台支持（macOS、Windows、Linux、Android）
 
+[1.9.0]: https://github.com/AptS-1547/dns-orchestrator/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/AptS-1547/dns-orchestrator/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/AptS-1547/dns-orchestrator/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/AptS-1547/dns-orchestrator/compare/v1.5.2...v1.6.0
