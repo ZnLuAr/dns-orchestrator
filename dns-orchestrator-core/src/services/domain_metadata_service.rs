@@ -462,3 +462,229 @@ impl DomainMetadataService {
         Ok((key, metadata))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::MockDomainMetadataRepository;
+
+    fn make_service() -> DomainMetadataService {
+        DomainMetadataService::new(Arc::new(MockDomainMetadataRepository::new()))
+    }
+
+    #[tokio::test]
+    async fn get_metadata_returns_default_when_not_found() {
+        let svc = make_service();
+        let m = svc.get_metadata("acc", "dom").await.unwrap();
+        assert!(m.is_empty());
+        assert!(!m.is_favorite);
+    }
+
+    #[tokio::test]
+    async fn toggle_favorite_on_off() {
+        let svc = make_service();
+
+        // 首次 toggle → 开
+        let state = svc.toggle_favorite("a", "d").await.unwrap();
+        assert!(state);
+
+        let m = svc.get_metadata("a", "d").await.unwrap();
+        assert!(m.is_favorite);
+
+        // 再次 toggle → 关
+        let state = svc.toggle_favorite("a", "d").await.unwrap();
+        assert!(!state);
+
+        let m = svc.get_metadata("a", "d").await.unwrap();
+        assert!(!m.is_favorite);
+    }
+
+    #[tokio::test]
+    async fn toggle_favorite_records_favorited_at_once() {
+        let svc = make_service();
+
+        // 收藏 → 设置 favorited_at
+        svc.toggle_favorite("a", "d").await.unwrap();
+        let m = svc.get_metadata("a", "d").await.unwrap();
+        assert!(m.favorited_at.is_some());
+        let first_fav_at = m.favorited_at.unwrap();
+
+        // 取消收藏 → favorited_at 不变
+        svc.toggle_favorite("a", "d").await.unwrap();
+        let m = svc.get_metadata("a", "d").await.unwrap();
+        assert_eq!(m.favorited_at, Some(first_fav_at));
+
+        // 重新收藏 → favorited_at 仍不变（首次记录后永不修改）
+        svc.toggle_favorite("a", "d").await.unwrap();
+        let m = svc.get_metadata("a", "d").await.unwrap();
+        assert_eq!(m.favorited_at, Some(first_fav_at));
+    }
+
+    #[tokio::test]
+    async fn add_tag_success() {
+        let svc = make_service();
+        let tags = svc.add_tag("a", "d", "web".to_string()).await.unwrap();
+        assert_eq!(tags, vec!["web"]);
+    }
+
+    #[tokio::test]
+    async fn add_tag_duplicate_ignored() {
+        let svc = make_service();
+        svc.add_tag("a", "d", "web".to_string()).await.unwrap();
+        let tags = svc.add_tag("a", "d", "web".to_string()).await.unwrap();
+        assert_eq!(tags, vec!["web"]);
+    }
+
+    #[tokio::test]
+    async fn add_tag_exceeds_limit() {
+        let svc = make_service();
+        for i in 0..10 {
+            svc.add_tag("a", "d", format!("tag{i}")).await.unwrap();
+        }
+        let result = svc.add_tag("a", "d", "overflow".to_string()).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn add_tag_empty_rejected() {
+        let svc = make_service();
+        let result = svc.add_tag("a", "d", "  ".to_string()).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn add_tag_too_long_rejected() {
+        let svc = make_service();
+        let long_tag = "a".repeat(51);
+        let result = svc.add_tag("a", "d", long_tag).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn remove_tag_success() {
+        let svc = make_service();
+        svc.add_tag("a", "d", "web".to_string()).await.unwrap();
+        let tags = svc.remove_tag("a", "d", "web").await.unwrap();
+        assert!(tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn remove_tag_nonexistent_silent() {
+        let svc = make_service();
+        // 移除不存在的标签不报错
+        let tags = svc.remove_tag("a", "d", "ghost").await.unwrap();
+        assert!(tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn set_tags_dedup_and_sort() {
+        let svc = make_service();
+        let tags = svc
+            .set_tags("a", "d", vec!["b".into(), "a".into(), "b".into()])
+            .await
+            .unwrap();
+        assert_eq!(tags, vec!["a", "b"]);
+    }
+
+    #[tokio::test]
+    async fn set_tags_exceeds_limit() {
+        let svc = make_service();
+        let tags: Vec<String> = (0..11).map(|i| format!("tag{i}")).collect();
+        let result = svc.set_tags("a", "d", tags).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn validate_color_valid() {
+        let svc = make_service();
+        let update = DomainMetadataUpdate {
+            is_favorite: None,
+            tags: None,
+            color: Some("red".to_string()),
+            note: None,
+        };
+        let result = svc.update_metadata("a", "d", update).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_color_invalid() {
+        let svc = make_service();
+        let update = DomainMetadataUpdate {
+            is_favorite: None,
+            tags: None,
+            color: Some("rainbow".to_string()),
+            note: None,
+        };
+        let result = svc.update_metadata("a", "d", update).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn validate_note_too_long() {
+        let svc = make_service();
+        let update = DomainMetadataUpdate {
+            is_favorite: None,
+            tags: None,
+            color: None,
+            note: Some(Some("x".repeat(501))),
+        };
+        let result = svc.update_metadata("a", "d", update).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn batch_add_tags() {
+        let svc = make_service();
+        let requests = vec![
+            BatchTagRequest {
+                account_id: "a".into(),
+                domain_id: "d1".into(),
+                tags: vec!["shared".into()],
+            },
+            BatchTagRequest {
+                account_id: "a".into(),
+                domain_id: "d2".into(),
+                tags: vec!["shared".into()],
+            },
+        ];
+        let result = svc.batch_add_tags(requests).await.unwrap();
+        assert_eq!(result.success_count, 2);
+        assert_eq!(result.failed_count, 0);
+
+        let m1 = svc.get_metadata("a", "d1").await.unwrap();
+        let m2 = svc.get_metadata("a", "d2").await.unwrap();
+        assert_eq!(m1.tags, vec!["shared"]);
+        assert_eq!(m2.tags, vec!["shared"]);
+    }
+
+    #[tokio::test]
+    async fn batch_remove_tags() {
+        let svc = make_service();
+
+        // 先添加标签
+        svc.add_tag("a", "d1", "web".to_string()).await.unwrap();
+        svc.add_tag("a", "d2", "web".to_string()).await.unwrap();
+
+        let requests = vec![
+            BatchTagRequest {
+                account_id: "a".into(),
+                domain_id: "d1".into(),
+                tags: vec!["web".into()],
+            },
+            BatchTagRequest {
+                account_id: "a".into(),
+                domain_id: "d2".into(),
+                tags: vec!["web".into()],
+            },
+        ];
+        let result = svc.batch_remove_tags(requests).await.unwrap();
+        assert_eq!(result.success_count, 2);
+        assert_eq!(result.failed_count, 0);
+
+        let m1 = svc.get_metadata("a", "d1").await.unwrap();
+        let m2 = svc.get_metadata("a", "d2").await.unwrap();
+        assert!(m1.tags.is_empty());
+        assert!(m2.tags.is_empty());
+    }
+}

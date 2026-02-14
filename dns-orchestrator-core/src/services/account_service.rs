@@ -436,3 +436,223 @@ impl AccountService {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::{create_test_account_service, test_credentials};
+    use crate::traits::{AccountRepository, CredentialStore, DomainMetadataRepository};
+    use dns_orchestrator_provider::ProviderType;
+
+    #[tokio::test]
+    async fn create_account_from_import_success() {
+        let (svc, account_repo, credential_store, _) = create_test_account_service();
+
+        let account = svc
+            .create_account_from_import(
+                "Test CF".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(account.name, "Test CF");
+        assert_eq!(account.provider, ProviderType::Cloudflare);
+        assert_eq!(account.status, Some(AccountStatus::Active));
+
+        // 验证凭证已保存
+        let creds = credential_store.get(&account.id).await.unwrap();
+        assert!(creds.is_some());
+
+        // 验证账户元数据已保存
+        let saved = account_repo.find_by_id(&account.id).await.unwrap();
+        assert!(saved.is_some());
+
+        // 验证 provider 已注册
+        let provider = svc.ctx.provider_registry().get(&account.id).await;
+        assert!(provider.is_some());
+    }
+
+    #[tokio::test]
+    async fn create_account_from_import_save_failure_cleanup() {
+        let (svc, account_repo, credential_store, _) = create_test_account_service();
+
+        // 设置 save 必定失败
+        account_repo
+            .set_save_error(Some("disk full".to_string()))
+            .await;
+
+        let result = svc
+            .create_account_from_import(
+                "Fail".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await;
+
+        assert!(result.is_err());
+
+        // 验证 cleanup：凭证被清理
+        let all_creds = credential_store.load_all().await.unwrap();
+        assert!(all_creds.is_empty());
+
+        // 验证 cleanup：provider 已注销
+        let ids = svc.ctx.provider_registry().list_account_ids().await;
+        assert!(ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn delete_account_success() {
+        let (svc, account_repo, credential_store, _) = create_test_account_service();
+
+        let account = svc
+            .create_account_from_import(
+                "To Delete".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+        let id = account.id.clone();
+
+        svc.delete_account(&id).await.unwrap();
+
+        // 账户元数据已删除
+        assert!(account_repo.find_by_id(&id).await.unwrap().is_none());
+        // 凭证已删除
+        assert!(credential_store.get(&id).await.unwrap().is_none());
+        // provider 已注销
+        assert!(svc.ctx.provider_registry().get(&id).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_account_not_found() {
+        let (svc, _, _, _) = create_test_account_service();
+        let result = svc.delete_account("nonexistent").await;
+        assert!(matches!(result, Err(CoreError::AccountNotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn delete_account_cleans_domain_metadata() {
+        let (svc, _, _, domain_meta_repo) = create_test_account_service();
+
+        let account = svc
+            .create_account_from_import(
+                "Meta Test".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+        let id = account.id.clone();
+
+        // 为该账户的域名添加一些元数据
+        use crate::types::{DomainMetadata, DomainMetadataKey};
+        let key = DomainMetadataKey::new(id.clone(), "example.com".to_string());
+        let mut meta = DomainMetadata::default();
+        meta.is_favorite = true;
+        meta.favorited_at = Some(chrono::Utc::now());
+        domain_meta_repo.save(&key, &meta).await.unwrap();
+
+        // 删除账户
+        svc.delete_account(&id).await.unwrap();
+
+        // 域名元数据也被清理了
+        let found = domain_meta_repo.find_by_key(&key).await.unwrap();
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn batch_delete_accounts_partial_failure() {
+        let (svc, _, _, _) = create_test_account_service();
+
+        let acc = svc
+            .create_account_from_import(
+                "Keep".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+
+        let result = svc
+            .batch_delete_accounts(vec![acc.id.clone(), "nonexistent".to_string()])
+            .await
+            .unwrap();
+
+        assert_eq!(result.success_count, 1);
+        assert_eq!(result.failed_count, 1);
+        assert_eq!(result.failures[0].record_id, "nonexistent");
+    }
+
+    #[tokio::test]
+    async fn list_accounts() {
+        let (svc, _, _, _) = create_test_account_service();
+
+        svc.create_account_from_import(
+            "A".to_string(),
+            ProviderType::Cloudflare,
+            test_credentials(),
+        )
+        .await
+        .unwrap();
+        svc.create_account_from_import(
+            "B".to_string(),
+            ProviderType::Cloudflare,
+            test_credentials(),
+        )
+        .await
+        .unwrap();
+
+        let accounts = svc.list_accounts().await.unwrap();
+        assert_eq!(accounts.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn get_account_found() {
+        let (svc, _, _, _) = create_test_account_service();
+
+        let acc = svc
+            .create_account_from_import(
+                "Find Me".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+
+        let found = svc.get_account(&acc.id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "Find Me");
+    }
+
+    #[tokio::test]
+    async fn get_account_not_found() {
+        let (svc, _, _, _) = create_test_account_service();
+        let found = svc.get_account("ghost").await.unwrap();
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn update_status() {
+        let (svc, _, _, _) = create_test_account_service();
+
+        let acc = svc
+            .create_account_from_import(
+                "Status".to_string(),
+                ProviderType::Cloudflare,
+                test_credentials(),
+            )
+            .await
+            .unwrap();
+
+        svc.update_status(&acc.id, AccountStatus::Error, Some("broken".to_string()))
+            .await
+            .unwrap();
+
+        let updated = svc.get_account(&acc.id).await.unwrap().unwrap();
+        assert_eq!(updated.status, Some(AccountStatus::Error));
+        assert_eq!(updated.error, Some("broken".to_string()));
+    }
+}

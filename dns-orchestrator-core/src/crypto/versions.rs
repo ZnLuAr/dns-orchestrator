@@ -50,3 +50,29 @@ pub const fn get_pbkdf2_iterations(version: u32) -> Option<u32> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_1_iterations() {
+        assert_eq!(get_pbkdf2_iterations(1), Some(100_000));
+    }
+
+    #[test]
+    fn version_2_iterations() {
+        assert_eq!(get_pbkdf2_iterations(2), Some(600_000));
+    }
+
+    #[test]
+    fn unknown_version_returns_none() {
+        assert_eq!(get_pbkdf2_iterations(0), None);
+        assert_eq!(get_pbkdf2_iterations(99), None);
+    }
+
+    #[test]
+    fn current_version_is_2() {
+        assert_eq!(CURRENT_FILE_VERSION, 2);
+    }
+}

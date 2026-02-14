@@ -15,6 +15,9 @@ pub mod traits;
 pub mod types;
 pub mod utils;
 
+#[cfg(test)]
+mod test_utils;
+
 // Re-export 常用类型
 pub use error::{CoreError, CoreResult};
 pub use services::ServiceContext;

@@ -1,53 +1,34 @@
-//! SSL 证书检查模块
+//! SSL/TLS certificate inspection module.
 //!
-//! 使用 rustls 实现纯异步的 SSL 证书检查，支持完整证书链获取
+//! Uses rustls for fully async certificate checking with complete chain retrieval.
 
-#[cfg(feature = "rustls")]
 use std::sync::Arc;
-#[cfg(feature = "rustls")]
 use std::time::Duration;
 
-#[cfg(feature = "rustls")]
 use log::{debug, error, trace, warn};
-#[cfg(feature = "rustls")]
 use rustls::crypto::CryptoProvider;
-#[cfg(feature = "rustls")]
 use rustls::{ClientConfig, RootCertStore};
-#[cfg(feature = "rustls")]
 use rustls_pki_types::{CertificateDer, ServerName};
-#[cfg(feature = "rustls")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-#[cfg(feature = "rustls")]
 use tokio::net::TcpStream;
-#[cfg(feature = "rustls")]
 use tokio::time::timeout;
-#[cfg(feature = "rustls")]
 use tokio_rustls::TlsConnector;
-#[cfg(feature = "rustls")]
 use x509_parser::prelude::*;
 
-#[cfg(not(feature = "rustls"))]
-use crate::error::ToolboxError;
 use crate::error::ToolboxResult;
-use crate::types::SslCheckResult;
-#[cfg(feature = "rustls")]
-use crate::types::{CertChainItem, SslCertInfo};
+use crate::types::{CertChainItem, SslCertInfo, SslCheckResult};
 
-// 超时配置常量
-#[cfg(feature = "rustls")]
+// Timeout constants
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-#[cfg(feature = "rustls")]
 const TLS_TIMEOUT: Duration = Duration::from_secs(5);
-#[cfg(feature = "rustls")]
 const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
 
-/// 初始化 rustls CryptoProvider（仅初始化一次）
+/// Initialize the rustls `CryptoProvider` (once).
 ///
 /// # Panics
 /// Panics if the default crypto provider cannot be installed. This is a fatal
 /// initialization error - TLS operations cannot function without a crypto provider,
 /// so there is no reasonable way to recover.
-#[cfg(feature = "rustls")]
 #[allow(clippy::panic)]
 fn ensure_crypto_provider() {
     use std::sync::Once;
@@ -63,12 +44,11 @@ fn ensure_crypto_provider() {
     });
 }
 
-/// 检查 HTTP 连接是否可用（异步版本）
-#[cfg(feature = "rustls")]
+/// Check whether a plain HTTP connection is available (async).
 async fn check_http_connection(domain: &str, port: u16) -> bool {
-    // 使用 timeout 包装整个 HTTP 检测过程
+    // Wrap the entire HTTP probe in a timeout
     let result = timeout(HTTP_TIMEOUT, async {
-        // 建立 TCP 连接
+        // Establish TCP connection
         let mut stream = timeout(
             CONNECT_TIMEOUT,
             TcpStream::connect(format!("{domain}:{port}")),
@@ -77,11 +57,11 @@ async fn check_http_connection(domain: &str, port: u16) -> bool {
         .ok()?
         .ok()?;
 
-        // 发送 HTTP HEAD 请求
+        // Send HTTP HEAD request
         let request = format!("HEAD / HTTP/1.1\r\nHost: {domain}\r\nConnection: close\r\n\r\n");
         stream.write_all(request.as_bytes()).await.ok()?;
 
-        // 读取响应
+        // Read response
         let mut response = vec![0u8; 128];
         let _ = stream.read(&mut response).await.ok()?;
 
@@ -93,10 +73,9 @@ async fn check_http_connection(domain: &str, port: u16) -> bool {
     result.unwrap_or(None).unwrap_or(false)
 }
 
-/// SSL 证书检查（使用 rustls 纯异步实现）
-#[cfg(feature = "rustls")]
+/// Perform an SSL/TLS certificate check (fully async via rustls).
 pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslCheckResult> {
-    // 确保 CryptoProvider 已初始化
+    // Ensure CryptoProvider is initialized
     ensure_crypto_provider();
 
     let port = port.unwrap_or(443);
@@ -105,7 +84,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
     debug!("[SSL] Starting check for {domain}:{port}");
     let start_time = std::time::Instant::now();
 
-    // 1. 建立 TCP 连接（带超时）
+    // 1. Establish TCP connection (with timeout)
     trace!("[SSL] Establishing TCP connection...");
     let stream = match timeout(
         CONNECT_TIMEOUT,
@@ -127,7 +106,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 port,
                 connection_status: "failed".to_string(),
                 cert_info: None,
-                error: Some(format!("连接失败: {e}")),
+                error: Some(format!("Connection failed: {e}")),
             });
         }
         Err(_) => {
@@ -140,12 +119,12 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 port,
                 connection_status: "failed".to_string(),
                 cert_info: None,
-                error: Some("连接超时".to_string()),
+                error: Some("Connection timed out".to_string()),
             });
         }
     };
 
-    // 2. 配置 rustls 客户端
+    // 2. Configure rustls client
     let mut root_store = RootCertStore::empty();
     root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
@@ -162,11 +141,11 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
             port,
             connection_status: "failed".to_string(),
             cert_info: None,
-            error: Some("无效的域名".to_string()),
+            error: Some("Invalid domain name".to_string()),
         });
     };
 
-    // 3. TLS 握手（带超时）
+    // 3. TLS handshake (with timeout)
     trace!("[SSL] Performing TLS handshake...");
     let tls_start = std::time::Instant::now();
     let tls_result = timeout(TLS_TIMEOUT, connector.connect(server_name, stream)).await;
@@ -181,7 +160,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
         }
         Ok(Err(e)) => {
             warn!("[SSL] TLS handshake failed: {e}");
-            // TLS 握手失败，检查是否为 HTTP
+            // TLS handshake failed — check if plain HTTP is available
             trace!("[SSL] Checking if HTTP connection...");
             if check_http_connection(&domain, port).await {
                 debug!(
@@ -201,12 +180,12 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 port,
                 connection_status: "failed".to_string(),
                 cert_info: None,
-                error: Some(format!("TLS 握手失败: {e}")),
+                error: Some(format!("TLS handshake failed: {e}")),
             });
         }
         Err(_) => {
             warn!("[SSL] TLS handshake timeout ({}s)", TLS_TIMEOUT.as_secs());
-            // 超时
+            // Timeout
             trace!("[SSL] Checking if HTTP connection...");
             if check_http_connection(&domain, port).await {
                 debug!(
@@ -226,12 +205,12 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 port,
                 connection_status: "failed".to_string(),
                 cert_info: None,
-                error: Some("TLS 握手超时".to_string()),
+                error: Some("TLS handshake timed out".to_string()),
             });
         }
     };
 
-    // 4. 获取证书链
+    // 4. Retrieve certificate chain
     trace!("[SSL] Retrieving certificate chain...");
     let (_, tls_conn) = tls_stream.get_ref();
     let certs = match tls_conn.peer_certificates() {
@@ -246,14 +225,14 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 port,
                 connection_status: "https".to_string(),
                 cert_info: None,
-                error: Some("未找到证书".to_string()),
+                error: Some("No certificate found".to_string()),
             });
         }
     };
 
     let cert_der = certs[0].as_ref();
 
-    // 5. 解析叶子证书
+    // 5. Parse leaf certificate
     trace!("[SSL] Parsing certificate...");
     let (_, cert) = match X509Certificate::from_der(cert_der) {
         Ok(c) => c,
@@ -264,15 +243,15 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
                 port,
                 connection_status: "https".to_string(),
                 cert_info: None,
-                error: Some(format!("证书解析失败: {e}")),
+                error: Some(format!("Certificate parsing failed: {e}")),
             });
         }
     };
 
-    // 6. 解析证书信息
+    // 6. Extract certificate info
     let mut cert_info = parse_certificate(&domain, port, &cert);
 
-    // 7. 解析完整证书链
+    // 7. Parse full certificate chain
     cert_info.certificate_chain = certs
         .iter()
         .filter_map(|c: &CertificateDer| {
@@ -305,8 +284,7 @@ pub async fn ssl_check(domain: &str, port: Option<u16>) -> ToolboxResult<SslChec
     })
 }
 
-/// 解析证书信息
-#[cfg(feature = "rustls")]
+/// Parse certificate fields into [`SslCertInfo`].
 fn parse_certificate(
     query: &str,
     _port: u16,
@@ -317,7 +295,7 @@ fn parse_certificate(
     let valid_from = cert.validity().not_before.to_rfc2822().unwrap_or_default();
     let valid_to = cert.validity().not_after.to_rfc2822().unwrap_or_default();
 
-    // 计算剩余天数
+    // Calculate days remaining
     let now = chrono::Utc::now();
     let not_after = chrono::DateTime::parse_from_rfc2822(&valid_to)
         .map(|dt| dt.with_timezone(&chrono::Utc))
@@ -325,7 +303,7 @@ fn parse_certificate(
     let days_remaining = (not_after - now).num_days();
     let is_expired = days_remaining < 0;
 
-    // 提取 SAN
+    // Extract Subject Alternative Names
     let san: Vec<String> = cert
         .subject_alternative_name()
         .ok()
@@ -342,7 +320,7 @@ fn parse_certificate(
         })
         .unwrap_or_default();
 
-    // 从证书提取 CN
+    // Extract CN from certificate
     let cn = cert
         .subject()
         .iter_common_name()
@@ -350,23 +328,23 @@ fn parse_certificate(
         .and_then(|cn| cn.as_str().ok())
         .map(String::from);
 
-    // 从证书提取实际域名
-    // 优先级: CN > SAN 第一个 > 用户查询值
+    // Determine the effective domain from the certificate
+    // Priority: CN > first SAN entry > queried value
     let cert_domain = cn
         .clone()
         .or_else(|| san.first().cloned())
         .unwrap_or_else(|| query.to_string());
 
-    // 检查域名是否匹配（CN 或 SAN 中任意一个）
+    // Check whether the queried domain matches (CN or any SAN)
     let domain_matches = check_domain_match(query, cn.as_deref(), &san);
 
-    // is_valid = 未过期 且 域名匹配
+    // is_valid = not expired AND domain matches
     let is_valid = !is_expired && domain_matches;
 
     let serial_number = cert.serial.to_str_radix(16).to_uppercase();
     let signature_algorithm = cert.signature_algorithm.algorithm.to_string();
 
-    // 证书链将在 ssl_check 函数中填充，这里先初始化为空
+    // Certificate chain will be filled in by ssl_check(); initialize empty here
     let certificate_chain = vec![];
 
     SslCertInfo {
@@ -385,19 +363,18 @@ fn parse_certificate(
     }
 }
 
-/// 检查查询的域名/IP 是否与证书的 CN 或 SAN 匹配
-#[cfg(feature = "rustls")]
+/// Check whether the queried domain/IP matches the certificate's CN or SANs.
 fn check_domain_match(query: &str, cn: Option<&str>, san: &[String]) -> bool {
     let query_lower = query.to_lowercase();
 
-    // 检查 CN
+    // Check CN
     if let Some(cn) = cn {
         if matches_domain(&query_lower, &cn.to_lowercase()) {
             return true;
         }
     }
 
-    // 检查 SAN
+    // Check SANs
     for name in san {
         if matches_domain(&query_lower, &name.to_lowercase()) {
             return true;
@@ -407,20 +384,19 @@ fn check_domain_match(query: &str, cn: Option<&str>, san: &[String]) -> bool {
     false
 }
 
-/// 域名匹配（支持通配符）
-#[cfg(feature = "rustls")]
+/// Domain matching with wildcard support.
 fn matches_domain(query: &str, pattern: &str) -> bool {
-    // 精确匹配
+    // Exact match
     if query == pattern {
         return true;
     }
 
-    // 通配符匹配 (*.example.com)
+    // Wildcard match (*.example.com)
     if let Some(suffix) = pattern.strip_prefix("*.") {
-        // 通配符只匹配一级子域名
-        // 例如: *.example.com 匹配 foo.example.com，但不匹配 foo.bar.example.com
+        // Wildcards match exactly one subdomain level
+        // e.g. *.example.com matches foo.example.com but NOT foo.bar.example.com
         if let Some(prefix) = query.strip_suffix(suffix) {
-            // prefix 应该是 "xxx." 的形式，且 xxx 中不能包含 "."
+            // prefix should be "xxx." where xxx contains no "."
             if prefix.ends_with('.') && !prefix[..prefix.len() - 1].contains('.') {
                 return true;
             }
@@ -430,11 +406,143 @@ fn matches_domain(query: &str, pattern: &str) -> bool {
     false
 }
 
-/// 无 rustls 支持时的 SSL 检查（返回错误）
-#[cfg(not(feature = "rustls"))]
-#[allow(dead_code)]
-pub async fn ssl_check(_domain: &str, _port: Option<u16>) -> ToolboxResult<SslCheckResult> {
-    Err(ToolboxError::ValidationError(
-        "SSL 检查功能未启用，请编译时启用 rustls feature".to_string(),
-    ))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== matches_domain tests ====================
+
+    #[test]
+    fn test_matches_domain_exact() {
+        assert!(matches_domain("example.com", "example.com"));
+    }
+
+    #[test]
+    fn test_matches_domain_exact_no_match() {
+        assert!(!matches_domain("example.com", "other.com"));
+    }
+
+    #[test]
+    fn test_matches_domain_wildcard_basic() {
+        assert!(matches_domain("sub.example.com", "*.example.com"));
+    }
+
+    #[test]
+    fn test_matches_domain_wildcard_different_sub() {
+        assert!(matches_domain("www.example.com", "*.example.com"));
+        assert!(matches_domain("api.example.com", "*.example.com"));
+        assert!(matches_domain("test.example.com", "*.example.com"));
+    }
+
+    #[test]
+    fn test_matches_domain_wildcard_no_bare_domain() {
+        // *.example.com should NOT match example.com
+        assert!(!matches_domain("example.com", "*.example.com"));
+    }
+
+    #[test]
+    fn test_matches_domain_wildcard_no_multi_level() {
+        // *.example.com should NOT match a.b.example.com
+        assert!(!matches_domain("a.b.example.com", "*.example.com"));
+    }
+
+    #[test]
+    fn test_matches_domain_no_partial_match() {
+        assert!(!matches_domain("notexample.com", "example.com"));
+    }
+
+    // ==================== check_domain_match tests ====================
+
+    #[test]
+    fn test_check_domain_match_cn_match() {
+        assert!(check_domain_match("example.com", Some("example.com"), &[]));
+    }
+
+    #[test]
+    fn test_check_domain_match_san_match() {
+        assert!(check_domain_match(
+            "www.example.com",
+            Some("example.com"),
+            &["www.example.com".to_string()],
+        ));
+    }
+
+    #[test]
+    fn test_check_domain_match_wildcard_in_san() {
+        assert!(check_domain_match(
+            "api.example.com",
+            None,
+            &["*.example.com".to_string()],
+        ));
+    }
+
+    #[test]
+    fn test_check_domain_match_case_insensitive() {
+        assert!(check_domain_match("EXAMPLE.COM", Some("example.com"), &[]));
+        assert!(check_domain_match("example.com", Some("EXAMPLE.COM"), &[]));
+    }
+
+    #[test]
+    fn test_check_domain_match_no_cn_no_san() {
+        assert!(!check_domain_match("example.com", None, &[]));
+    }
+
+    #[test]
+    fn test_check_domain_match_no_match() {
+        assert!(!check_domain_match(
+            "evil.com",
+            Some("example.com"),
+            &["www.example.com".to_string()],
+        ));
+    }
+
+    // ==================== integration tests ====================
+
+    // NOTE: These tests depend on external networks; failures may be due to firewall/proxy issues
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_ssl_check_https_site_real() {
+        let result = ssl_check("google.com", None).await;
+        let check = result.unwrap_or_else(|e| panic!("SSL check failed: {e}"));
+        // Network issues may cause connection failure; only verify cert if connected
+        if check.connection_status == "https" {
+            let cert = check
+                .cert_info
+                .expect("cert_info should be Some when connection_status is https");
+            assert!(!cert.is_expired, "Google cert should not be expired");
+            assert!(cert.days_remaining > 0);
+            assert!(!cert.san.is_empty(), "SAN should not be empty");
+            assert!(
+                !cert.certificate_chain.is_empty(),
+                "Certificate chain should not be empty"
+            );
+        } else {
+            eprintln!(
+                "WARN: SSL connection to google.com returned '{}', error: {:?} (network issue?)",
+                check.connection_status, check.error
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_ssl_check_custom_port_real() {
+        let result = ssl_check("google.com", Some(443)).await;
+        let check = result.unwrap_or_else(|e| panic!("SSL check with custom port failed: {e}"));
+        assert_eq!(check.port, 443);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_ssl_check_invalid_domain_real() {
+        let result = ssl_check("this-domain-does-not-exist-12345.com", None).await;
+        let check = result.unwrap_or_else(|e| panic!("SSL check on invalid domain failed: {e}"));
+        assert_eq!(
+            check.connection_status, "failed",
+            "Invalid domain should fail, got: {}",
+            check.connection_status
+        );
+        assert!(check.error.is_some());
+    }
 }

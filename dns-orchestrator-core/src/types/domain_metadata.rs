@@ -185,3 +185,121 @@ pub struct BatchTagFailure {
     pub domain_id: String,
     pub reason: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_metadata_is_empty() {
+        let m = DomainMetadata::default();
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn metadata_with_favorite_not_empty() {
+        let mut m = DomainMetadata::default();
+        m.is_favorite = true;
+        assert!(!m.is_empty());
+    }
+
+    #[test]
+    fn metadata_with_tag_not_empty() {
+        let mut m = DomainMetadata::default();
+        m.tags = vec!["important".to_string()];
+        assert!(!m.is_empty());
+    }
+
+    #[test]
+    fn metadata_with_color_not_empty() {
+        let mut m = DomainMetadata::default();
+        m.color = "red".to_string();
+        assert!(!m.is_empty());
+    }
+
+    #[test]
+    fn metadata_with_color_none_is_empty() {
+        let m = DomainMetadata::default();
+        assert_eq!(m.color, "none");
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn metadata_touch_updates_timestamp() {
+        let mut m = DomainMetadata::default();
+        let before = m.updated_at;
+        // chrono::Utc::now() 精度足够让两次调用产生不同时间戳
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        m.touch();
+        assert!(m.updated_at >= before);
+    }
+
+    #[test]
+    fn metadata_key_storage_roundtrip() {
+        let key = DomainMetadataKey::new("acc-123".to_string(), "domain.com".to_string());
+        let storage = key.to_storage_key();
+        assert_eq!(storage, "acc-123::domain.com");
+
+        let parsed = DomainMetadataKey::from_storage_key(&storage).unwrap();
+        assert_eq!(parsed, key);
+    }
+
+    #[test]
+    fn metadata_key_invalid_storage_key() {
+        assert!(DomainMetadataKey::from_storage_key("no-separator").is_none());
+        assert!(DomainMetadataKey::from_storage_key("a::b::c").is_none());
+    }
+
+    #[test]
+    fn apply_to_partial_update() {
+        let mut m = DomainMetadata::default();
+        m.tags = vec!["old".to_string()];
+        m.color = "red".to_string();
+
+        let update = DomainMetadataUpdate {
+            is_favorite: Some(true),
+            tags: None,
+            color: None,
+            note: None,
+        };
+        update.apply_to(&mut m);
+
+        assert!(m.is_favorite);
+        // 未更新的字段保持不变
+        assert_eq!(m.tags, vec!["old".to_string()]);
+        assert_eq!(m.color, "red");
+    }
+
+    #[test]
+    fn apply_to_full_update() {
+        let mut m = DomainMetadata::default();
+
+        let update = DomainMetadataUpdate {
+            is_favorite: Some(true),
+            tags: Some(vec!["a".to_string(), "b".to_string()]),
+            color: Some("blue".to_string()),
+            note: Some(Some("hello".to_string())),
+        };
+        update.apply_to(&mut m);
+
+        assert!(m.is_favorite);
+        assert_eq!(m.tags, vec!["a", "b"]);
+        assert_eq!(m.color, "blue");
+        assert_eq!(m.note, Some("hello".to_string()));
+    }
+
+    #[test]
+    fn metadata_serde_roundtrip() {
+        let m = DomainMetadata::new(
+            true,
+            vec!["tag1".to_string(), "tag2".to_string()],
+            "green".to_string(),
+            Some("a note".to_string()),
+            Some(chrono::Utc::now()),
+        );
+        let json = serde_json::to_string(&m).unwrap();
+        let deserialized: DomainMetadata = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(m, deserialized);
+    }
+}

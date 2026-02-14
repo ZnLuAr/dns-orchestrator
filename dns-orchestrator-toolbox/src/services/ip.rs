@@ -1,4 +1,4 @@
-//! IP 地理位置查询模块
+//! IP geolocation lookup module.
 
 use hickory_resolver::{
     config::{ResolverConfig, ResolverOpts},
@@ -10,7 +10,7 @@ use serde::Deserialize;
 use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{IpGeoInfo, IpLookupResult};
 
-/// ipwhois.io 响应结构
+/// Response structure from ipwho.is API.
 #[derive(Deserialize)]
 struct IpWhoisResponse {
     ip: String,
@@ -40,7 +40,7 @@ struct IpWhoisConnection {
     isp: Option<String>,
 }
 
-/// 查询单个 IP 的地理位置
+/// Look up geolocation for a single IP address.
 async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> ToolboxResult<IpGeoInfo> {
     let url = format!(
         "https://ipwho.is/{ip}?fields=ip,success,message,type,country,country_code,region,city,latitude,longitude,timezone,connection"
@@ -50,20 +50,22 @@ async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> ToolboxResult<I
         .get(&url)
         .send()
         .await
-        .map_err(|e| ToolboxError::NetworkError(format!("请求失败: {e}")))?
+        .map_err(|e| ToolboxError::NetworkError(format!("Request failed: {e}")))?
         .json()
         .await
-        .map_err(|e| ToolboxError::NetworkError(format!("解析失败: {e}")))?;
+        .map_err(|e| ToolboxError::NetworkError(format!("Failed to parse response: {e}")))?;
 
     if !response.success {
         let error_msg = match response.message.as_deref() {
             Some("You've hit the monthly limit") => {
-                "IP 查询服务已达本月限额，请稍后再试".to_string()
+                "IP lookup service monthly quota exceeded, please try again later".to_string()
             }
-            Some("Invalid IP address") => "无效的 IP 地址".to_string(),
-            Some("Reserved range") => "该 IP 属于保留地址段，无法查询".to_string(),
-            Some(msg) => format!("查询失败: {msg}"),
-            None => "查询失败".to_string(),
+            Some("Invalid IP address") => "Invalid IP address".to_string(),
+            Some("Reserved range") => {
+                "This IP belongs to a reserved range and cannot be looked up".to_string()
+            }
+            Some(msg) => format!("Lookup failed: {msg}"),
+            None => "Lookup failed".to_string(),
         };
         return Err(ToolboxError::NetworkError(error_msg));
     }
@@ -104,18 +106,18 @@ async fn lookup_single_ip(ip: &str, client: &reqwest::Client) -> ToolboxResult<I
     })
 }
 
-/// IP/域名 地理位置查询
+/// Look up geolocation for an IP address or domain.
 pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
     let query = query.trim().to_string();
     if query.is_empty() {
         return Err(ToolboxError::ValidationError(
-            "请输入 IP 地址或域名".to_string(),
+            "IP address or domain required".to_string(),
         ));
     }
 
     let client = reqwest::Client::new();
 
-    // 检查是否为 IP 地址
+    // Check if the query is an IP address
     if query.parse::<std::net::IpAddr>().is_ok() {
         let result = lookup_single_ip(&query, &client).await?;
         return Ok(IpLookupResult {
@@ -125,7 +127,7 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
         });
     }
 
-    // 作为域名处理，解析 A 和 AAAA 记录
+    // Treat as domain — resolve A and AAAA records
     let provider = TokioConnectionProvider::default();
     let resolver = TokioResolver::builder_with_config(ResolverConfig::default(), provider)
         .with_options(ResolverOpts::default())
@@ -133,14 +135,14 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
 
     let mut ips: Vec<String> = Vec::new();
 
-    // 解析 IPv4 (A 记录)
+    // Resolve IPv4 (A records)
     if let Ok(response) = resolver.ipv4_lookup(&query).await {
         for ip in response.iter() {
             ips.push(ip.to_string());
         }
     }
 
-    // 解析 IPv6 (AAAA 记录)
+    // Resolve IPv6 (AAAA records)
     if let Ok(response) = resolver.ipv6_lookup(&query).await {
         for ip in response.iter() {
             ips.push(ip.to_string());
@@ -148,23 +150,25 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
     }
 
     if ips.is_empty() {
-        return Err(ToolboxError::NetworkError(format!("无法解析域名: {query}")));
+        return Err(ToolboxError::NetworkError(format!(
+            "Failed to resolve domain: {query}"
+        )));
     }
 
-    // 查询每个 IP 的地理位置
+    // Geolocate each resolved IP
     let mut results = Vec::new();
     for ip in ips {
         match lookup_single_ip(&ip, &client).await {
             Ok(info) => results.push(info),
             Err(e) => {
-                log::warn!("查询 IP {ip} 失败: {e}");
+                log::warn!("Failed to look up IP {ip}: {e}");
             }
         }
     }
 
     if results.is_empty() {
         return Err(ToolboxError::NetworkError(
-            "所有 IP 地址查询均失败".to_string(),
+            "All IP address lookups failed".to_string(),
         ));
     }
 
@@ -173,4 +177,65 @@ pub async fn ip_lookup(query: &str) -> ToolboxResult<IpLookupResult> {
         is_domain: true,
         results,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_ip_lookup_empty_query() {
+        let result = ip_lookup("").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ToolboxError::ValidationError(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_ip_lookup_whitespace_only() {
+        let result = ip_lookup("   ").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ToolboxError::ValidationError(_)
+        ));
+    }
+
+    // NOTE: These tests depend on the ipwho.is external API; failures may be due to rate limiting or network issues
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_ip_lookup_ipv4_real() {
+        let result = ip_lookup("8.8.8.8").await;
+        let info =
+            result.unwrap_or_else(|e| panic!("IPv4 lookup failed (ipwho.is unreachable?): {e}"));
+        assert_eq!(info.query, "8.8.8.8");
+        assert!(!info.is_domain);
+        assert_eq!(info.results.len(), 1);
+        assert_eq!(info.results[0].ip, "8.8.8.8");
+        assert_eq!(info.results[0].ip_version, "IPv4");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_ip_lookup_domain_real() {
+        let result = ip_lookup("google.com").await;
+        let info =
+            result.unwrap_or_else(|e| panic!("Domain lookup failed (DNS or ipwho.is issue?): {e}"));
+        assert_eq!(info.query, "google.com");
+        assert!(info.is_domain);
+        assert!(!info.results.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_ip_lookup_ipv6_real() {
+        let result = ip_lookup("2606:4700:4700::1111").await;
+        let info =
+            result.unwrap_or_else(|e| panic!("IPv6 lookup failed (ipwho.is unreachable?): {e}"));
+        assert!(!info.is_domain);
+        assert_eq!(info.results.len(), 1);
+    }
 }

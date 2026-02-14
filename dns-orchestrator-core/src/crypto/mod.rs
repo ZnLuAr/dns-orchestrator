@@ -137,3 +137,72 @@ pub fn decrypt_with_iterations(
         )
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encrypt_decrypt_roundtrip() {
+        let plaintext = b"hello, DNS orchestrator!";
+        let password = "strong-password-123";
+
+        let (salt, nonce, ciphertext) = encrypt(plaintext, password).unwrap();
+        let decrypted = decrypt(&ciphertext, password, &salt, &nonce).unwrap();
+
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn decrypt_wrong_password_fails() {
+        let plaintext = b"secret data";
+        let (salt, nonce, ciphertext) = encrypt(plaintext, "correct-password").unwrap();
+
+        let result = decrypt(&ciphertext, "wrong-password", &salt, &nonce);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn decrypt_corrupted_ciphertext_fails() {
+        let plaintext = b"some data";
+        let password = "password";
+        let (salt, nonce, _) = encrypt(plaintext, password).unwrap();
+
+        // 构造一个合法 base64 但内容是垃圾的密文
+        let corrupted = BASE64.encode(b"this is not valid ciphertext at all!!");
+        let result = decrypt(&corrupted, password, &salt, &nonce);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn decrypt_invalid_base64_fails() {
+        let result = decrypt("not-valid-base64!!!", "password", "also-bad!!!", "bad!!!");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn encrypt_produces_different_output() {
+        let plaintext = b"same data";
+        let password = "same-password";
+
+        let (salt1, nonce1, ct1) = encrypt(plaintext, password).unwrap();
+        let (salt2, nonce2, ct2) = encrypt(plaintext, password).unwrap();
+
+        // 随机 salt/nonce 使得输出不同
+        assert!(salt1 != salt2 || nonce1 != nonce2 || ct1 != ct2);
+    }
+
+    #[test]
+    fn decrypt_with_different_iterations() {
+        let plaintext = b"version test data";
+        let password = "test-password";
+
+        // 用当前版本（v2, 600k 次）加密
+        let (salt, nonce, ciphertext) = encrypt(plaintext, password).unwrap();
+
+        // 用 v1 迭代次数（100k）解密 → 密钥不同，必然失败
+        let v1_iterations = versions::get_pbkdf2_iterations(1).unwrap();
+        let result = decrypt_with_iterations(&ciphertext, password, &salt, &nonce, v1_iterations);
+        assert!(result.is_err());
+    }
+}

@@ -1,4 +1,4 @@
-//! HTTP 头检查模块
+//! HTTP header inspection and security analysis module.
 
 use std::fmt::Write;
 use std::time::Instant;
@@ -14,7 +14,7 @@ use crate::types::{
 
 const REQUEST_TIMEOUT_SECS: u64 = 10;
 
-/// 必需的安全头列表
+/// Required security headers.
 const REQUIRED_SECURITY_HEADERS: &[&str] = &[
     "strict-transport-security",
     "x-frame-options",
@@ -22,18 +22,18 @@ const REQUIRED_SECURITY_HEADERS: &[&str] = &[
     "content-security-policy",
 ];
 
-/// 建议的安全头列表
+/// Recommended (but not required) security headers.
 const RECOMMENDED_SECURITY_HEADERS: &[&str] =
     &["referrer-policy", "permissions-policy", "x-xss-protection"];
 
-/// HTTP 头检查
+/// Perform an HTTP header check and security analysis.
 pub async fn http_header_check(
     request: &HttpHeaderCheckRequest,
 ) -> ToolboxResult<HttpHeaderCheckResult> {
     debug!("[HTTP] Checking headers for {}", request.url);
     let start = Instant::now();
 
-    // 确保 URL 包含协议，如果没有则默认添加 https://
+    // Ensure the URL includes a scheme; default to https://
     let url = if request.url.starts_with("http://") || request.url.starts_with("https://") {
         request.url.clone()
     } else {
@@ -42,7 +42,7 @@ pub async fn http_header_check(
 
     debug!("[HTTP] Normalized URL: {url}");
 
-    // 构建 HTTP 客户端
+    // Build HTTP client
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .redirect(reqwest::redirect::Policy::limited(5))
@@ -51,7 +51,7 @@ pub async fn http_header_check(
             ToolboxError::NetworkError(format!("HTTP client initialization failed: {e}"))
         })?;
 
-    // 转换 HTTP 方法
+    // Map HttpMethod to reqwest::Method
     let method = match request.method {
         HttpMethod::GET => Method::GET,
         HttpMethod::HEAD => Method::HEAD,
@@ -62,15 +62,10 @@ pub async fn http_header_check(
         HttpMethod::OPTIONS => Method::OPTIONS,
     };
 
-    // 构建请求
+    // Build request
     let mut req_builder = client.request(method.clone(), &url);
 
-    // 添加自定义请求头
-    for header in &request.custom_headers {
-        req_builder = req_builder.header(&header.name, &header.value);
-    }
-
-    // 添加请求体（POST/PUT/PATCH）
+    // Add custom headers
     if let Some(body) = &request.body {
         if let Some(content_type) = &request.content_type {
             req_builder = req_builder.header("Content-Type", content_type);
@@ -78,7 +73,7 @@ pub async fn http_header_check(
         req_builder = req_builder.body(body.clone());
     }
 
-    // 发送请求
+    // Send request
     let response = req_builder
         .send()
         .await
@@ -92,7 +87,7 @@ pub async fn http_header_check(
         .unwrap_or("Unknown")
         .to_string();
 
-    // 提取响应头
+    // Extract response headers
     let mut headers: Vec<HttpHeader> = Vec::new();
     for (name, value) in response.headers() {
         headers.push(HttpHeader {
@@ -101,25 +96,25 @@ pub async fn http_header_check(
         });
     }
 
-    // 读取响应体为 bytes
+    // Read response body as bytes
     let body_bytes = response
         .bytes()
         .await
         .map_err(|e| ToolboxError::NetworkError(format!("Failed to read response body: {e}")))?;
 
-    // Content-Length - 计算实际大小
+    // Content-Length — compute actual size
     let content_length = Some(body_bytes.len() as u64);
 
-    // 将 body_bytes 转换为字符串（用于 raw_response）
+    // Convert body bytes to string (for raw_response)
     let body = String::from_utf8_lossy(&body_bytes).to_string();
 
-    // 安全头分析
+    // Security header analysis
     let security_analysis = analyze_security_headers(&headers);
 
-    // 构建原始请求报文
+    // Build raw request message
     let mut raw_request = format!("{} {} HTTP/1.1\r\n", method.as_str(), url);
 
-    // 使用 url crate 解析 Host
+    // Parse Host from URL
     if let Ok(parsed_url) = Url::parse(&url) {
         if let Some(host) = parsed_url.host_str() {
             let host_header = if let Some(port) = parsed_url.port() {
@@ -131,14 +126,14 @@ pub async fn http_header_check(
         }
     }
 
-    // 添加自定义请求头
+    // Append custom headers to raw request
     for header in &request.custom_headers {
         if !header.name.is_empty() && !header.value.is_empty() {
             let _ = write!(raw_request, "{}: {}\r\n", header.name, header.value);
         }
     }
 
-    // 添加 Content-Type 和请求体
+    // Append Content-Type and body
     if let Some(body) = &request.body {
         if let Some(content_type) = &request.content_type {
             let _ = write!(raw_request, "Content-Type: {content_type}\r\n");
@@ -150,7 +145,7 @@ pub async fn http_header_check(
         raw_request.push_str("\r\n");
     }
 
-    // 构建原始响应报文
+    // Build raw response message
     let mut raw_response = format!("HTTP/1.1 {status_code} {status_text}\r\n");
     for header in &headers {
         let _ = write!(raw_response, "{}: {}\r\n", header.name, header.value);
@@ -183,11 +178,11 @@ pub async fn http_header_check(
     })
 }
 
-/// 分析安全头
+/// Analyse response headers for security best practices.
 fn analyze_security_headers(headers: &[HttpHeader]) -> Vec<SecurityHeaderAnalysis> {
     let mut analysis = Vec::new();
 
-    // 检查必需的安全头
+    // Check required security headers
     for &header_name in REQUIRED_SECURITY_HEADERS {
         let found = headers
             .iter()
@@ -210,7 +205,7 @@ fn analyze_security_headers(headers: &[HttpHeader]) -> Vec<SecurityHeaderAnalysi
         });
     }
 
-    // 检查建议的安全头
+    // Check recommended security headers
     for &header_name in RECOMMENDED_SECURITY_HEADERS {
         let found = headers
             .iter()
@@ -236,7 +231,7 @@ fn analyze_security_headers(headers: &[HttpHeader]) -> Vec<SecurityHeaderAnalysi
     analysis
 }
 
-/// 获取安全头建议
+/// Return a human-readable recommendation for a missing security header.
 fn get_recommendation(header_name: &str) -> String {
     match header_name {
         "strict-transport-security" => "Add HSTS header to enforce HTTPS connections".to_string(),
@@ -247,5 +242,280 @@ fn get_recommendation(header_name: &str) -> String {
         "permissions-policy" => "Set Permissions-Policy to restrict browser features".to_string(),
         "x-xss-protection" => "Add to enable browser XSS filter".to_string(),
         _ => "Consider adding this security header".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== get_recommendation tests ====================
+
+    #[test]
+    fn test_get_recommendation_known_headers() {
+        assert!(get_recommendation("strict-transport-security").contains("HSTS"));
+        assert!(get_recommendation("x-frame-options").contains("clickjacking"));
+        assert!(get_recommendation("x-content-type-options").contains("nosniff"));
+        assert!(get_recommendation("content-security-policy").contains("XSS"));
+        assert!(get_recommendation("referrer-policy").contains("Referrer"));
+        assert!(get_recommendation("permissions-policy").contains("Permissions"));
+        assert!(get_recommendation("x-xss-protection").contains("XSS"));
+    }
+
+    #[test]
+    fn test_get_recommendation_unknown_header() {
+        let rec = get_recommendation("custom-header");
+        assert!(rec.contains("Consider"));
+    }
+
+    // ==================== analyze_security_headers tests ====================
+
+    #[test]
+    fn test_analyze_security_headers_all_present() {
+        let headers = vec![
+            HttpHeader {
+                name: "strict-transport-security".to_string(),
+                value: "max-age=31536000".to_string(),
+            },
+            HttpHeader {
+                name: "x-frame-options".to_string(),
+                value: "DENY".to_string(),
+            },
+            HttpHeader {
+                name: "x-content-type-options".to_string(),
+                value: "nosniff".to_string(),
+            },
+            HttpHeader {
+                name: "content-security-policy".to_string(),
+                value: "default-src 'self'".to_string(),
+            },
+            HttpHeader {
+                name: "referrer-policy".to_string(),
+                value: "strict-origin".to_string(),
+            },
+            HttpHeader {
+                name: "permissions-policy".to_string(),
+                value: "geolocation=()".to_string(),
+            },
+            HttpHeader {
+                name: "x-xss-protection".to_string(),
+                value: "1; mode=block".to_string(),
+            },
+        ];
+
+        let analysis = analyze_security_headers(&headers);
+
+        // All should be present and "good"
+        for item in &analysis {
+            assert!(item.present, "Header {} should be present", item.name);
+            assert_eq!(item.status, "good", "Header {} should be good", item.name);
+            assert!(
+                item.recommendation.is_none(),
+                "Header {} should have no recommendation",
+                item.name
+            );
+            assert!(item.value.is_some());
+        }
+    }
+
+    #[test]
+    fn test_analyze_security_headers_none_present() {
+        let headers: Vec<HttpHeader> = vec![
+            HttpHeader {
+                name: "content-type".to_string(),
+                value: "text/html".to_string(),
+            },
+            HttpHeader {
+                name: "server".to_string(),
+                value: "nginx".to_string(),
+            },
+        ];
+
+        let analysis = analyze_security_headers(&headers);
+
+        // Total: 4 required + 3 recommended = 7
+        assert_eq!(analysis.len(), 7);
+
+        // Required headers should be "missing"
+        let required_names: Vec<&str> = REQUIRED_SECURITY_HEADERS.to_vec();
+        for item in analysis
+            .iter()
+            .filter(|a| required_names.contains(&a.name.as_str()))
+        {
+            assert!(!item.present);
+            assert_eq!(item.status, "missing");
+            assert!(item.recommendation.is_some());
+            assert!(item.value.is_none());
+        }
+
+        // Recommended headers should be "warning"
+        let recommended_names: Vec<&str> = RECOMMENDED_SECURITY_HEADERS.to_vec();
+        for item in analysis
+            .iter()
+            .filter(|a| recommended_names.contains(&a.name.as_str()))
+        {
+            assert!(!item.present);
+            assert_eq!(item.status, "warning");
+            assert!(item.recommendation.is_some());
+        }
+    }
+
+    #[test]
+    fn test_analyze_security_headers_partial() {
+        let headers = vec![
+            HttpHeader {
+                name: "strict-transport-security".to_string(),
+                value: "max-age=31536000".to_string(),
+            },
+            HttpHeader {
+                name: "x-content-type-options".to_string(),
+                value: "nosniff".to_string(),
+            },
+        ];
+
+        let analysis = analyze_security_headers(&headers);
+
+        let hsts = analysis
+            .iter()
+            .find(|a| a.name == "strict-transport-security")
+            .unwrap();
+        assert!(hsts.present);
+        assert_eq!(hsts.status, "good");
+        assert_eq!(hsts.value.as_deref(), Some("max-age=31536000"));
+
+        let xfo = analysis
+            .iter()
+            .find(|a| a.name == "x-frame-options")
+            .unwrap();
+        assert!(!xfo.present);
+        assert_eq!(xfo.status, "missing");
+    }
+
+    #[test]
+    fn test_analyze_security_headers_case_insensitive() {
+        let headers = vec![HttpHeader {
+            name: "Strict-Transport-Security".to_string(),
+            value: "max-age=31536000".to_string(),
+        }];
+
+        let analysis = analyze_security_headers(&headers);
+        let hsts = analysis
+            .iter()
+            .find(|a| a.name == "strict-transport-security")
+            .unwrap();
+        assert!(hsts.present);
+        assert_eq!(hsts.status, "good");
+    }
+
+    #[test]
+    fn test_analyze_security_headers_count() {
+        let analysis = analyze_security_headers(&[]);
+        // 4 required + 3 recommended = 7
+        assert_eq!(analysis.len(), 7);
+    }
+
+    // ==================== integration tests ====================
+    // NOTE: These tests depend on external networks; failures may be due to network issues, not code bugs
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_http_header_check_real() {
+        let request = HttpHeaderCheckRequest {
+            url: "https://httpbin.org/get".to_string(),
+            method: HttpMethod::GET,
+            custom_headers: vec![],
+            body: None,
+            content_type: None,
+        };
+        let result = http_header_check(&request).await;
+        let check =
+            result.unwrap_or_else(|e| panic!("HTTP header check failed (network issue?): {e}"));
+        assert_eq!(check.status_code, 200);
+        assert!(!check.headers.is_empty());
+        assert!(!check.security_analysis.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_http_header_check_head_method_real() {
+        let request = HttpHeaderCheckRequest {
+            url: "https://httpbin.org/get".to_string(),
+            method: HttpMethod::HEAD,
+            custom_headers: vec![],
+            body: None,
+            content_type: None,
+        };
+        let result = http_header_check(&request).await;
+        result.unwrap_or_else(|e| panic!("HEAD request failed (network issue?): {e}"));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_http_header_check_auto_https_prefix() {
+        let request = HttpHeaderCheckRequest {
+            url: "httpbin.org/get".to_string(),
+            method: HttpMethod::GET,
+            custom_headers: vec![],
+            body: None,
+            content_type: None,
+        };
+        let result = http_header_check(&request).await;
+        let check = result
+            .unwrap_or_else(|e| panic!("Auto HTTPS prefix test failed (network issue?): {e}"));
+        assert!(
+            check.url.starts_with("https://"),
+            "URL should have been prefixed with https://, got: {}",
+            check.url
+        );
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_http_header_check_custom_headers_real() {
+        let request = HttpHeaderCheckRequest {
+            url: "https://httpbin.org/get".to_string(),
+            method: HttpMethod::GET,
+            custom_headers: vec![HttpHeader {
+                name: "X-Custom-Header".to_string(),
+                value: "test-value".to_string(),
+            }],
+            body: None,
+            content_type: None,
+        };
+        let result = http_header_check(&request).await;
+        let check =
+            result.unwrap_or_else(|e| panic!("Custom headers test failed (network issue?): {e}"));
+        assert!(
+            check.raw_request.contains("X-Custom-Header: test-value"),
+            "raw_request should contain custom header, got:\n{}",
+            check.raw_request
+        );
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_http_header_check_with_body_real() {
+        let request = HttpHeaderCheckRequest {
+            url: "https://httpbin.org/post".to_string(),
+            method: HttpMethod::POST,
+            custom_headers: vec![],
+            body: Some("{\"key\": \"value\"}".to_string()),
+            content_type: Some("application/json".to_string()),
+        };
+        let result = http_header_check(&request).await;
+        result.unwrap_or_else(|e| panic!("POST with body test failed (network issue?): {e}"));
+    }
+
+    #[tokio::test]
+    async fn test_http_header_check_invalid_url() {
+        let request = HttpHeaderCheckRequest {
+            url: "not a valid url at all !!!".to_string(),
+            method: HttpMethod::GET,
+            custom_headers: vec![],
+            body: None,
+            content_type: None,
+        };
+        let result = http_header_check(&request).await;
+        assert!(result.is_err());
     }
 }

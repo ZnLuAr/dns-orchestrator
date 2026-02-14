@@ -1,4 +1,4 @@
-//! DNSSEC 验证模块
+//! DNSSEC validation module.
 
 use std::net::IpAddr;
 use std::time::Instant;
@@ -46,7 +46,7 @@ fn get_digest_type_name(digest_type: u8) -> String {
     }
 }
 
-/// 从 RRSIG/SIG 记录提取签名信息
+/// Extract signature fields from an RRSIG/SIG record.
 #[allow(clippy::too_many_arguments)]
 fn extract_signature_record(
     type_covered: RecordType,
@@ -62,7 +62,7 @@ fn extract_signature_record(
     use base64::{engine::general_purpose::STANDARD, Engine};
     use chrono::{DateTime, Utc};
 
-    // 格式化时间戳
+    // Format timestamps
     let expiration = DateTime::<Utc>::from_timestamp(i64::from(sig_expiration), 0).map_or_else(
         || format!("Invalid ({sig_expiration})"),
         |dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
@@ -73,7 +73,7 @@ fn extract_signature_record(
         |dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
     );
 
-    // Base64 编码签名
+    // Base64-encode signature
     let signature_b64 = STANDARD.encode(signature_bytes);
 
     RrsigRecord {
@@ -90,7 +90,7 @@ fn extract_signature_record(
     }
 }
 
-/// DNSSEC 验证
+/// Validate DNSSEC deployment for a domain.
 pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResult<DnssecResult> {
     // Get system default DNS server addresses
     fn get_system_dns() -> String {
@@ -109,7 +109,7 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
 
     let start_time = Instant::now();
 
-    // 根据 nameserver 参数决定使用自定义还是系统默认
+    // Use custom nameserver if provided, otherwise fall back to system default
     let effective_ns = nameserver.filter(|s| !s.is_empty());
 
     let (resolver, used_nameserver) = if let Some(ns) = effective_ns {
@@ -124,7 +124,7 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
         );
         let provider = TokioConnectionProvider::default();
         let mut opts = ResolverOpts::default();
-        opts.validate = true; // 启用 DNSSEC 验证
+        opts.validate = true; // Enable DNSSEC validation
         let resolver = TokioResolver::builder_with_config(config, provider)
             .with_options(opts)
             .build();
@@ -133,7 +133,7 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
         let system_dns = get_system_dns();
         let provider = TokioConnectionProvider::default();
         let mut opts = ResolverOpts::default();
-        opts.validate = true; // 启用 DNSSEC 验证
+        opts.validate = true; // Enable DNSSEC validation
         let resolver = TokioResolver::builder_with_config(ResolverConfig::default(), provider)
             .with_options(opts)
             .build();
@@ -276,13 +276,13 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
         }
     }
 
-    // 确定验证状态
-    // 注意：由于启用了 ResolverOpts.validate = true，hickory-resolver 会自动验证 DNSSEC
-    // 如果验证失败（bogus 签名），查询会返回 SERVFAIL 错误
-    // 因此，能成功查询到 DNSSEC 记录说明验证通过或未启用 DNSSEC
+    // Determine validation status
+    // Note: with ResolverOpts.validate = true, hickory-resolver automatically validates DNSSEC.
+    // If validation fails (bogus signature), the query returns a SERVFAIL error.
+    // Therefore, successfully retrieving DNSSEC records means validation passed or DNSSEC is not enabled.
     let validation_status = if dnssec_enabled {
         if !dnskey_records.is_empty() && !ds_records.is_empty() {
-            // 有完整的 DNSSEC 记录，且查询成功（验证通过）
+            // Full DNSSEC records present and query succeeded (validation passed)
             log::debug!(
                 "DNSSEC validation for {}: Found DNSKEY ({}) and DS ({}) records, validation passed",
                 domain,
@@ -291,7 +291,7 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
             );
             "secure".to_string()
         } else if !dnskey_records.is_empty() || !ds_records.is_empty() {
-            // 只有部分 DNSSEC 记录
+            // Only partial DNSSEC records found
             log::debug!(
                 "DNSSEC validation for {}: Partial DNSSEC records (DNSKEY: {}, DS: {})",
                 domain,
@@ -323,4 +323,147 @@ pub async fn dnssec_check(domain: &str, nameserver: Option<&str>) -> ToolboxResu
         response_time_ms,
         error: None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== get_algorithm_name tests ====================
+
+    #[test]
+    fn test_get_algorithm_name_known() {
+        assert_eq!(get_algorithm_name(1), "RSA/MD5 (deprecated)");
+        assert_eq!(get_algorithm_name(5), "RSA/SHA-1");
+        assert_eq!(get_algorithm_name(8), "RSA/SHA-256");
+        assert_eq!(get_algorithm_name(10), "RSA/SHA-512");
+        assert_eq!(get_algorithm_name(13), "ECDSAP256SHA256");
+        assert_eq!(get_algorithm_name(14), "ECDSAP384SHA384");
+        assert_eq!(get_algorithm_name(15), "Ed25519");
+        assert_eq!(get_algorithm_name(16), "Ed448");
+    }
+
+    #[test]
+    fn test_get_algorithm_name_deprecated() {
+        assert!(get_algorithm_name(3).contains("deprecated"));
+        assert!(get_algorithm_name(6).contains("deprecated"));
+    }
+
+    #[test]
+    fn test_get_algorithm_name_unknown() {
+        assert_eq!(get_algorithm_name(0), "Unknown (0)");
+        assert_eq!(get_algorithm_name(99), "Unknown (99)");
+        assert_eq!(get_algorithm_name(255), "Unknown (255)");
+    }
+
+    // ==================== get_digest_type_name tests ====================
+
+    #[test]
+    fn test_get_digest_type_name_known() {
+        assert_eq!(get_digest_type_name(1), "SHA-1");
+        assert_eq!(get_digest_type_name(2), "SHA-256");
+        assert_eq!(get_digest_type_name(3), "GOST R 34.11-94");
+        assert_eq!(get_digest_type_name(4), "SHA-384");
+    }
+
+    #[test]
+    fn test_get_digest_type_name_unknown() {
+        assert_eq!(get_digest_type_name(0), "Unknown (0)");
+        assert_eq!(get_digest_type_name(5), "Unknown (5)");
+        assert_eq!(get_digest_type_name(255), "Unknown (255)");
+    }
+
+    // ==================== extract_signature_record tests ====================
+
+    #[test]
+    fn test_extract_signature_record_basic() {
+        let record = extract_signature_record(
+            RecordType::A,
+            13, // ECDSAP256SHA256
+            3,
+            3600,
+            1700000000, // 2023-11-14
+            1699000000, // 2023-11-03
+            12345,
+            "example.com.",
+            &[1, 2, 3, 4],
+        );
+        assert_eq!(record.algorithm, 13);
+        assert_eq!(record.algorithm_name, "ECDSAP256SHA256");
+        assert_eq!(record.labels, 3);
+        assert_eq!(record.original_ttl, 3600);
+        assert_eq!(record.key_tag, 12345);
+        assert_eq!(record.signer_name, "example.com.");
+        assert!(!record.signature.is_empty());
+        // Verify base64 encoding
+        assert_eq!(record.signature, "AQIDBA==");
+    }
+
+    #[test]
+    fn test_extract_signature_record_timestamps() {
+        let record = extract_signature_record(
+            RecordType::SOA,
+            8,
+            2,
+            86400,
+            0,          // epoch
+            1700000000, // valid timestamp
+            999,
+            "test.com.",
+            &[0],
+        );
+        // epoch 0 => 1970-01-01
+        assert!(record.signature_expiration.contains("1970"));
+        assert!(record.signature_inception.contains("2023"));
+    }
+
+    #[test]
+    fn test_extract_signature_record_empty_signature() {
+        let record = extract_signature_record(
+            RecordType::A,
+            8,
+            2,
+            300,
+            1700000000,
+            1699000000,
+            1,
+            "example.com.",
+            &[],
+        );
+        // Empty bytes => empty base64
+        assert_eq!(record.signature, "");
+    }
+
+    // ==================== dnssec_check integration tests ====================
+
+    #[tokio::test]
+    async fn test_dnssec_check_invalid_nameserver() {
+        let result = dnssec_check("example.com", Some("not-an-ip")).await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ToolboxError::ValidationError(_)
+        ));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dnssec_check_cloudflare_real() {
+        // cloudflare.com has DNSSEC enabled
+        let result = dnssec_check("cloudflare.com", Some("8.8.8.8")).await;
+        assert!(result.is_ok());
+        let info = result.unwrap();
+        assert_eq!(info.domain, "cloudflare.com");
+        assert!(info.dnssec_enabled);
+        assert!(!info.dnskey_records.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dnssec_check_no_dnssec_real() {
+        // Many domains don't have DNSSEC, use system default
+        let result = dnssec_check("example.com", None).await;
+        let info = result.unwrap_or_else(|e| panic!("DNSSEC check failed (network issue?): {e}"));
+        assert_eq!(info.domain, "example.com");
+    }
 }

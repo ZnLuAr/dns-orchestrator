@@ -1,4 +1,4 @@
-//! DNS 查询模块
+//! DNS record lookup module.
 
 use std::net::IpAddr;
 
@@ -12,13 +12,13 @@ use hickory_resolver::{
 use crate::error::{ToolboxError, ToolboxResult};
 use crate::types::{DnsLookupRecord, DnsLookupResult};
 
-/// DNS 查询
+/// Resolve DNS records for a domain.
 pub async fn dns_lookup(
     domain: &str,
     record_type: &str,
     nameserver: Option<&str>,
 ) -> ToolboxResult<DnsLookupResult> {
-    // 获取系统默认 DNS 服务器地址
+    // Get system default DNS server addresses
     fn get_system_dns() -> String {
         let config = ResolverConfig::default();
         let servers: Vec<String> = config
@@ -27,13 +27,13 @@ pub async fn dns_lookup(
             .map(|ns| ns.socket_addr.ip().to_string())
             .collect();
         if servers.is_empty() {
-            "系统默认".to_string()
+            "System Default".to_string()
         } else {
             servers.join(", ")
         }
     }
 
-    // 根据 nameserver 参数决定使用自定义还是系统默认
+    // Use custom nameserver if provided, otherwise fall back to system default
     let (resolver, used_nameserver) = if let Some(ns) = nameserver {
         if ns.is_empty() {
             let system_dns = get_system_dns();
@@ -44,7 +44,7 @@ pub async fn dns_lookup(
             (resolver, system_dns)
         } else {
             let ns_ip: IpAddr = ns.parse().map_err(|_| {
-                ToolboxError::ValidationError(format!("无效的 DNS 服务器地址: {ns}"))
+                ToolboxError::ValidationError(format!("Invalid DNS server address: {ns}"))
             })?;
 
             let config = ResolverConfig::from_parts(
@@ -102,7 +102,7 @@ pub async fn dns_lookup(
         }
         _ => {
             return Err(ToolboxError::ValidationError(format!(
-                "不支持的记录类型: {record_type}"
+                "Unsupported record type: {record_type}"
             )));
         }
     }
@@ -319,5 +319,126 @@ async fn lookup_ptr(resolver: &TokioResolver, domain: &str, records: &mut Vec<Dn
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_dns_lookup_invalid_record_type() {
+        let result = dns_lookup("example.com", "INVALID", None).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ToolboxError::ValidationError(_)));
+        assert!(err.to_string().contains("INVALID"));
+    }
+
+    #[tokio::test]
+    async fn test_dns_lookup_invalid_nameserver() {
+        let result = dns_lookup("example.com", "A", Some("not-an-ip")).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ToolboxError::ValidationError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_dns_lookup_empty_nameserver_uses_system_default() {
+        // Empty nameserver should fall back to system default, not error
+        let result = dns_lookup("example.com", "A", Some("")).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        assert!(!lookup.nameserver.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_dns_lookup_record_type_case_insensitive() {
+        // Record type should be case-insensitive
+        let result_lower = dns_lookup("example.com", "a", None).await;
+        let result_upper = dns_lookup("example.com", "A", None).await;
+        // Both should succeed (or both fail due to network), neither should return ValidationError
+        assert!(
+            result_lower.is_ok()
+                || !matches!(result_lower.unwrap_err(), ToolboxError::ValidationError(_))
+        );
+        assert!(
+            result_upper.is_ok()
+                || !matches!(result_upper.unwrap_err(), ToolboxError::ValidationError(_))
+        );
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_a_record_real() {
+        let result = dns_lookup("google.com", "A", None).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        assert!(!lookup.records.is_empty());
+        assert!(lookup.records.iter().all(|r| r.record_type == "A"));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_mx_record_real() {
+        let result = dns_lookup("google.com", "MX", None).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        assert!(!lookup.records.is_empty());
+        for record in &lookup.records {
+            assert_eq!(record.record_type, "MX");
+            assert!(record.priority.is_some());
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_ns_record_real() {
+        let result = dns_lookup("google.com", "NS", None).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        assert!(!lookup.records.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_txt_record_real() {
+        let result = dns_lookup("google.com", "TXT", None).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_soa_record_real() {
+        let result = dns_lookup("google.com", "SOA", None).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        assert!(!lookup.records.is_empty());
+        assert_eq!(lookup.records[0].record_type, "SOA");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_with_custom_nameserver() {
+        let result = dns_lookup("google.com", "A", Some("8.8.8.8")).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        assert_eq!(lookup.nameserver, "8.8.8.8");
+        assert!(!lookup.records.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_dns_lookup_all_types_real() {
+        let result = dns_lookup("google.com", "ALL", None).await;
+        assert!(result.is_ok());
+        let lookup = result.unwrap();
+        // ALL should return multiple record types
+        let types: Vec<_> = lookup
+            .records
+            .iter()
+            .map(|r| r.record_type.as_str())
+            .collect();
+        assert!(types.contains(&"A") || types.contains(&"AAAA") || types.contains(&"NS"));
     }
 }

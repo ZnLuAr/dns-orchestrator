@@ -12,10 +12,6 @@ keywords = ["dns", "whois", "ssl", "dnssec", "network"]
 categories = ["network-programming", "web-programming"]
 rust-version = "1.89"
 
-[features]
-default = ["rustls"]
-rustls = ["dep:rustls", "dep:tokio-rustls", "dep:rustls-pki-types", "dep:webpki-roots", "dep:x509-parser"]
-
 [dependencies]
 # Serialization
 serde.workspace = true
@@ -32,13 +28,13 @@ thiserror.workspace = true
 log.workspace = true
 
 # HTTP
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
 
 # WHOIS
 whois-rust = { version = "1.6", features = ["tokio"] }
 regex = "1"
 
-# DNS 查询
+# DNS resolver
 hickory-resolver = { version = "0.25", features = ["dnssec-ring"] }
 
 # URL
@@ -51,12 +47,12 @@ chrono.workspace = true
 base64 = "0.22"
 hex.workspace = true
 
-# SSL 检查 (feature-gated)
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
-tokio-rustls = { version = "0.26", optional = true }
-rustls-pki-types = { version = "1", optional = true }
-webpki-roots = { version = "1", optional = true }
-x509-parser = { version = "0.18", optional = true }
+# SSL/TLS inspection
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = "0.26"
+rustls-pki-types = "1"
+webpki-roots = "1"
+x509-parser = "0.18"
 
 [lints]
 workspace = true

@@ -23,13 +23,6 @@ Add to your `Cargo.toml`:
 dns-orchestrator-toolbox = "0.1"
 ```
 
-The `rustls` feature is enabled by default for SSL certificate checking. To disable it:
-
-```toml
-[dependencies]
-dns-orchestrator-toolbox = { version = "0.1", default-features = false }
-```
-
 ### WHOIS Lookup
 
 ```rust
@@ -89,8 +82,6 @@ for info in &result.results {
 ```
 
 ### SSL Certificate Check
-
-Requires the `rustls` feature (enabled by default).
 
 ```rust
 let result = ToolboxService::ssl_check("example.com", None).await?;

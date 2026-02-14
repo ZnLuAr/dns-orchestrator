@@ -33,7 +33,7 @@ urlencoding.workspace = true
 
 # Common deps (all platforms)
 dns-orchestrator-core = { workspace = true, features = ["rustls"] }
-dns-orchestrator-toolbox = { workspace = true, features = ["rustls"] }
+dns-orchestrator-toolbox.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
