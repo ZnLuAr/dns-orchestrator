@@ -52,8 +52,8 @@ Provider flags:
 
 TLS backend flags:
 
-- `native-tls` (default)
-- `rustls`
+- `native-tls`
+- `rustls` (default)
 
 ## Usage
 

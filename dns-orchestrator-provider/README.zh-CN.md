@@ -52,8 +52,8 @@ Provider 相关：
 
 TLS 后端：
 
-- `native-tls`（默认）
-- `rustls`
+- `native-tls`
+- `rustls`（默认）
 
 ## 使用示例
 

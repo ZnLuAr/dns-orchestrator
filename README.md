@@ -64,7 +64,7 @@ Download the latest version for your platform from the [Releases](https://github
 1. Click **"Add Account"** to configure your first DNS provider
 2. Select provider type and enter your API credentials
 3. View and manage your domains and DNS records
-4. Use the **Network Toolbox** for DNS queries and WHOIS lookups
+4. Use the **Network Toolbox** for network diagnostics (DNS, WHOIS, IP, SSL, HTTP headers, propagation, DNSSEC)
 
 ## Core Functionality
 
