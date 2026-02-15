@@ -10,7 +10,6 @@ homepage = "https://github.com/AptS-1547/dns-orchestrator"
 keywords = ["dns", "orchestrator"]
 categories = ["web-programming"]
 rust-version = "1.89"
-publish = false
 
 [features]
 default = ["rustls"]

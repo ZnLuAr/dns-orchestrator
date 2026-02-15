@@ -349,12 +349,12 @@ impl DnsProvider for MockDnsProvider {
 
 #[derive(Default)]
 struct MockToolboxGateway {
-    dns_lookup_calls: Mutex<Vec<(String, String, Option<String>)>>,
+    dns_lookup_calls: Mutex<Vec<(String, DnsQueryType, Option<String>)>>,
     dns_lookup_delay: Mutex<Option<Duration>>,
     dns_lookup_error: Mutex<Option<String>>,
     whois_calls: Mutex<Vec<String>>,
     ip_calls: Mutex<Vec<String>>,
-    propagation_calls: Mutex<Vec<(String, String)>>,
+    propagation_calls: Mutex<Vec<(String, DnsQueryType)>>,
     dnssec_calls: Mutex<Vec<(String, Option<String>)>>,
 }
 
@@ -367,7 +367,7 @@ impl MockToolboxGateway {
         *self.dns_lookup_error.lock().await = error;
     }
 
-    async fn dns_lookup_calls(&self) -> Vec<(String, String, Option<String>)> {
+    async fn dns_lookup_calls(&self) -> Vec<(String, DnsQueryType, Option<String>)> {
         self.dns_lookup_calls.lock().await.clone()
     }
 
@@ -379,7 +379,7 @@ impl MockToolboxGateway {
         self.ip_calls.lock().await.clone()
     }
 
-    async fn propagation_calls(&self) -> Vec<(String, String)> {
+    async fn propagation_calls(&self) -> Vec<(String, DnsQueryType)> {
         self.propagation_calls.lock().await.clone()
     }
 
@@ -393,12 +393,12 @@ impl ToolboxGateway for MockToolboxGateway {
     async fn dns_lookup(
         &self,
         domain: &str,
-        record_type: &str,
+        record_type: DnsQueryType,
         nameserver: Option<&str>,
     ) -> ToolboxResult<DnsLookupResult> {
         self.dns_lookup_calls.lock().await.push((
             domain.to_string(),
-            record_type.to_string(),
+            record_type,
             nameserver.map(std::string::ToString::to_string),
         ));
 
@@ -456,15 +456,15 @@ impl ToolboxGateway for MockToolboxGateway {
     async fn dns_propagation_check(
         &self,
         domain: &str,
-        record_type: &str,
+        record_type: DnsQueryType,
     ) -> ToolboxResult<DnsPropagationResult> {
         self.propagation_calls
             .lock()
             .await
-            .push((domain.to_string(), record_type.to_string()));
+            .push((domain.to_string(), record_type));
         Ok(DnsPropagationResult {
             domain: domain.to_string(),
-            record_type: record_type.to_string(),
+            record_type,
             results: vec![dns_orchestrator_toolbox::DnsPropagationServerResult {
                 server: dns_orchestrator_toolbox::DnsPropagationServer {
                     name: "Mock DNS".to_string(),
@@ -732,7 +732,7 @@ async fn dns_lookup_uses_toolbox_arguments() {
     let calls = toolbox.dns_lookup_calls().await;
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].0, "example.com");
-    assert_eq!(calls[0].1, "A");
+    assert_eq!(calls[0].1, DnsQueryType::A);
     assert_eq!(calls[0].2, Some("8.8.8.8".to_string()));
 }
 
@@ -844,7 +844,7 @@ async fn toolbox_tools_delegate_to_gateway() {
     assert_eq!(toolbox.ip_calls().await, vec!["1.1.1.1".to_string()]);
     assert_eq!(
         toolbox.propagation_calls().await,
-        vec![("example.com".to_string(), "A".to_string())]
+        vec![("example.com".to_string(), DnsQueryType::A)]
     );
     assert_eq!(
         toolbox.dnssec_calls().await,
@@ -896,4 +896,55 @@ async fn run_toolbox_tool_error_maps_toolbox_error() {
         .await
         .unwrap_err();
     assert!(error.to_string().contains("conn refused"));
+}
+
+#[tokio::test]
+async fn dns_lookup_invalid_record_type_returns_error() {
+    let account_repository: Arc<dyn AccountRepository> =
+        Arc::new(TestAccountRepository::new(Vec::new()));
+    let toolbox = Arc::new(MockToolboxGateway::default());
+
+    let server = build_server(
+        account_repository,
+        None,
+        Arc::clone(&toolbox) as Arc<dyn ToolboxGateway>,
+        ToolTimeouts::default(),
+    )
+    .await;
+
+    let error = server
+        .dns_lookup(Parameters(DnsLookupParams {
+            domain: "example.com".to_string(),
+            record_type: "INVALID".to_string(),
+            nameserver: None,
+        }))
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("Unsupported DNS query type"));
+}
+
+#[tokio::test]
+async fn dns_propagation_invalid_record_type_returns_error() {
+    let account_repository: Arc<dyn AccountRepository> =
+        Arc::new(TestAccountRepository::new(Vec::new()));
+    let toolbox = Arc::new(MockToolboxGateway::default());
+
+    let server = build_server(
+        account_repository,
+        None,
+        Arc::clone(&toolbox) as Arc<dyn ToolboxGateway>,
+        ToolTimeouts::default(),
+    )
+    .await;
+
+    let error = server
+        .dns_propagation_check(Parameters(DnsPropagationCheckParams {
+            domain: "example.com".to_string(),
+            record_type: "BOGUS".to_string(),
+        }))
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("Unsupported DNS query type"));
 }

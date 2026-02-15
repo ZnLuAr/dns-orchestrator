@@ -18,8 +18,8 @@ use dns_orchestrator_core::services::{
 };
 use dns_orchestrator_core::types::DnsRecordType;
 use dns_orchestrator_toolbox::{
-    DnsLookupResult, DnsPropagationResult, DnssecResult, IpLookupResult, ToolboxError,
-    ToolboxResult, ToolboxService, WhoisResult,
+    DnsLookupResult, DnsPropagationResult, DnsQueryType, DnssecResult, IpLookupResult,
+    ToolboxError, ToolboxResult, ToolboxService, WhoisResult,
 };
 
 use crate::schemas::{
@@ -60,7 +60,7 @@ trait ToolboxGateway: Send + Sync {
     async fn dns_lookup(
         &self,
         domain: &str,
-        record_type: &str,
+        record_type: DnsQueryType,
         nameserver: Option<&str>,
     ) -> ToolboxResult<DnsLookupResult>;
 
@@ -71,7 +71,7 @@ trait ToolboxGateway: Send + Sync {
     async fn dns_propagation_check(
         &self,
         domain: &str,
-        record_type: &str,
+        record_type: DnsQueryType,
     ) -> ToolboxResult<DnsPropagationResult>;
 
     async fn dnssec_check(
@@ -89,7 +89,7 @@ impl ToolboxGateway for DefaultToolboxGateway {
     async fn dns_lookup(
         &self,
         domain: &str,
-        record_type: &str,
+        record_type: DnsQueryType,
         nameserver: Option<&str>,
     ) -> ToolboxResult<DnsLookupResult> {
         ToolboxService::dns_lookup(domain, record_type, nameserver).await
@@ -106,7 +106,7 @@ impl ToolboxGateway for DefaultToolboxGateway {
     async fn dns_propagation_check(
         &self,
         domain: &str,
-        record_type: &str,
+        record_type: DnsQueryType,
     ) -> ToolboxResult<DnsPropagationResult> {
         ToolboxService::dns_propagation_check(domain, record_type).await
     }
@@ -306,13 +306,15 @@ impl DnsOrchestratorMcp {
         &self,
         Parameters(params): Parameters<DnsLookupParams>,
     ) -> Result<CallToolResult, McpError> {
+        let record_type: DnsQueryType = params
+            .record_type
+            .parse()
+            .map_err(|e: String| McpError::invalid_params(e, None))?;
+
         run_toolbox_tool(
             self.timeouts.dns_lookup,
-            self.toolbox.dns_lookup(
-                &params.domain,
-                &params.record_type,
-                params.nameserver.as_deref(),
-            ),
+            self.toolbox
+                .dns_lookup(&params.domain, record_type, params.nameserver.as_deref()),
             "DNS lookup",
         )
         .await
@@ -356,10 +358,15 @@ impl DnsOrchestratorMcp {
         &self,
         Parameters(params): Parameters<DnsPropagationCheckParams>,
     ) -> Result<CallToolResult, McpError> {
+        let record_type: DnsQueryType = params
+            .record_type
+            .parse()
+            .map_err(|e: String| McpError::invalid_params(e, None))?;
+
         run_toolbox_tool(
             self.timeouts.dns_propagation_check,
             self.toolbox
-                .dns_propagation_check(&params.domain, &params.record_type),
+                .dns_propagation_check(&params.domain, record_type),
             "DNS propagation check",
         )
         .await
