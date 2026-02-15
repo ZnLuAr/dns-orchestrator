@@ -11,6 +11,7 @@ use ratatui::{
 use crate::i18n::t;
 use crate::model::state::{
     get_all_dns_servers, get_all_providers, get_all_record_types, get_credential_fields, Modal,
+    QueryToolType,
 };
 use crate::model::App;
 use crate::view::theme::colors;
@@ -70,6 +71,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         Modal::HttpHeaderCheck { .. } => render_http_header_check(frame, modal),
         Modal::DnsPropagation { .. } => render_dns_propagation(frame, modal),
         Modal::DnssecCheck { .. } => render_dnssec_check(frame, modal),
+        Modal::QueryTool { .. } => render_query_tool(frame, modal),
         Modal::Error { title, message } => render_error(frame, title, message),
         Modal::Help => render_help(frame),
         _ => {}
@@ -81,6 +83,92 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     let x = area.x + (area.width.saturating_sub(width)) / 2;
     let y = area.y + (area.height.saturating_sub(height)) / 2;
     Rect::new(x, y, width.min(area.width), height.min(area.height))
+}
+
+/// 通用简单工具弹窗渲染函数
+///
+/// # 参数
+/// - `frame`: 渲染帧
+/// - `modal_area`: 弹窗区域
+/// - `title`: 弹窗标题
+/// - `label`: 输入框标签
+/// - `placeholder`: 输入框占位符
+/// - `input`: 输入的值
+/// - `is_focused`: 是否聚焦
+/// - `result`: 查询结果
+/// - `loading`: 是否正在加载
+/// - `status_text`: 加载状态文本
+/// - `action_text`: 底部操作提示文本
+fn render_simple_tool_modal(
+    frame: &mut Frame,
+    modal_area: Rect,
+    title: &str,
+    label: &str,
+    placeholder: &str,
+    input: &str,
+    is_focused: bool,
+    result: &Option<String>,
+    loading: bool,
+    status_text: &str,
+    action_text: &str,
+) {
+    let texts = t();
+    let c = colors();
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, modal_area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(format!(" {} ", title))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(c.highlight))
+        .style(Style::default().bg(c.bg));
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 输入框标签
+    lines.push(Line::from(vec![Span::styled(
+        label,
+        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD),
+    )]));
+
+    // 输入框
+    let mut input_spans = vec![Span::styled("  ", Style::default())];
+    input_spans.extend(render_input_with_cursor(input, placeholder, is_focused));
+    lines.push(Line::from(input_spans));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if loading {
+        lines.push(Line::styled(status_text, Style::default().fg(Color::Yellow)));
+    } else if let Some(ref res) = result {
+        lines.push(Line::styled(
+            format!("{}", texts.modal.tools.result_label),
+            Style::default().fg(c.success).add_modifier(Modifier::BOLD),
+        ));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        format!(" {}: {} | {}: {} ",
+            texts.hints.keys.enter,
+            action_text,
+            texts.hints.keys.esc,
+            texts.common.close
+        ),
+        Style::default().fg(c.muted),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
 }
 
 /// 渲染添加账号弹窗
@@ -542,70 +630,21 @@ fn render_whois_lookup(frame: &mut Frame, modal: &Modal) {
     };
 
     let texts = t();
-    let c = colors();
-    let area = frame.area();
-    let modal_area = centered_rect(70, 18, area);
+    let modal_area = centered_rect(70, 18, frame.area());
 
-    // 清除弹窗区域
-    frame.render_widget(Clear, modal_area);
-
-    // 创建边框
-    let block = Block::default()
-        .title(format!(" {} ", texts.modal.tools.titles.whois))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(c.highlight))
-        .style(Style::default().bg(c.bg));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
-
-    // 构建弹窗内容
-    let mut lines = vec![];
-
-    // 域名输入框
-    lines.push(Line::from(vec![Span::styled(
-        texts.modal.tools.labels.domain,
-        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD),
-    )]));
-
-    let mut input_spans = vec![Span::styled("  ", Style::default())];
-    input_spans.extend(render_input_with_cursor(
+    render_simple_tool_modal(
+        frame,
+        modal_area,
+        &texts.modal.tools.titles.whois,
+        &texts.modal.tools.labels.domain,
+        &texts.modal.tools.placeholders.enter_domain,
         domain,
-        texts.modal.tools.placeholders.enter_domain,
-        true, // WHOIS 弹窗只有一个输入框，始终聚焦
-    ));
-    lines.push(Line::from(input_spans));
-    lines.push(Line::from(""));
-
-    // 查询结果
-    if *loading {
-        lines.push(Line::styled(
-            texts.modal.tools.status.querying,
-            Style::default().fg(Color::Yellow))
-        );
-    } else if let Some(ref res) = result {
-        lines.push(Line::styled(
-            format!("{}", texts.modal.tools.result_label),
-            Style::default().fg(c.success).add_modifier(Modifier::BOLD))
-        );
-        for line in res.lines() {
-            lines.push(Line::from(line));
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::styled(
-        format!(" {}: {} | {}: {} ",
-            texts.hints.keys.enter,
-            texts.common.query,
-            texts.hints.keys.esc,
-            texts.common.close
-        ),
-        Style::default().fg(c.muted),
-    ));
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+        true,
+        result,
+        *loading,
+        &texts.modal.tools.status.querying,
+        &texts.common.query,
+    );
 }
 
 /// 渲染 SSL 证书检查工具弹窗
@@ -620,64 +659,21 @@ fn render_ssl_check(frame: &mut Frame, modal: &Modal) {
     };
 
     let texts = t();
-    let c = colors();
-    let area = frame.area();
-    let modal_area = centered_rect(70, 18, area);
+    let modal_area = centered_rect(70, 18, frame.area());
 
-    // 清除弹窗区域
-    frame.render_widget(Clear, modal_area);
-
-    // 创建边框
-    let block = Block::default()
-        .title(format!(" {} ", texts.modal.tools.titles.ssl_check))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(c.highlight))
-        .style(Style::default().bg(c.bg));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
-
-    // 构建弹窗内容
-    let mut lines = vec![];
-
-    // 域名输入框
-    lines.push(Line::from(vec![Span::styled(
-        texts.modal.tools.labels.domain,
-        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD),
-    )]));
-
-    let mut input_spans = vec![Span::styled("  ", Style::default())];
-    input_spans.extend(render_input_with_cursor(
+    render_simple_tool_modal(
+        frame,
+        modal_area,
+        &texts.modal.tools.titles.ssl_check,
+        &texts.modal.tools.labels.domain,
+        &texts.modal.tools.placeholders.enter_domain,
         domain,
-        texts.modal.tools.placeholders.enter_domain,
         true,
-    ));
-    lines.push(Line::from(input_spans));
-    lines.push(Line::from(""));
-
-    // 查询结果
-    if *loading {
-        lines.push(Line::styled(texts.modal.tools.status.checking, Style::default().fg(Color::Yellow)));
-    } else if let Some(ref res) = result {
-        lines.push(Line::styled(format!("{}", texts.modal.tools.result_label), Style::default().fg(c.success).add_modifier(Modifier::BOLD)));
-        for line in res.lines() {
-            lines.push(Line::from(line));
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::styled(
-        format!(" {}: {} | {}: {} ",
-            texts.hints.keys.enter,
-            texts.common.check,
-            texts.hints.keys.esc,
-            texts.common.close
-        ),
-        Style::default().fg(c.muted),
-    ));
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+        result,
+        *loading,
+        &texts.modal.tools.status.checking,
+        &texts.common.check,
+    );
 }
 
 /// 渲染 IP 查询工具弹窗
@@ -692,64 +688,21 @@ fn render_ip_lookup(frame: &mut Frame, modal: &Modal) {
     };
 
     let texts = t();
-    let c = colors();
-    let area = frame.area();
-    let modal_area = centered_rect(70, 18, area);
+    let modal_area = centered_rect(70, 18, frame.area());
 
-    // 清除弹窗区域
-    frame.render_widget(Clear, modal_area);
-
-    // 创建边框
-    let block = Block::default()
-        .title(format!(" {} ", texts.modal.tools.titles.ip_lookup))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(c.highlight))
-        .style(Style::default().bg(c.bg));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
-
-    // 构建弹窗内容
-    let mut lines = vec![];
-
-    // IP 或域名输入框
-    lines.push(Line::from(vec![Span::styled(
-        texts.modal.tools.labels.ip_or_domain,
-        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD),
-    )]));
-
-    let mut input_spans = vec![Span::styled("  ", Style::default())];
-    input_spans.extend(render_input_with_cursor(
+    render_simple_tool_modal(
+        frame,
+        modal_area,
+        &texts.modal.tools.titles.ip_lookup,
+        &texts.modal.tools.labels.ip_or_domain,
+        &texts.modal.tools.placeholders.enter_ip_or_domain,
         input,
-        texts.modal.tools.placeholders.enter_ip_or_domain,
         true,
-    ));
-    lines.push(Line::from(input_spans));
-    lines.push(Line::from(""));
-
-    // 查询结果
-    if *loading {
-        lines.push(Line::styled(texts.modal.tools.status.looking_up, Style::default().fg(Color::Yellow)));
-    } else if let Some(ref res) = result {
-        lines.push(Line::styled(format!("{}", texts.modal.tools.result_label), Style::default().fg(c.success).add_modifier(Modifier::BOLD)));
-        for line in res.lines() {
-            lines.push(Line::from(line));
-        }
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::styled(
-        format!(" {}: {} | {}: {} ",
-            texts.hints.keys.enter,
-            texts.common.lookup,
-            texts.hints.keys.esc,
-            texts.common.close
-        ),
-        Style::default().fg(c.muted),
-    ));
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+        result,
+        *loading,
+        &texts.modal.tools.status.looking_up,
+        &texts.common.lookup,
+    );
 }
 
 /// 渲染 HTTP 头检查工具弹窗
@@ -974,62 +927,81 @@ fn render_dnssec_check(frame: &mut Frame, modal: &Modal) {
     };
 
     let texts = t();
-    let c = colors();
-    let area = frame.area();
-    let modal_area = centered_rect(70, 18, area);
+    let modal_area = centered_rect(70, 18, frame.area());
 
-    // 清除弹窗区域
-    frame.render_widget(Clear, modal_area);
-
-    // 创建边框
-    let block = Block::default()
-        .title(format!(" {} ", texts.modal.tools.titles.dnssec))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(c.highlight))
-        .style(Style::default().bg(c.bg));
-
-    let inner = block.inner(modal_area);
-    frame.render_widget(block, modal_area);
-
-    // 构建弹窗内容
-    let mut lines = vec![];
-
-    // 域名输入框
-    lines.push(Line::from(vec![Span::styled(
-        texts.modal.tools.labels.domain,
-        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD),
-    )]));
-
-    let mut input_spans = vec![Span::styled("  ", Style::default())];
-    input_spans.extend(render_input_with_cursor(
+    render_simple_tool_modal(
+        frame,
+        modal_area,
+        &texts.modal.tools.titles.dnssec,
+        &texts.modal.tools.labels.domain,
+        &texts.modal.tools.placeholders.enter_domain,
         domain,
-        texts.modal.tools.placeholders.enter_domain,
         true,
-    ));
-    lines.push(Line::from(input_spans));
-    lines.push(Line::from(""));
+        result,
+        *loading,
+        &texts.modal.tools.status.checking_dnssec,
+        &texts.common.check,
+    );
+}
 
-    // 查询结果
-    if *loading {
-        lines.push(Line::styled(texts.modal.tools.status.checking_dnssec, Style::default().fg(Color::Yellow)));
-    } else if let Some(ref res) = result {
-        lines.push(Line::styled(format!("{}", texts.modal.tools.result_label), Style::default().fg(c.success).add_modifier(Modifier::BOLD)));
-        for line in res.lines() {
-            lines.push(Line::from(line));
-        }
-    }
+/// 渲染通用查询工具弹窗
+fn render_query_tool(frame: &mut Frame, modal: &Modal) {
+    let Modal::QueryTool {
+        query_type,
+        input,
+        result,
+        loading,
+    } = modal
+    else {
+        return;
+    };
 
-    lines.push(Line::from(""));
-    lines.push(Line::styled(
-        format!(" {}: {} | {}: {} ",
-            texts.hints.keys.enter,
-            texts.common.check,
-            texts.hints.keys.esc,
-            texts.common.close
-        ),
-        Style::default().fg(c.muted),
-    ));
+    let texts = t();
+    let modal_area = centered_rect(70, 18, frame.area());
 
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+    // 根据工具类型获取本地化字符串
+    let title = match query_type {
+        QueryToolType::WhoisLookup => &texts.modal.tools.titles.whois,
+        QueryToolType::SslCheck => &texts.modal.tools.titles.ssl_check,
+        QueryToolType::IpLookup => &texts.modal.tools.titles.ip_lookup,
+        QueryToolType::DnssecCheck => &texts.modal.tools.titles.dnssec,
+    };
+
+    let label = match query_type {
+        QueryToolType::WhoisLookup | QueryToolType::SslCheck | QueryToolType::DnssecCheck =>
+            &texts.modal.tools.labels.domain,
+        QueryToolType::IpLookup => &texts.modal.tools.labels.ip_or_domain,
+    };
+
+    let placeholder = match query_type {
+        QueryToolType::IpLookup => &texts.modal.tools.placeholders.enter_ip_or_domain,
+        _ => &texts.modal.tools.placeholders.enter_domain,
+    };
+
+    let status_text = match query_type {
+        QueryToolType::WhoisLookup => &texts.modal.tools.status.querying,
+        QueryToolType::SslCheck => &texts.modal.tools.status.checking,
+        QueryToolType::IpLookup => &texts.modal.tools.status.looking_up,
+        QueryToolType::DnssecCheck => &texts.modal.tools.status.checking_dnssec,
+    };
+
+    let action_text = match query_type {
+        QueryToolType::SslCheck | QueryToolType::DnssecCheck => &texts.common.check,
+        QueryToolType::IpLookup => &texts.common.lookup,
+        QueryToolType::WhoisLookup => &texts.common.query,
+    };
+
+    render_simple_tool_modal(
+        frame,
+        modal_area,
+        title,
+        label,
+        placeholder,
+        input,
+        true,
+        result,
+        *loading,
+        status_text,
+        action_text,
+    );
 }

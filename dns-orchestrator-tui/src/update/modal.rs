@@ -1,7 +1,7 @@
 //! 弹窗更新逻辑
 
 use crate::message::ModalMessage;
-use crate::model::state::{get_all_providers, get_credential_fields, Modal};
+use crate::model::state::{get_all_providers, get_credential_fields, Modal, QueryToolType};
 use crate::model::App;
 
 /// 处理弹窗消息
@@ -20,6 +20,7 @@ pub fn update(app: &mut App, msg: ModalMessage) {
         Modal::HttpHeaderCheck { .. } => handle_http_header_check(app, msg),
         Modal::DnsPropagation { .. } => handle_dns_propagation(app, msg),
         Modal::DnssecCheck { .. } => handle_dnssec_check(app, msg),
+        Modal::QueryTool { .. } => handle_query_tool(app, msg),
         Modal::Error { .. } | Modal::Help => handle_simple_modal(app, msg),
         _ => {}
     }
@@ -675,6 +676,75 @@ fn handle_dnssec_check(app: &mut App, msg: ModalMessage) {
 
         ModalMessage::Backspace => {
             domain.pop();
+        }
+
+        _ => {}
+    }
+}
+
+/// 处理通用查询工具弹窗
+fn handle_query_tool(app: &mut App, msg: ModalMessage) {
+    let Some(Modal::QueryTool {
+        query_type,
+        ref mut input,
+        ref mut result,
+        ref mut loading,
+    }) = app.modal.active
+    else {
+        return;
+    };
+
+    match msg {
+        ModalMessage::Close => {
+            app.modal.close();
+            app.clear_status();
+        }
+
+        ModalMessage::Confirm => {
+            if input.is_empty() {
+                app.set_status("Please enter a value");
+                return;
+            }
+
+            *loading = true;
+
+            // 根据工具类型生成不同的结果
+            let input_clone = input.clone();
+            *result = Some(match query_type {
+                QueryToolType::WhoisLookup => format!(
+                    "WHOIS Lookup for {}\nResult: (To be implemented)",
+                    input_clone
+                ),
+                QueryToolType::SslCheck => format!(
+                    "SSL Certificate Check for {}\nResult: (To be implemented)",
+                    input_clone
+                ),
+                QueryToolType::IpLookup => format!(
+                    "IP Lookup for {}\nResult: (To be implemented)",
+                    input_clone
+                ),
+                QueryToolType::DnssecCheck => format!(
+                    "DNSSEC Check for {}\nResult: (To be implemented)",
+                    input_clone
+                ),
+            });
+            *loading = false;
+
+            let status_msg = match query_type {
+                QueryToolType::WhoisLookup => format!("WHOIS query completed: {}", input_clone),
+                QueryToolType::SslCheck => format!("SSL check completed: {}", input_clone),
+                QueryToolType::IpLookup => format!("IP lookup completed: {}", input_clone),
+                QueryToolType::DnssecCheck => format!("DNSSEC check completed: {}", input_clone),
+            };
+            app.set_status(status_msg);
+        }
+
+        ModalMessage::Input(ch) => {
+            input.push(ch);
+        }
+
+        ModalMessage::Backspace => {
+            input.pop();
         }
 
         _ => {}

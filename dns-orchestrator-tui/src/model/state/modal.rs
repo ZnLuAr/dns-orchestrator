@@ -165,6 +165,66 @@ pub fn get_all_providers() -> Vec<ProviderType> {
     ]
 }
 
+/// 查询工具类型（用于通用单输入查询弹窗）
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum QueryToolType {
+    /// WHOIS 查询
+    WhoisLookup,
+    /// SSL 证书检查
+    SslCheck,
+    /// IP 查询
+    IpLookup,
+    /// DNSSEC 验证
+    DnssecCheck,
+}
+
+impl QueryToolType {
+    /// 获取工具类型的显示名称 key
+    pub fn title_key(&self) -> &'static str {
+        match self {
+            Self::WhoisLookup => "whois",
+            Self::SslCheck => "ssl_check",
+            Self::IpLookup => "ip_lookup",
+            Self::DnssecCheck => "dnssec",
+        }
+    }
+
+    /// 获取输入框标签的 key
+    pub fn label_key(&self) -> &'static str {
+        match self {
+            Self::WhoisLookup | Self::SslCheck | Self::DnssecCheck => "domain",
+            Self::IpLookup => "ip_or_domain",
+        }
+    }
+
+    /// 获取占位符的 key
+    pub fn placeholder_key(&self) -> &'static str {
+        match self {
+            Self::IpLookup => "enter_ip_or_domain",
+            _ => "enter_domain",
+        }
+    }
+
+    /// 获取加载状态的 key
+    pub fn status_key(&self) -> &'static str {
+        match self {
+            Self::WhoisLookup => "querying",
+            Self::SslCheck => "checking",
+            Self::IpLookup => "looking_up",
+            Self::DnssecCheck => "checking_dnssec",
+        }
+    }
+
+    /// 获取操作文本的 key
+    pub fn action_key(&self) -> &'static str {
+        match self {
+            Self::SslCheck | Self::DnssecCheck => "check",
+            Self::IpLookup => "lookup",
+            Self::WhoisLookup => "query",
+        }
+    }
+}
+
 /// 弹窗类型
 #[derive(Debug, Clone)]
 pub enum Modal {
@@ -293,6 +353,17 @@ pub enum Modal {
     DnssecCheck {
         /// 域名输入
         domain: String,
+        /// 查询结果
+        result: Option<String>,
+        /// 是否正在查询
+        loading: bool,
+    },
+    /// 通用查询工具（替代 WhoisLookup、SslCheck、IpLookup、DnssecCheck）
+    QueryTool {
+        /// 查询工具类型
+        query_type: QueryToolType,
+        /// 输入值
+        input: String,
         /// 查询结果
         result: Option<String>,
         /// 是否正在查询
@@ -459,6 +530,16 @@ impl ModalState {
     pub fn show_dnssec_check(&mut self) {
         self.active = Some(Modal::DnssecCheck {
             domain: String::new(),
+            result: None,
+            loading: false,
+        });
+    }
+
+    /// 显示通用查询工具弹窗
+    pub fn show_query_tool(&mut self, query_type: QueryToolType) {
+        self.active = Some(Modal::QueryTool {
+            query_type,
+            input: String::new(),
             result: None,
             loading: false,
         });

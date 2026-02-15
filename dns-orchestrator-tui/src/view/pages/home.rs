@@ -38,7 +38,7 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled(
             format!("  {}", texts.home.welcome_desc),
-            Style::default().fg(c.muted),
+            Style::default().fg(c.fg),
         )),
         Line::from(""),
     ];

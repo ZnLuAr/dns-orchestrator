@@ -50,17 +50,17 @@ impl ThemeColors {
     /// 深色主题
     pub fn dark() -> Self {
         Self {
-            bg: Color::Rgb(30, 30, 30),
-            fg: Color::Rgb(212, 212, 212),
+            bg: Color::Rgb(0, 0, 0),
+            fg: Color::Rgb(224, 224, 224),
             border: Color::Rgb(62, 62, 62),
             border_focused: Color::Rgb(0, 122, 204),
-            highlight: Color::Rgb(0, 122, 204),
+            highlight: Color::Rgb(0, 128, 224),
             selected_bg: Color::Rgb(38, 79, 120),
             selected_fg: Color::White,
             success: Color::Rgb(78, 201, 176),
             warning: Color::Rgb(206, 145, 120),
             error: Color::Rgb(244, 135, 113),
-            muted: Color::Rgb(176, 176, 176),
+            muted: Color::Rgb(128, 128, 128),
         }
     }
 
