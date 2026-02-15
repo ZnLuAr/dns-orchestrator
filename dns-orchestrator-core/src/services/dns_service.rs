@@ -12,19 +12,19 @@ use crate::types::{
     DnsRecordType, PaginatedResponse, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
-/// DNS record management service
+/// Service for DNS record operations.
 pub struct DnsService {
     ctx: Arc<ServiceContext>,
 }
 
 impl DnsService {
-    /// Create a DNS service instance
+    /// Creates a DNS service.
     #[must_use]
     pub fn new(ctx: Arc<ServiceContext>) -> Self {
         Self { ctx }
     }
 
-    /// List all DNS records under a domain name (paging + search)
+    /// Lists DNS records for a domain with pagination and filters.
     pub async fn list_records(
         &self,
         account_id: &str,
@@ -49,7 +49,7 @@ impl DnsService {
         }
     }
 
-    /// Create DNS record
+    /// Creates one DNS record.
     pub async fn create_record(
         &self,
         account_id: &str,
@@ -62,7 +62,7 @@ impl DnsService {
         }
     }
 
-    /// Update DNS records
+    /// Updates one DNS record.
     pub async fn update_record(
         &self,
         account_id: &str,
@@ -76,7 +76,7 @@ impl DnsService {
         }
     }
 
-    /// Delete DNS records
+    /// Deletes one DNS record.
     pub async fn delete_record(
         &self,
         account_id: &str,
@@ -90,7 +90,9 @@ impl DnsService {
         }
     }
 
-    /// Delete DNS records in bulk
+    /// Deletes DNS records in batch.
+    ///
+    /// Deletions run concurrently with a bounded parallelism of `5`.
     pub async fn batch_delete_records(
         &self,
         account_id: &str,
@@ -126,7 +128,7 @@ impl DnsService {
                     if !account_marked_invalid {
                         if let ProviderError::InvalidCredentials { .. } = &e {
                             self.ctx
-                                .mark_account_invalid(account_id, "凭证已失效")
+                                .mark_account_invalid(account_id, "Credentials have expired")
                                 .await;
                             account_marked_invalid = true;
                         }
