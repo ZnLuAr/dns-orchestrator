@@ -7,7 +7,7 @@ authors = [
     "AptS-1547 <apts-1547@esaps.net>",
     "YewFence <88962785+YewFence@users.noreply.github.com>",
 ]
-edition = "2021"
+edition = "2024"
 rust-version = "1.89"
 publish = false
 
@@ -53,7 +53,10 @@ futures.workspace = true
 # Desktop only
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-updater = "2"
-dns-orchestrator-app = { workspace = true, features = ["keyring-store", "sqlite-store"] }
+dns-orchestrator-app = { workspace = true, features = [
+    "keyring-store",
+    "sqlite-store",
+] }
 
 [target."cfg(target_os = \"macos\")".dependencies]
 cocoa = "0.26"

@@ -15,8 +15,8 @@
 
 pub mod adapters;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use dns_orchestrator_core::error::{CoreError, CoreResult};
 use dns_orchestrator_core::services::{

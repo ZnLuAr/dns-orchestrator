@@ -2,8 +2,8 @@
 //! Integration tests for `AppStateBuilder` and `AppState` startup sequence.
 
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use async_trait::async_trait;
 use dns_orchestrator_app::adapters::SqliteStore;

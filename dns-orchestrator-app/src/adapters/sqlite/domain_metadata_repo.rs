@@ -4,17 +4,17 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
 use sea_orm::{
-    sea_query::{Alias, Expr, ExprTrait, Func, IntoIden, Query, TableRef},
     ActiveValue::Set,
     ColumnTrait, EntityTrait, FromQueryResult, ModelTrait, QueryFilter, QueryTrait,
+    sea_query::{Alias, Expr, ExprTrait, Func, IntoIden, Query, TableRef},
 };
 
 use dns_orchestrator_core::error::{CoreError, CoreResult};
 use dns_orchestrator_core::traits::DomainMetadataRepository;
 use dns_orchestrator_core::types::{DomainMetadata, DomainMetadataKey, DomainMetadataUpdate};
 
-use super::entity::domain_metadata;
 use super::SqliteStore;
+use super::entity::domain_metadata;
 
 impl domain_metadata::Model {
     /// Convert a `SeaORM` row model into `(DomainMetadataKey, DomainMetadata)`.

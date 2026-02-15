@@ -4,8 +4,8 @@ use super::*;
 use std::sync::Arc;
 
 use dns_orchestrator_core::traits::AccountRepository;
-use rmcp::model::CallToolRequestParams;
 use rmcp::ServiceExt;
+use rmcp::model::CallToolRequestParams;
 
 // ---------------------------------------------------------------------------
 // Helpers

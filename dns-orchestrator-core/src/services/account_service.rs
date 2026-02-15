@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use dns_orchestrator_provider::{create_provider, DnsProvider, ProviderCredentials, ProviderType};
+use dns_orchestrator_provider::{DnsProvider, ProviderCredentials, ProviderType, create_provider};
 
 use crate::error::{CoreError, CoreResult};
 use crate::services::ServiceContext;

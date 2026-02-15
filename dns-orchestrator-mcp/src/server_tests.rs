@@ -258,32 +258,40 @@ async fn toolbox_tools_delegate_to_gateway() {
     )
     .await;
 
-    assert!(server
-        .whois_lookup(Parameters(WhoisLookupParams {
-            domain: "example.com".to_string(),
-        }))
-        .await
-        .is_ok());
-    assert!(server
-        .ip_lookup(Parameters(IpLookupParams {
-            query: "1.1.1.1".to_string(),
-        }))
-        .await
-        .is_ok());
-    assert!(server
-        .dns_propagation_check(Parameters(DnsPropagationCheckParams {
-            domain: "example.com".to_string(),
-            record_type: DnsQueryType::A,
-        }))
-        .await
-        .is_ok());
-    assert!(server
-        .dnssec_check(Parameters(DnssecCheckParams {
-            domain: "example.com".to_string(),
-            nameserver: Some("8.8.8.8".to_string()),
-        }))
-        .await
-        .is_ok());
+    assert!(
+        server
+            .whois_lookup(Parameters(WhoisLookupParams {
+                domain: "example.com".to_string(),
+            }))
+            .await
+            .is_ok()
+    );
+    assert!(
+        server
+            .ip_lookup(Parameters(IpLookupParams {
+                query: "1.1.1.1".to_string(),
+            }))
+            .await
+            .is_ok()
+    );
+    assert!(
+        server
+            .dns_propagation_check(Parameters(DnsPropagationCheckParams {
+                domain: "example.com".to_string(),
+                record_type: DnsQueryType::A,
+            }))
+            .await
+            .is_ok()
+    );
+    assert!(
+        server
+            .dnssec_check(Parameters(DnssecCheckParams {
+                domain: "example.com".to_string(),
+                nameserver: Some("8.8.8.8".to_string()),
+            }))
+            .await
+            .is_ok()
+    );
 
     assert_eq!(toolbox.whois_calls().await, vec!["example.com".to_string()]);
     assert_eq!(toolbox.ip_calls().await, vec!["1.1.1.1".to_string()]);

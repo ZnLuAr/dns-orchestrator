@@ -72,23 +72,23 @@ impl DomainMetadataService {
             "none",
         ];
 
-        if let Some(ref color) = update.color {
-            if !VALID_COLORS.contains(&color.as_str()) {
-                return Err(CoreError::ValidationError(format!(
-                    "Invalid color key: '{}'. Must be one of: {}",
-                    color,
-                    VALID_COLORS.join(", ")
-                )));
-            }
+        if let Some(ref color) = update.color
+            && !VALID_COLORS.contains(&color.as_str())
+        {
+            return Err(CoreError::ValidationError(format!(
+                "Invalid color key: '{}'. Must be one of: {}",
+                color,
+                VALID_COLORS.join(", ")
+            )));
         }
 
         // Validate note length (only when note is provided).
-        if let Some(Some(ref note)) = update.note {
-            if note.len() > 500 {
-                return Err(CoreError::ValidationError(
-                    "Note length cannot exceed 500 characters".to_string(),
-                ));
-            }
+        if let Some(Some(ref note)) = update.note
+            && note.len() > 500
+        {
+            return Err(CoreError::ValidationError(
+                "Note length cannot exceed 500 characters".to_string(),
+            ));
         }
 
         let key = DomainMetadataKey::new(account_id.to_string(), domain_id.to_string());

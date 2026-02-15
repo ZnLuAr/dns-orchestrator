@@ -125,13 +125,12 @@ impl DnsService {
             match result {
                 Ok(_) => success_count += 1,
                 Err((record_id, e)) => {
-                    if !account_marked_invalid {
-                        if let ProviderError::InvalidCredentials { .. } = &e {
-                            self.ctx
-                                .mark_account_invalid(account_id, "Credentials have expired")
-                                .await;
-                            account_marked_invalid = true;
-                        }
+                    if !account_marked_invalid && let ProviderError::InvalidCredentials { .. } = &e
+                    {
+                        self.ctx
+                            .mark_account_invalid(account_id, "Credentials have expired")
+                            .await;
+                        account_marked_invalid = true;
                     }
                     failures.push(BatchDeleteFailure {
                         record_id,

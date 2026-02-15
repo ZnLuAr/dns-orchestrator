@@ -1,7 +1,7 @@
 [package]
 name = "dns-orchestrator-mcp"
 version = "0.0.1"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 description = "MCP Server for DNS Orchestrator - AI agent interface"
 authors = [
@@ -18,13 +18,21 @@ rust-version = "1.89"
 # DNS Orchestrator crates
 dns-orchestrator-core = { workspace = true, features = ["rustls"] }
 dns-orchestrator-toolbox = { workspace = true, features = ["schemars"] }
-dns-orchestrator-app = { workspace = true, features = ["keyring-store", "sqlite-store"] }
+dns-orchestrator-app = { workspace = true, features = [
+    "keyring-store",
+    "sqlite-store",
+] }
 
 # MCP SDK
 rmcp = { version = "0.15", features = ["server", "transport-io"] }
 
 # Async runtime
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio = { workspace = true, features = [
+    "rt-multi-thread",
+    "macros",
+    "time",
+    "sync",
+] }
 
 # Serialization
 serde.workspace = true
@@ -46,7 +54,10 @@ dirs = "6"
 chrono.workspace = true
 
 [dev-dependencies]
-dns-orchestrator-provider = { workspace = true, features = ["all-providers", "rustls"] }
+dns-orchestrator-provider = { workspace = true, features = [
+    "all-providers",
+    "rustls",
+] }
 rmcp = { version = "0.15", features = ["client"] }
 anyhow = "1"
 

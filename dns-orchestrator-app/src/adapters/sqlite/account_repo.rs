@@ -7,8 +7,8 @@ use dns_orchestrator_core::error::{CoreError, CoreResult};
 use dns_orchestrator_core::traits::AccountRepository;
 use dns_orchestrator_core::types::{Account, AccountStatus};
 
-use super::entity::account;
 use super::SqliteStore;
+use super::entity::account;
 
 impl account::Model {
     /// Convert a `SeaORM` row model into a domain `Account`.

@@ -14,7 +14,7 @@ use dns_orchestrator_app::adapters::{KeyringCredentialStore, SqliteStore};
 use dns_orchestrator_app::{AppStateBuilder, NoopStartupHooks};
 use rmcp::ServiceExt;
 use server::DnsOrchestratorMcp;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 const PRIMARY_APP_DIR_NAME: &str = "net.esaps.dns-orchestrator";
 const LEGACY_APP_DIR_NAME: &str = "com.apts-1547.dns-orchestrator";

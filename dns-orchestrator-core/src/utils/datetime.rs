@@ -54,7 +54,7 @@ where
 
 /// `Option<DateTime<Utc>>` serializer/deserializer helpers.
 pub mod option {
-    use super::{parse_unix_timestamp, DateTime, Deserialize, Deserializer, Serializer, Utc};
+    use super::{DateTime, Deserialize, Deserializer, Serializer, Utc, parse_unix_timestamp};
 
     /// Serializes `Option<DateTime<Utc>>` as RFC3339 or `null`.
     pub fn serialize<S>(dt: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>

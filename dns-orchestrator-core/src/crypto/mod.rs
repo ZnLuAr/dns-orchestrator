@@ -4,13 +4,13 @@
 
 mod versions;
 
-pub use versions::{get_current_iterations, get_pbkdf2_iterations, CURRENT_FILE_VERSION};
+pub use versions::{CURRENT_FILE_VERSION, get_current_iterations, get_pbkdf2_iterations};
 
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use pbkdf2::pbkdf2_hmac_array;
 use rand::RngCore;
 use sha2::Sha256;

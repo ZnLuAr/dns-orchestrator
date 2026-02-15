@@ -12,8 +12,8 @@ use dns_orchestrator_core::error::{CoreError, CoreResult};
 use dns_orchestrator_core::traits::{CredentialStore, CredentialsMap};
 use dns_orchestrator_core::types::ProviderCredentials;
 
-use super::entity::credential;
 use super::SqliteStore;
+use super::entity::credential;
 
 impl SqliteStore {
     /// Return the configured encryption password or an explicit credential error.
