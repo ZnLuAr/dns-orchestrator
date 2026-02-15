@@ -17,12 +17,9 @@ pub async fn whois_lookup(domain: String) -> Result<ApiResponse<WhoisResult>, Ap
 #[tauri::command]
 pub async fn dns_lookup(
     domain: String,
-    record_type: String,
+    record_type: DnsQueryType,
     nameserver: Option<String>,
 ) -> Result<ApiResponse<DnsLookupResult>, AppError> {
-    let record_type: DnsQueryType = record_type
-        .parse()
-        .map_err(dns_orchestrator_toolbox::ToolboxError::ValidationError)?;
     let result = ToolboxService::dns_lookup(&domain, record_type, nameserver.as_deref()).await?;
     Ok(ApiResponse::success(result))
 }
@@ -57,11 +54,8 @@ pub async fn http_header_check(
 #[tauri::command]
 pub async fn dns_propagation_check(
     domain: String,
-    record_type: String,
+    record_type: DnsQueryType,
 ) -> Result<ApiResponse<DnsPropagationResult>, AppError> {
-    let record_type: DnsQueryType = record_type
-        .parse()
-        .map_err(dns_orchestrator_toolbox::ToolboxError::ValidationError)?;
     let result = ToolboxService::dns_propagation_check(&domain, record_type).await?;
     Ok(ApiResponse::success(result))
 }

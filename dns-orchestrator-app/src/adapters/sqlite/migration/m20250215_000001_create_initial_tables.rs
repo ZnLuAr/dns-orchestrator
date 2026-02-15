@@ -1,12 +1,15 @@
+//! Initial schema for `SqliteStore`.
+
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
+/// Create `accounts`, `credentials`, and `domain_metadata` tables.
 pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // accounts 表
+        // accounts table
         manager
             .create_table(
                 Table::create()
@@ -28,7 +31,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // credentials 表
+        // credentials table
         manager
             .create_table(
                 Table::create()
@@ -47,7 +50,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // domain_metadata 表
+        // domain_metadata table
         manager
             .create_table(
                 Table::create()

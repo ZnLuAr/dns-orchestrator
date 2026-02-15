@@ -17,6 +17,7 @@ use super::entity::domain_metadata;
 use super::SqliteStore;
 
 impl domain_metadata::Model {
+    /// Convert a `SeaORM` row model into `(DomainMetadataKey, DomainMetadata)`.
     fn into_key_and_metadata(self) -> CoreResult<(DomainMetadataKey, DomainMetadata)> {
         let tags: Vec<String> = serde_json::from_str(&self.tags)
             .map_err(|e| CoreError::SerializationError(format!("Invalid tags JSON: {e}")))?;
@@ -63,6 +64,7 @@ fn json_each_tags() -> TableRef {
     TableRef::FunctionCall(func_call, Alias::new("je").into_iden())
 }
 
+/// Convert domain metadata into a `SeaORM` active model for upsert.
 fn metadata_to_active_model(
     key: &DomainMetadataKey,
     metadata: &DomainMetadata,
@@ -84,6 +86,7 @@ fn metadata_to_active_model(
 }
 
 impl SqliteStore {
+    /// Insert or update metadata for a key, or delete the row if metadata is empty.
     async fn upsert_metadata(
         &self,
         key: &DomainMetadataKey,

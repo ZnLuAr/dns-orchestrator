@@ -3,6 +3,7 @@
 //! Defines the input parameter structures for all MCP tools.
 //! All structs derive `Debug`, `Deserialize`, and `JsonSchema` as required by rmcp.
 
+use dns_orchestrator_toolbox::DnsQueryType;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -63,11 +64,11 @@ pub struct DnsLookupParams {
     #[schemars(description = "The domain name to query")]
     pub domain: String,
 
-    /// DNS record type (A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA, PTR, ALL).
+    /// DNS record type to query.
     #[schemars(
-        description = "DNS record type (A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA, PTR, ALL)"
+        description = "DNS record type to query (A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA, PTR, ALL)"
     )]
-    pub record_type: String,
+    pub record_type: DnsQueryType,
 
     /// Optional custom nameserver IP address.
     #[schemars(description = "Optional custom nameserver IP address")]
@@ -97,9 +98,9 @@ pub struct DnsPropagationCheckParams {
     #[schemars(description = "The domain name to check")]
     pub domain: String,
 
-    /// DNS record type to check (e.g., A, AAAA, CNAME).
+    /// DNS record type to check.
     #[schemars(description = "DNS record type to check (e.g., A, AAAA, CNAME)")]
-    pub record_type: String,
+    pub record_type: DnsQueryType,
 }
 
 /// Parameters for `dnssec_check` tool.

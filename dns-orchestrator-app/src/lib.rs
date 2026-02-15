@@ -3,6 +3,15 @@
 //! Provides `AppState` (service container), `AppStateBuilder` (adapter injection),
 //! `StartupHooks` (platform-specific startup callbacks), and generic file-based
 //! storage adapters for non-Tauri frontends.
+//!
+//! # Startup Lifecycle
+//! 1. `AppState::run_migration` checks credential format and performs migration if needed.
+//! 2. `AppState::run_account_restore` restores account runtime state from stored credentials.
+//! 3. `AppState::restore_completed` is set to `true` after restore finishes.
+//!
+//! # Feature Flags
+//! - `keyring-store`: enables `adapters::KeyringCredentialStore`.
+//! - `sqlite-store`: enables `adapters::SqliteStore`.
 
 pub mod adapters;
 
@@ -24,9 +33,14 @@ use dns_orchestrator_core::types::AccountStatus;
 ///
 /// Frontends implement this to handle credential backup before migration.
 /// Use `NoopStartupHooks` if no backup is needed (e.g., database-backed storage).
+///
+/// The `backup_info` returned by [`StartupHooks::backup_credentials`] is passed to
+/// [`StartupHooks::cleanup_backup`] on success paths and to
+/// [`StartupHooks::preserve_backup`] on migration failure.
 #[async_trait::async_trait]
 pub trait StartupHooks: Send + Sync {
     /// Called before migration to backup credentials.
+    ///
     /// Returns a backup identifier (e.g., file path) or `None` to skip backup.
     async fn backup_credentials(&self, _raw_json: &str) -> Option<String> {
         None
@@ -40,6 +54,7 @@ pub trait StartupHooks: Send + Sync {
 }
 
 /// No-op startup hooks for frontends that don't need credential backup.
+#[derive(Debug, Default, Clone, Copy)]
 pub struct NoopStartupHooks;
 
 #[async_trait::async_trait]
@@ -50,26 +65,30 @@ impl StartupHooks for NoopStartupHooks {}
 /// Holds all services and the `ServiceContext`. Every frontend constructs this
 /// once at startup via `AppStateBuilder`.
 pub struct AppState {
-    /// Service context (holds all storage adapters)
+    /// Shared service context containing all repository/provider adapters.
     pub ctx: Arc<ServiceContext>,
-    /// Account service
+    /// Service for account CRUD, validation, and restoration.
     pub account_service: Arc<AccountService>,
-    /// Provider metadata service
+    /// Service for provider metadata (capabilities and provider information).
     pub provider_metadata_service: ProviderMetadataService,
-    /// Import/export service
+    /// Service for importing/exporting account snapshots.
     pub import_export_service: ImportExportService,
-    /// Domain service
+    /// Service for domain listing and domain-level orchestration logic.
     pub domain_service: DomainService,
-    /// Domain metadata service
+    /// Service for per-domain UI metadata (favorite/tag/color/note).
     pub domain_metadata_service: Arc<DomainMetadataService>,
-    /// DNS service
+    /// Service for DNS record operations.
     pub dns_service: DnsService,
-    /// Whether account restoration has completed
+    /// Whether account restoration has completed for this process lifecycle.
     pub restore_completed: AtomicBool,
 }
 
 impl AppState {
     /// Run the full startup sequence: migration → account restoration.
+    ///
+    /// This method always completes migration first, then account restoration.
+    /// It returns `CoreResult` for forward compatibility with future startup
+    /// stages that may become fallible.
     pub async fn run_startup(&self, hooks: &dyn StartupHooks) -> CoreResult<()> {
         self.run_migration(hooks).await;
         self.run_account_restore().await;
@@ -79,7 +98,10 @@ impl AppState {
     /// Run credential migration.
     ///
     /// This should be called before the app is ready to serve requests.
-    /// Failed accounts are marked as `Error` status.
+    /// Failed accounts are marked as `AccountStatus::Error`.
+    ///
+    /// Migration failures are logged instead of being returned so startup can
+    /// continue to the restore stage.
     pub async fn run_migration(&self, hooks: &dyn StartupHooks) {
         // 1. Backup
         let backup_info = match self.ctx.credential_store().load_raw_json().await {
@@ -98,7 +120,7 @@ impl AppState {
 
         match migration_service.migrate_if_needed().await {
             Ok(MigrationResult::NotNeeded) => {
-                log::info!("凭证格式检查：无需迁移");
+                log::info!("Credential format check complete: no migration needed");
                 if let Some(ref info) = backup_info {
                     hooks.cleanup_backup(info).await;
                 }
@@ -107,10 +129,10 @@ impl AppState {
                 migrated_count,
                 failed_accounts,
             }) => {
-                log::info!("凭证迁移成功：{migrated_count} 个账户已迁移");
+                log::info!("Credential migration succeeded: migrated {migrated_count} account(s)");
                 if !failed_accounts.is_empty() {
                     log::warn!(
-                        "部分账户迁移失败 ({} 个): {:?}",
+                        "Credential migration partially failed ({} account(s)): {:?}",
                         failed_accounts.len(),
                         failed_accounts
                     );
@@ -120,11 +142,11 @@ impl AppState {
                             .update_status(
                                 account_id,
                                 AccountStatus::Error,
-                                Some(format!("凭证迁移失败: {error_msg}")),
+                                Some(format!("Credential migration failed: {error_msg}")),
                             )
                             .await
                         {
-                            log::error!("更新账户 {account_id} 状态失败: {e}");
+                            log::error!("Failed to update status for account {account_id}: {e}");
                         }
                     }
                 }
@@ -133,7 +155,7 @@ impl AppState {
                 }
             }
             Err(e) => {
-                log::error!("凭证迁移失败: {e}");
+                log::error!("Credential migration failed: {e}");
                 if let Some(ref info) = backup_info {
                     hooks.preserve_backup(info, &e.to_string()).await;
                 }
@@ -141,7 +163,9 @@ impl AppState {
         }
     }
 
-    /// Run account restoration. Sets `restore_completed` to `true` when done.
+    /// Run account restoration and set `restore_completed` to `true` when done.
+    ///
+    /// Restoration errors are logged and do not panic.
     pub async fn run_account_restore(&self) {
         match self.account_service.restore_accounts().await {
             Ok(result) => {
@@ -161,6 +185,9 @@ impl AppState {
 
 /// Builder for constructing `AppState` with platform-specific adapters.
 ///
+/// The builder validates required adapters, then wires all core services with
+/// a shared `ServiceContext`.
+///
 /// # Required adapters
 /// - `credential_store` — how credentials are stored
 /// - `account_repository` — how account metadata is stored
@@ -176,6 +203,9 @@ pub struct AppStateBuilder {
 }
 
 impl AppStateBuilder {
+    /// Create an empty builder.
+    ///
+    /// Required adapters must be injected before calling [`Self::build`].
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -186,24 +216,30 @@ impl AppStateBuilder {
         }
     }
 
+    /// Set the credential storage adapter.
     #[must_use]
     pub fn credential_store(mut self, store: Arc<dyn CredentialStore>) -> Self {
         self.credential_store = Some(store);
         self
     }
 
+    /// Set the account metadata repository adapter.
     #[must_use]
     pub fn account_repository(mut self, repo: Arc<dyn AccountRepository>) -> Self {
         self.account_repository = Some(repo);
         self
     }
 
+    /// Override the provider registry implementation.
+    ///
+    /// If not provided, an [`InMemoryProviderRegistry`] will be used.
     #[must_use]
     pub fn provider_registry(mut self, registry: Arc<dyn ProviderRegistry>) -> Self {
         self.provider_registry = Some(registry);
         self
     }
 
+    /// Set the domain metadata repository adapter.
     #[must_use]
     pub fn domain_metadata_repository(mut self, repo: Arc<dyn DomainMetadataRepository>) -> Self {
         self.domain_metadata_repository = Some(repo);
@@ -214,6 +250,10 @@ impl AppStateBuilder {
     ///
     /// # Errors
     /// Returns `CoreError::ValidationError` if required adapters are missing.
+    ///
+    /// # Behavior
+    /// If no provider registry is injected, this method uses
+    /// `InMemoryProviderRegistry`.
     pub fn build(self) -> CoreResult<AppState> {
         let credential_store = self.credential_store.ok_or_else(|| {
             CoreError::ValidationError("credential_store is required".to_string())
@@ -258,6 +298,7 @@ impl AppStateBuilder {
 }
 
 impl Default for AppStateBuilder {
+    /// Equivalent to [`AppStateBuilder::new`].
     fn default() -> Self {
         Self::new()
     }

@@ -7,7 +7,7 @@
 ## 功能特性
 
 - **WHOIS 查询** - 返回结构化域名注册信息
-- **DNS 查询** - 支持 A/AAAA/MX/TXT/NS/CNAME/SOA/SRV/CAA/PTR，可选自定义 DNS 服务器
+- **DNS 查询** - 支持 A/AAAA/MX/TXT/NS/CNAME/SOA/SRV/CAA/PTR，可选自定义 DNS 服务器（强类型 `DnsQueryType` 枚举）
 - **DNS 传播检查** - 对比 13 个全球解析器的返回一致性
 - **DNSSEC 校验** - 检查 DNSKEY/DS/RRSIG 与验证状态
 - **IP 地理位置查询** - 支持 IP 或域名解析后地址定位
@@ -40,16 +40,16 @@ dns-orchestrator-toolbox = "0.1"
 ### 使用示例
 
 ```rust,no_run
-use dns_orchestrator_toolbox::{ToolboxResult, ToolboxService};
+use dns_orchestrator_toolbox::{DnsQueryType, ToolboxResult, ToolboxService};
 
 async fn run() -> ToolboxResult<()> {
     let whois = ToolboxService::whois_lookup("example.com").await?;
     println!("registrar: {:?}", whois.registrar);
 
-    let dns = ToolboxService::dns_lookup("example.com", "A", None).await?;
+    let dns = ToolboxService::dns_lookup("example.com", DnsQueryType::A, None).await?;
     println!("records: {}", dns.records.len());
 
-    let propagation = ToolboxService::dns_propagation_check("example.com", "A").await?;
+    let propagation = ToolboxService::dns_propagation_check("example.com", DnsQueryType::A).await?;
     println!("consistency: {:.1}%", propagation.consistency_percentage);
 
     let dnssec = ToolboxService::dnssec_check("example.com", None).await?;
@@ -97,10 +97,11 @@ async fn check_headers() -> ToolboxResult<()> {
 ```
 ToolboxService（无状态门面）
   -> whois / dns / dns_propagation / dnssec / ip / ssl / http_headers 模块
+  -> 共享 LazyLock 单例（DNS 解析器、HTTP 客户端）
   -> 外部网络服务（DNS 解析器、WHOIS 服务器、HTTPS 端点、ipwho.is）
 ```
 
-所有方法彼此独立，不共享可变全局状态。
+所有方法彼此独立。DNS 解析器和 HTTP 客户端懒初始化后跨调用复用。
 
 ## DNS 传播检查节点
 

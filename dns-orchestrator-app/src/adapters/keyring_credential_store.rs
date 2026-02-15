@@ -32,21 +32,25 @@ enum StorageFormat {
 /// Stores all credentials as a single JSON blob in the system keychain.
 /// Compatible with the Tauri desktop app's credential storage.
 pub struct KeyringCredentialStore {
+    /// In-memory cache to avoid repeated keychain reads during one process lifetime.
     cache: Arc<RwLock<Option<CredentialsMap>>>,
 }
 
 impl KeyringCredentialStore {
+    /// Create a new keyring-backed credential store with an empty cache.
     pub fn new() -> Self {
         Self {
             cache: Arc::new(RwLock::new(None)),
         }
     }
 
+    /// Build a keyring entry handle for the shared credentials record.
     fn get_entry() -> CoreResult<Entry> {
         Entry::new(SERVICE_NAME, CREDENTIALS_KEY)
             .map_err(|e| CoreError::CredentialError(e.to_string()))
     }
 
+    /// Read the raw credential JSON from the keychain.
     fn read_raw_sync() -> CoreResult<String> {
         let entry = Self::get_entry()?;
         match entry.get_password() {
@@ -56,6 +60,7 @@ impl KeyringCredentialStore {
         }
     }
 
+    /// Write raw credential JSON to the keychain.
     fn write_raw_sync(json: &str) -> CoreResult<()> {
         let entry = Self::get_entry()?;
         entry
@@ -64,6 +69,7 @@ impl KeyringCredentialStore {
         Ok(())
     }
 
+    /// Read and parse all credentials, validating whether migration is required.
     fn read_all_sync() -> CoreResult<CredentialsMap> {
         let json = Self::read_raw_sync()?;
         match serde_json::from_str::<StorageFormat>(&json) {
@@ -74,12 +80,14 @@ impl KeyringCredentialStore {
         }
     }
 
+    /// Serialize and write all credentials to the keychain.
     fn write_all_sync(credentials: &CredentialsMap) -> CoreResult<()> {
         let json = serde_json::to_string(credentials)
             .map_err(|e| CoreError::SerializationError(e.to_string()))?;
         Self::write_raw_sync(&json)
     }
 
+    /// Replace the in-memory credential cache.
     async fn update_cache(&self, credentials: CredentialsMap) {
         let mut cache = self.cache.write().await;
         *cache = Some(credentials);

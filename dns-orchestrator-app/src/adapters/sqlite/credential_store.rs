@@ -16,12 +16,14 @@ use super::entity::credential;
 use super::SqliteStore;
 
 impl SqliteStore {
+    /// Return the configured encryption password or an explicit credential error.
     fn get_encryption_password(&self) -> CoreResult<&str> {
         self.encryption_password.as_deref().ok_or_else(|| {
             CoreError::CredentialError("Encryption password not configured for SqliteStore".into())
         })
     }
 
+    /// Serialize and encrypt provider credentials for database storage.
     fn encrypt_credentials(
         &self,
         credentials: &ProviderCredentials,
@@ -32,6 +34,7 @@ impl SqliteStore {
         crypto::encrypt(json.as_bytes(), password)
     }
 
+    /// Decrypt and deserialize provider credentials from a database row.
     fn decrypt_credentials(&self, model: &credential::Model) -> CoreResult<ProviderCredentials> {
         let password = self.get_encryption_password()?;
         let plaintext = crypto::decrypt(&model.ciphertext, password, &model.salt, &model.nonce)?;

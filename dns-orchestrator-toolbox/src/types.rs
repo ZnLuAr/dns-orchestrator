@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Includes all supported record types plus [`All`](Self::All) to query every
 /// type at once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(rename_all = "UPPERCASE")]
 pub enum DnsQueryType {
     /// IPv4 address record.

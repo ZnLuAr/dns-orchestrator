@@ -306,15 +306,13 @@ impl DnsOrchestratorMcp {
         &self,
         Parameters(params): Parameters<DnsLookupParams>,
     ) -> Result<CallToolResult, McpError> {
-        let record_type: DnsQueryType = params
-            .record_type
-            .parse()
-            .map_err(|e: String| McpError::invalid_params(e, None))?;
-
         run_toolbox_tool(
             self.timeouts.dns_lookup,
-            self.toolbox
-                .dns_lookup(&params.domain, record_type, params.nameserver.as_deref()),
+            self.toolbox.dns_lookup(
+                &params.domain,
+                params.record_type,
+                params.nameserver.as_deref(),
+            ),
             "DNS lookup",
         )
         .await
@@ -358,15 +356,10 @@ impl DnsOrchestratorMcp {
         &self,
         Parameters(params): Parameters<DnsPropagationCheckParams>,
     ) -> Result<CallToolResult, McpError> {
-        let record_type: DnsQueryType = params
-            .record_type
-            .parse()
-            .map_err(|e: String| McpError::invalid_params(e, None))?;
-
         run_toolbox_tool(
             self.timeouts.dns_propagation_check,
             self.toolbox
-                .dns_propagation_check(&params.domain, record_type),
+                .dns_propagation_check(&params.domain, params.record_type),
             "DNS propagation check",
         )
         .await
@@ -409,6 +402,16 @@ impl ServerHandler for DnsOrchestratorMcp {
 }
 
 #[cfg(test)]
+#[path = "test_mocks.rs"]
+#[allow(clippy::unwrap_used, clippy::panic)]
+pub(crate) mod test_mocks;
+
+#[cfg(test)]
 #[path = "server_tests.rs"]
 #[allow(clippy::unwrap_used, clippy::panic)]
 mod tests;
+
+#[cfg(test)]
+#[path = "client_integration_tests.rs"]
+#[allow(clippy::unwrap_used, clippy::panic)]
+mod client_integration_tests;

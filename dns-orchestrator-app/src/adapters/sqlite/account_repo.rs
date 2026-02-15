@@ -11,6 +11,9 @@ use super::entity::account;
 use super::SqliteStore;
 
 impl account::Model {
+    /// Convert a `SeaORM` row model into a domain `Account`.
+    ///
+    /// String-backed fields are parsed into strongly typed values.
     fn into_account(self) -> CoreResult<Account> {
         let created_at = chrono::DateTime::parse_from_rfc3339(&self.created_at)
             .map_err(|e| CoreError::SerializationError(format!("Invalid created_at: {e}")))?
@@ -38,6 +41,7 @@ impl account::Model {
     }
 }
 
+/// Convert a domain `Account` into a `SeaORM` active model for upsert.
 fn account_to_active_model(account: &Account) -> CoreResult<account::ActiveModel> {
     let provider_str = serde_json::to_value(&account.provider)
         .map_err(|e| CoreError::SerializationError(e.to_string()))?

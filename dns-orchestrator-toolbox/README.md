@@ -7,7 +7,7 @@ Async network diagnostic toolkit for DNS and domain analysis.
 ## Features
 
 - **WHOIS Lookup** - Query registration data with structured output
-- **DNS Lookup** - Resolve A/AAAA/MX/TXT/NS/CNAME/SOA/SRV/CAA/PTR with optional custom nameserver
+- **DNS Lookup** - Resolve A/AAAA/MX/TXT/NS/CNAME/SOA/SRV/CAA/PTR with optional custom nameserver (strongly-typed `DnsQueryType` enum)
 - **DNS Propagation Check** - Compare answers across 13 global resolvers
 - **DNSSEC Validation** - Inspect DNSKEY/DS/RRSIG and validation status
 - **IP Geolocation** - Geolocate IP or domain-resolved addresses
@@ -40,16 +40,16 @@ dns-orchestrator-toolbox = "0.1"
 ### Usage
 
 ```rust,no_run
-use dns_orchestrator_toolbox::{ToolboxResult, ToolboxService};
+use dns_orchestrator_toolbox::{DnsQueryType, ToolboxResult, ToolboxService};
 
 async fn run() -> ToolboxResult<()> {
     let whois = ToolboxService::whois_lookup("example.com").await?;
     println!("registrar: {:?}", whois.registrar);
 
-    let dns = ToolboxService::dns_lookup("example.com", "A", None).await?;
+    let dns = ToolboxService::dns_lookup("example.com", DnsQueryType::A, None).await?;
     println!("records: {}", dns.records.len());
 
-    let propagation = ToolboxService::dns_propagation_check("example.com", "A").await?;
+    let propagation = ToolboxService::dns_propagation_check("example.com", DnsQueryType::A).await?;
     println!("consistency: {:.1}%", propagation.consistency_percentage);
 
     let dnssec = ToolboxService::dnssec_check("example.com", None).await?;
@@ -97,10 +97,11 @@ async fn check_headers() -> ToolboxResult<()> {
 ```
 ToolboxService (stateless facade)
   -> whois / dns / dns_propagation / dnssec / ip / ssl / http_headers modules
+  -> shared LazyLock singletons (DNS resolver, HTTP client)
   -> external network services (DNS resolvers, WHOIS servers, HTTPS endpoints, ipwho.is)
 ```
 
-All methods are independent and do not share mutable global state.
+All methods are independent. DNS resolvers and HTTP clients are lazily initialised and reused across calls.
 
 ## DNS Propagation Servers
 
