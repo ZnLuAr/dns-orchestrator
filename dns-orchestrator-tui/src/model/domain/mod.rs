@@ -5,6 +5,7 @@
 
 mod account;
 mod dns_record;
+#[allow(clippy::module_inception)]
 mod domain;
 
 // 从 core 库导出 Account 和 AccountStatus（统一使用 chrono::DateTime<Utc>）

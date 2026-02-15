@@ -81,7 +81,7 @@ fn handle_select_previous(app: &mut App) {
         Page::Settings => {
             app.settings.select_previous();
         }
-        _ => {}
+        Page::Home => {}
     }
 }
 
@@ -102,7 +102,7 @@ fn handle_select_next(app: &mut App) {
         Page::Settings => {
             app.settings.select_next();
         }
-        _ => {}
+        Page::Home => {}
     }
 }
 

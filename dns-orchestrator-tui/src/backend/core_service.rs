@@ -96,6 +96,7 @@ impl CoreService {
     // ========== 其他服务 ==========
 
     /// 获取 Provider 元数据服务
+    #[allow(clippy::unused_self)]
     pub fn provider_metadata(&self) -> ProviderMetadataService {
         ProviderMetadataService::new()
     }

@@ -99,9 +99,10 @@ fn render_add_account(_app: &App, frame: &mut Frame, modal: &Modal) {
     let c = colors();
     let providers = get_all_providers();
     let current_provider = &providers[*provider_index];
-    let credential_fields = get_credential_fields(current_provider);
+    let credential_fields = get_credential_fields(*current_provider);
 
     // 计算弹窗高度：标题(3) + 服务商(3) + 名称(3) + 凭证字段(每个3) + 错误(2) + 按钮(3) + 边框(2)
+    #[allow(clippy::cast_possible_truncation)]
     let height = 3 + 3 + 3 + (credential_fields.len() as u16 * 3) + 2 + 3 + 2;
     let area = centered_rect(50, height, frame.area());
 

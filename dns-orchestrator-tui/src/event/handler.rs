@@ -19,10 +19,10 @@ pub fn poll_event(timeout: Duration) -> Result<Option<Event>> {
 }
 
 /// 处理事件，返回对应的消息
+#[allow(clippy::needless_pass_by_value)]
 pub fn handle_event(event: Event, app: &App) -> AppMessage {
     match event {
         Event::Key(key_event) => handle_key_event(key_event, app), // 键盘事件
-        Event::Resize(_, _) => AppMessage::Noop,                   // 终端窗口大小改变，自动重绘
         _ => AppMessage::Noop,
     }
 }
@@ -168,10 +168,7 @@ fn handle_modal_keys(key: KeyEvent, app: &App) -> AppMessage {
 
     // Esc 和 Ctrl+C 始终可以关闭弹窗
     match (key.modifiers, key.code) {
-        (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
-            return AppMessage::Modal(ModalMessage::Close);
-        }
-        (KeyModifiers::NONE, KeyCode::Esc) => {
+        (KeyModifiers::CONTROL, KeyCode::Char('c')) | (KeyModifiers::NONE, KeyCode::Esc) => {
             return AppMessage::Modal(ModalMessage::Close);
         }
         _ => {}
@@ -206,17 +203,11 @@ fn handle_modal_keys(key: KeyEvent, app: &App) -> AppMessage {
 /// 处理添加账号弹窗的按键
 fn handle_add_account_keys(key: KeyEvent, focus: usize) -> AppMessage {
     match key.code {
-        // Tab: 下一个字段
-        KeyCode::Tab => AppMessage::Modal(ModalMessage::NextField),
+        // Tab / ↓: 下一个字段
+        KeyCode::Tab | KeyCode::Down => AppMessage::Modal(ModalMessage::NextField),
 
-        // Shift+Tab: 上一个字段
-        KeyCode::BackTab => AppMessage::Modal(ModalMessage::PrevField),
-
-        // ↓: 下一个字段
-        KeyCode::Down => AppMessage::Modal(ModalMessage::NextField),
-
-        // ↑: 上一个字段
-        KeyCode::Up => AppMessage::Modal(ModalMessage::PrevField),
+        // Shift+Tab / ↑: 上一个字段
+        KeyCode::BackTab | KeyCode::Up => AppMessage::Modal(ModalMessage::PrevField),
 
         // ← →: 切换服务商（仅当焦点在服务商字段时）
         KeyCode::Left => {

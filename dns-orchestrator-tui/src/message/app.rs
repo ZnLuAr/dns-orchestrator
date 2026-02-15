@@ -3,7 +3,7 @@
 use super::{ContentMessage, ModalMessage, NavigationMessage};
 
 /// 应用主消息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum AppMessage {
     /// 退出应用
     Quit,

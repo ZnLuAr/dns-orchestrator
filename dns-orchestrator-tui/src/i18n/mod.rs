@@ -53,6 +53,7 @@ impl Language {
     }
 
     /// 获取下一个语言（用于循环切换）
+    #[must_use]
     pub fn next(&self) -> Language {
         match self {
             Language::EnUs => Language::ZhCn,
@@ -61,6 +62,7 @@ impl Language {
     }
 
     /// 获取上一个语言（用于循环切换）
+    #[must_use]
     pub fn prev(&self) -> Language {
         match self {
             Language::EnUs => Language::ZhCn,

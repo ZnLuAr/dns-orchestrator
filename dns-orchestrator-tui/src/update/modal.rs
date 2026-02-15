@@ -69,7 +69,7 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
                     *provider_index -= 1;
                 }
                 // 重置凭证值（因为不同服务商有不同字段）
-                let new_credential_count = get_credential_fields(&providers[*provider_index]).len();
+                let new_credential_count = get_credential_fields(providers[*provider_index]).len();
                 *credential_values = vec![String::new(); new_credential_count];
             }
         }
@@ -78,7 +78,7 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
             if *focus == 0 {
                 *provider_index = (*provider_index + 1) % providers.len();
                 // 重置凭证值
-                let new_credential_count = get_credential_fields(&providers[*provider_index]).len();
+                let new_credential_count = get_credential_fields(providers[*provider_index]).len();
                 *credential_values = vec![String::new(); new_credential_count];
             }
         }
@@ -86,7 +86,7 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
         ModalMessage::Confirm => {
             // 验证必填字段
             let provider = &providers[*provider_index];
-            let fields = get_credential_fields(provider);
+            let fields = get_credential_fields(*provider);
 
             // 检查凭证字段是否填写
             let has_empty_credentials = credential_values
@@ -140,16 +140,12 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
             }
         }
 
-        ModalMessage::Delete => {
+        ModalMessage::Delete | ModalMessage::ToggleDeleteFocus => {
             // Delete 键暂时不处理（需要光标位置支持）
         }
 
         ModalMessage::ToggleSecrets => {
             *show_secrets = !*show_secrets;
-        }
-
-        ModalMessage::ToggleDeleteFocus => {
-            // 不适用于此弹窗
         }
     }
 }

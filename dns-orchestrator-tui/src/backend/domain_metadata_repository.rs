@@ -89,13 +89,13 @@ impl DomainMetadataRepository for InMemoryDomainMetadataRepository {
             metadata.is_favorite = is_favorite;
         }
         if let Some(ref color) = update.color {
-            metadata.color = color.clone();
+            metadata.color.clone_from(color);
         }
         if let Some(ref tags) = update.tags {
-            metadata.tags = tags.clone();
+            metadata.tags.clone_from(tags);
         }
         if let Some(ref note) = update.note {
-            metadata.note = note.clone();
+            metadata.note.clone_from(note);
         }
 
         Ok(())

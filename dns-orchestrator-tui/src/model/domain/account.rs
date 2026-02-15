@@ -18,7 +18,7 @@ pub enum ProviderType {
 
 impl ProviderType {
     /// 获取服务商显示名称（用于 UI 渲染）
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(self) -> &'static str {
         match self {
             ProviderType::Cloudflare => "Cloudflare",
             ProviderType::Aliyun => "Aliyun",
@@ -28,7 +28,7 @@ impl ProviderType {
     }
 
     /// 获取服务商简称（用于紧凑显示）
-    pub fn short_name(&self) -> &'static str {
+    pub fn short_name(self) -> &'static str {
         match self {
             ProviderType::Cloudflare => "CF",
             ProviderType::Aliyun => "Ali",
@@ -38,7 +38,7 @@ impl ProviderType {
     }
 
     /// 转换为 core 库的 `ProviderType`
-    pub fn to_core(&self) -> CoreProviderType {
+    pub fn to_core(self) -> CoreProviderType {
         match self {
             ProviderType::Cloudflare => CoreProviderType::Cloudflare,
             ProviderType::Aliyun => CoreProviderType::Aliyun,

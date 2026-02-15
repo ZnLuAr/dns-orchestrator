@@ -1,7 +1,7 @@
 //! 弹窗消息类型
 
 /// 弹窗相关消息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ModalMessage {
     /// 关闭弹窗
     Close,

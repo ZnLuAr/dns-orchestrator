@@ -1,7 +1,7 @@
 //! 导航相关消息
 
 /// 导航消息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum NavigationMessage {
     /// 选择上一项
     SelectPrevious,

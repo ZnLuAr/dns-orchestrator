@@ -12,7 +12,7 @@ pub enum FocusPanel {
 
 impl FocusPanel {
     /// 切换到另一个面板
-    pub fn toggle(&self) -> Self {
+    pub fn toggle(self) -> Self {
         match self {
             FocusPanel::Navigation => FocusPanel::Content,
             FocusPanel::Content => FocusPanel::Navigation,
@@ -20,12 +20,12 @@ impl FocusPanel {
     }
 
     /// 是否是导航面板
-    pub fn is_navigation(&self) -> bool {
+    pub fn is_navigation(self) -> bool {
         matches!(self, FocusPanel::Navigation)
     }
 
     /// 是否是内容面板
-    pub fn is_content(&self) -> bool {
+    pub fn is_content(self) -> bool {
         matches!(self, FocusPanel::Content)
     }
 }

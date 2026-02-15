@@ -17,7 +17,7 @@ impl Theme {
     }
 
     /// 获取下一个主题
-    pub fn next(&self) -> Theme {
+    pub fn next(self) -> Theme {
         match self {
             Theme::Dark => Theme::Light,
             Theme::Light => Theme::Dark,
@@ -25,7 +25,7 @@ impl Theme {
     }
 
     /// 获取上一个主题
-    pub fn prev(&self) -> Theme {
+    pub fn prev(self) -> Theme {
         self.next() // 只有两个选项，prev 和 next 相同
     }
 }
@@ -45,7 +45,7 @@ impl PaginationMode {
     }
 
     /// 获取下一个分页模式
-    pub fn next(&self) -> PaginationMode {
+    pub fn next(self) -> PaginationMode {
         match self {
             PaginationMode::InfiniteScroll => PaginationMode::Traditional,
             PaginationMode::Traditional => PaginationMode::InfiniteScroll,
@@ -53,7 +53,7 @@ impl PaginationMode {
     }
 
     /// 获取上一个分页模式
-    pub fn prev(&self) -> PaginationMode {
+    pub fn prev(self) -> PaginationMode {
         self.next()
     }
 }
@@ -77,7 +77,7 @@ impl SettingItem {
     }
 
     /// 获取设置项的索引
-    pub fn index(&self) -> usize {
+    pub fn index(self) -> usize {
         match self {
             SettingItem::Theme => 0,
             SettingItem::Language => 1,
@@ -116,7 +116,7 @@ impl SettingsState {
     }
 
     /// 获取设置项数量
-    pub fn item_count(&self) -> usize {
+    pub fn item_count() -> usize {
         SettingItem::all().len()
     }
 
@@ -125,13 +125,13 @@ impl SettingsState {
         if self.selected_index > 0 {
             self.selected_index -= 1;
         } else {
-            self.selected_index = self.item_count() - 1;
+            self.selected_index = Self::item_count() - 1;
         }
     }
 
     /// 选择下一个设置项
     pub fn select_next(&mut self) {
-        if self.selected_index < self.item_count() - 1 {
+        if self.selected_index < Self::item_count() - 1 {
             self.selected_index += 1;
         } else {
             self.selected_index = 0;

@@ -3,7 +3,7 @@
 //! 处理内容面板中的操作，如列表选择、增删改查等
 
 /// 内容面板消息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ContentMessage {
     // ========== 列表导航 ==========
     /// 选择上一项

@@ -18,7 +18,7 @@ pub enum DnsRecordTypeOption {
 }
 
 impl DnsRecordTypeOption {
-    pub fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::All => "ALL",
             Self::A => "A",
@@ -58,7 +58,7 @@ pub enum DnsServerOption {
 }
 
 impl DnsServerOption {
-    pub fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::SystemDefault => "System Default",
             Self::Google => "Google DNS (8.8.8.8)",
@@ -67,7 +67,7 @@ impl DnsServerOption {
         }
     }
 
-    pub fn address(&self) -> Option<&'static str> {
+    pub fn address(self) -> Option<&'static str> {
         match self {
             Self::SystemDefault => None,
             Self::Google => Some("8.8.8.8"),
@@ -101,7 +101,7 @@ pub struct CredentialField {
 }
 
 /// 获取服务商的凭证字段定义
-pub fn get_credential_fields(provider: &ProviderType) -> Vec<CredentialField> {
+pub fn get_credential_fields(provider: ProviderType) -> Vec<CredentialField> {
     let texts = t();
     match provider {
         ProviderType::Cloudflare => vec![CredentialField {
@@ -309,7 +309,7 @@ impl Modal {
     pub fn add_account_field_count(provider_index: usize) -> usize {
         let providers = get_all_providers();
         let provider = &providers[provider_index];
-        let credential_count = get_credential_fields(provider).len();
+        let credential_count = get_credential_fields(*provider).len();
         2 + credential_count // 服务商 + 名称 + 凭证字段
     }
 }
@@ -345,7 +345,7 @@ impl ModalState {
     /// 显示添加账号弹窗
     pub fn show_add_account(&mut self) {
         let providers = get_all_providers();
-        let credential_count = get_credential_fields(&providers[0]).len();
+        let credential_count = get_credential_fields(providers[0]).len();
 
         self.active = Some(Modal::AddAccount {
             provider_index: 0,

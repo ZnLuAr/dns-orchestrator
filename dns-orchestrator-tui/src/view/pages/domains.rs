@@ -55,7 +55,6 @@ fn render_list(app: &App, frame: &mut Frame, area: Rect) {
             let is_selected = i == app.domains.selected;
             let status_icon = match domain.status {
                 crate::model::domain::DomainStatus::Active => "●",
-                crate::model::domain::DomainStatus::Pending => "○",
                 _ => "○",
             };
             let status_color = match domain.status {

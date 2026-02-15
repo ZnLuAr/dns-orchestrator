@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "preview:web": "VITE_PLATFORM=web vite preview",
     "tauri": "tauri",
+    "tui": "cargo run --bin dns-orchestrator-tui",
     "sync-version": "node scripts/sync-version.mjs",
     "lint": "biome lint ./src",
     "lint:fix": "biome lint --write ./src",
