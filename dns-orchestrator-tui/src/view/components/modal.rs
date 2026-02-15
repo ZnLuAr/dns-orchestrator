@@ -1,18 +1,18 @@
 //! 弹窗组件
 
 use ratatui::{
+    Frame,
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
 };
 
 use crate::i18n::t;
-use crate::model::state::{
-    get_all_dns_servers, get_all_providers, get_all_record_types, get_credential_fields, Modal,
-};
 use crate::model::App;
+use crate::model::state::{
+    Modal, get_all_dns_servers, get_all_providers, get_all_record_types, get_credential_fields,
+};
 use crate::view::theme::colors;
 
 /// 渲染带光标的输入框
@@ -593,7 +593,7 @@ fn render_dns_lookup(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.querying,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),
@@ -679,7 +679,7 @@ fn render_whois_lookup(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.querying,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),
@@ -757,7 +757,7 @@ fn render_ssl_check(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.checking,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),
@@ -835,7 +835,7 @@ fn render_ip_lookup(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.looking_up,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),
@@ -963,7 +963,7 @@ fn render_http_header_check(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.checking,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),
@@ -1099,7 +1099,7 @@ fn render_dns_propagation(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.checking_propagation,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),
@@ -1185,7 +1185,7 @@ fn render_dnssec_check(frame: &mut Frame, modal: &Modal) {
             texts.modal.tools.status.checking_dnssec,
             Style::default().fg(Color::Yellow),
         ));
-    } else if let Some(ref res) = result {
+    } else if let Some(res) = result {
         lines.push(Line::styled(
             texts.modal.tools.result_label.to_string(),
             Style::default().fg(c.success).add_modifier(Modifier::BOLD),

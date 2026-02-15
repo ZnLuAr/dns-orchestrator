@@ -1,11 +1,11 @@
 //! 底部状态栏组件
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
 
 use crate::i18n::t;

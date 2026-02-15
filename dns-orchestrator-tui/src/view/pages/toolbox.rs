@@ -1,11 +1,11 @@
 //! 工具箱页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
 
 use crate::i18n::keys::ToolboxTabTexts;

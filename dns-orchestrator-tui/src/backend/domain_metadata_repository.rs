@@ -4,9 +4,9 @@
 //! TUI 使用 JSON 文件存储域名元数据
 
 use async_trait::async_trait;
+use dns_orchestrator_core::CoreResult;
 use dns_orchestrator_core::traits::DomainMetadataRepository;
 use dns_orchestrator_core::types::{DomainMetadata, DomainMetadataKey, DomainMetadataUpdate};
-use dns_orchestrator_core::CoreResult;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 

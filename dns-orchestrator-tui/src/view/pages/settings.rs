@@ -1,17 +1,17 @@
 //! 设置页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
 use unicode_width::UnicodeWidthStr;
 
 use crate::i18n::t;
-use crate::model::state::{PaginationMode, Theme};
 use crate::model::App;
+use crate::model::state::{PaginationMode, Theme};
 use crate::view::theme::colors;
 
 /// 设置项的标签宽度（用于对齐，基于显示宽度）

@@ -1,10 +1,10 @@
 //! 主布局渲染
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 use crate::i18n::t;

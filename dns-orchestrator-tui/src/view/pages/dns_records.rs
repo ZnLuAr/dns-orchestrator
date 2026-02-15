@@ -1,11 +1,11 @@
 //! DNS 记录页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 
 use crate::model::App;

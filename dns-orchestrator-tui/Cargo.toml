@@ -1,11 +1,8 @@
 [package]
 name = "dns-orchestrator-tui"
 version = "0.1.0"
-edition = "2021"
-authors = [
-    "AptS-1547 <apts-1547@esaps.net>",
-    "ZnLuAr <znluar0514@gmail.com>"
-]
+edition = "2024"
+authors = ["AptS-1547 <apts-1547@esaps.net>", "ZnLuAr <znluar0514@gmail.com>"]
 description = "Terminal User Interface for DNS Orchestrator"
 license = "MIT"
 repository = "https://github.com/AptS-1547/dns-orchestrator"
@@ -49,7 +46,10 @@ log.workspace = true
 
 # DNS Orchestrator 核心库
 dns-orchestrator-core = { workspace = true, features = ["rustls"] }
-dns-orchestrator-provider = { workspace = true, features = ["all-providers", "rustls"] }
+dns-orchestrator-provider = { workspace = true, features = [
+    "all-providers",
+    "rustls",
+] }
 
 [dev-dependencies]
 # 测试

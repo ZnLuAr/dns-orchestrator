@@ -1,8 +1,8 @@
 //! 弹窗更新逻辑
 
 use crate::message::ModalMessage;
-use crate::model::state::{get_all_providers, get_credential_fields, Modal};
 use crate::model::App;
+use crate::model::state::{Modal, get_all_providers, get_credential_fields};
 
 /// 处理弹窗消息
 pub fn update(app: &mut App, msg: ModalMessage) {

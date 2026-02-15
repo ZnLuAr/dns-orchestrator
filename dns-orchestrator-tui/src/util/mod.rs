@@ -120,4 +120,4 @@
 
 mod terminal;
 
-pub use terminal::{init_terminal, restore_terminal, Term};
+pub use terminal::{Term, init_terminal, restore_terminal};
