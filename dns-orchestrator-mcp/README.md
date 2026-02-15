@@ -64,7 +64,7 @@ Network toolbox tools work without any account configuration.
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────┐
 │      MCP Client (Claude, etc.)      │
 └──────────────┬──────────────────────┘

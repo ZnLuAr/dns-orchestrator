@@ -37,7 +37,8 @@ fn resolve_app_data_dir() -> Option<PathBuf> {
         candidates.push(data_local_dir.join(LEGACY_APP_DIR_NAME));
     }
 
-    candidates.dedup();
+    let mut seen = std::collections::HashSet::new();
+    candidates.retain(|c| seen.insert(c.clone()));
 
     // Prefer a directory that already has data.db
     for candidate in &candidates {
@@ -48,9 +49,9 @@ fn resolve_app_data_dir() -> Option<PathBuf> {
     }
 
     // Fall back to primary path (SqliteStore will create the DB)
-    if let Some(default) = candidates.into_iter().next() {
+    if let Some(default) = candidates.first() {
         tracing::warn!("No existing database found, defaulting to {:?}", default);
-        return Some(default);
+        return Some(default.clone());
     }
 
     None
