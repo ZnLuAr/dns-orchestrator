@@ -1,4 +1,4 @@
-//! Provider 注册表抽象 Trait
+//! Provider registry abstraction.
 
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -7,45 +7,45 @@ use tokio::sync::RwLock;
 
 use dns_orchestrator_provider::DnsProvider;
 
-/// Provider 注册表 Trait
+/// Registry of runtime provider instances.
 ///
-/// 管理所有已注册的 Provider 实例，按 `account_id` 索引。
-/// 提供默认的内存实现 `InMemoryProviderRegistry`。
+/// Stores provider instances keyed by `account_id`.
+/// Includes an in-memory implementation: [`InMemoryProviderRegistry`].
 #[async_trait]
 pub trait ProviderRegistry: Send + Sync {
-    /// 注册 Provider 实例
+    /// Registers a provider instance.
     ///
     /// # Arguments
-    /// * `account_id` - 账户 ID
-    /// * `provider` - Provider 实例
+    /// * `account_id` - Account ID.
+    /// * `provider` - Provider instance.
     async fn register(&self, account_id: String, provider: Arc<dyn DnsProvider>);
 
-    /// 注销 Provider
+    /// Unregisters a provider.
     ///
     /// # Arguments
-    /// * `account_id` - 账户 ID
+    /// * `account_id` - Account ID.
     async fn unregister(&self, account_id: &str);
 
-    /// 获取 Provider 实例
+    /// Returns a provider instance.
     ///
     /// # Arguments
-    /// * `account_id` - 账户 ID
+    /// * `account_id` - Account ID.
     async fn get(&self, account_id: &str) -> Option<Arc<dyn DnsProvider>>;
 
-    /// 列出所有已注册的 `account_id`
+    /// Lists all registered account IDs.
     async fn list_account_ids(&self) -> Vec<String>;
 }
 
-/// 内存实现的 Provider 注册表
+/// In-memory provider registry.
 ///
-/// 默认实现，适用于所有平台。
+/// Default implementation, available on all platforms.
 #[derive(Clone)]
 pub struct InMemoryProviderRegistry {
     providers: Arc<RwLock<HashMap<String, Arc<dyn DnsProvider>>>>,
 }
 
 impl InMemoryProviderRegistry {
-    /// 创建新的内存注册表
+    /// Creates a new in-memory registry.
     #[must_use]
     pub fn new() -> Self {
         Self {

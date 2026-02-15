@@ -39,6 +39,7 @@ export function RootLayout() {
   }, [checkRestoreStatus, fetchProviders, loadFromStorage])
 
   // 账户加载完成后，清理无效记录并后台刷新域名
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: initialization logic with multiple cleanup steps
   useEffect(() => {
     // 只在账户真正加载后才清理，避免空数组误清理所有记录
     if (accounts.length > 0) {

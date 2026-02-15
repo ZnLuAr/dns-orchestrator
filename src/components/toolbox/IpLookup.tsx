@@ -36,6 +36,7 @@ export function IpLookup() {
 
   /** 渲染单个 IP 结果 - 使用 useCallback 缓存 */
   const renderIpResult = useCallback(
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: conditional rendering for geo/network info
     (ipInfo: IpGeoInfo) => (
       <div key={ipInfo.ip} className="space-y-4">
         {/* IP 标题（多结果时显示） */}

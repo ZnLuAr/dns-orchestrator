@@ -17,7 +17,6 @@
 //！│                    └─────────┘                                          │
 //！└─────────────────────────────────────────────────────────────────────────┘
 
-
 //!
 //! src/util/mod.rs
 //! Util 层：基础设施和工具函数
@@ -121,4 +120,4 @@
 
 mod terminal;
 
-pub use terminal::{init_terminal, restore_terminal, Term};
+pub use terminal::{Term, init_terminal, restore_terminal};

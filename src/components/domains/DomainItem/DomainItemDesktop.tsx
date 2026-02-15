@@ -48,6 +48,7 @@ export const DomainItemDesktop = memo(function DomainItemDesktop({
 
       {/* Color indicator */}
       <div
+        role="img"
         className="h-4 w-1 shrink-0 rounded-full"
         style={{
           backgroundColor: domain.metadata?.color

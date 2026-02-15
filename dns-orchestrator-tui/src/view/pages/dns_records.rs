@@ -1,11 +1,11 @@
 //! DNS 记录页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 
 use crate::model::App;
@@ -25,10 +25,7 @@ fn render_empty(frame: &mut Frame, area: Rect) {
     let c = colors();
     let content = vec![
         Line::from(""),
-        Line::styled(
-            "  No DNS records found.",
-            Style::default().fg(c.muted),
-        ),
+        Line::styled("  No DNS records found.", Style::default().fg(c.muted)),
         Line::from(""),
         Line::styled(
             "  Press Alt+a to add a new record, or Esc to go back.",
@@ -87,7 +84,7 @@ fn render_list(app: &App, frame: &mut Frame, area: Rect) {
 
             let line = Line::from(vec![
                 Span::raw("  "),
-                Span::styled(format!("{:6}", record_type), type_style),
+                Span::styled(format!("{record_type:6}"), type_style),
                 Span::raw(" "),
                 Span::styled(format!("{:20}", record.name), style),
                 Span::raw(" → "),

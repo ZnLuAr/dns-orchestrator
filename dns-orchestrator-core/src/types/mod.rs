@@ -1,13 +1,13 @@
-//! 类型定义模块
+//! Core type definitions.
 
 mod account;
+mod dns;
 mod domain;
 mod domain_metadata;
 mod export;
-mod response;
-mod toolbox;
 
 pub use account::{Account, AccountStatus, CreateAccountRequest, UpdateAccountRequest};
+pub use dns::BatchDeleteRequest;
 pub use domain::AppDomain;
 pub use domain_metadata::{
     BatchTagFailure, BatchTagRequest, BatchTagResult, DomainMetadata, DomainMetadataKey,
@@ -17,17 +17,12 @@ pub use export::{
     ExportAccountsRequest, ExportAccountsResponse, ExportFile, ExportFileHeader, ExportedAccount,
     ImportAccountsRequest, ImportFailure, ImportPreview, ImportPreviewAccount, ImportResult,
 };
-pub use response::{ApiResponse, BatchDeleteFailure, BatchDeleteRequest, BatchDeleteResult};
-pub use toolbox::{
-    CertChainItem, DnsLookupRecord, DnsLookupResult, DnsPropagationResult, DnsPropagationServer,
-    DnsPropagationServerResult, DnskeyRecord, DnssecResult, DsRecord, HttpHeader,
-    HttpHeaderCheckRequest, HttpHeaderCheckResult, HttpMethod, IpGeoInfo, IpLookupResult,
-    RrsigRecord, SecurityHeaderAnalysis, SslCertInfo, SslCheckResult, WhoisResult,
-};
 
-// Re-export provider 库的公共类型
+// Re-export commonly used types from `dns-orchestrator-provider`.
 pub use dns_orchestrator_provider::{
-    CreateDnsRecordRequest, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
+    BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
+    BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest,
+    CredentialValidationError, DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse,
     PaginationParams, ProviderCredentials, ProviderDomain, ProviderMetadata, ProviderType,
-    RecordQueryParams, UpdateDnsRecordRequest,
+    RecordData, RecordQueryParams, UpdateDnsRecordRequest,
 };

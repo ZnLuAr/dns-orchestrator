@@ -1,12 +1,12 @@
 //! 域名元数据仓库
 //!
-//! 实现 dns-orchestrator-core 的 DomainMetadataRepository trait
+//! 实现 dns-orchestrator-core 的 `DomainMetadataRepository` trait
 //! TUI 使用 JSON 文件存储域名元数据
 
 use async_trait::async_trait;
+use dns_orchestrator_core::CoreResult;
 use dns_orchestrator_core::traits::DomainMetadataRepository;
 use dns_orchestrator_core::types::{DomainMetadata, DomainMetadataKey, DomainMetadataUpdate};
-use dns_orchestrator_core::CoreResult;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
@@ -81,19 +81,21 @@ impl DomainMetadataRepository for InMemoryDomainMetadataRepository {
         update: &DomainMetadataUpdate,
     ) -> CoreResult<()> {
         let mut store = self.store.lock().await;
-        let metadata = store.entry(key.clone()).or_insert_with(DomainMetadata::default);
+        let metadata = store
+            .entry(key.clone())
+            .or_insert_with(DomainMetadata::default);
 
         if let Some(is_favorite) = update.is_favorite {
             metadata.is_favorite = is_favorite;
         }
         if let Some(ref color) = update.color {
-            metadata.color = color.clone();
+            metadata.color.clone_from(color);
         }
         if let Some(ref tags) = update.tags {
-            metadata.tags = tags.clone();
+            metadata.tags.clone_from(tags);
         }
         if let Some(ref note) = update.note {
-            metadata.note = note.clone();
+            metadata.note.clone_from(note);
         }
 
         Ok(())

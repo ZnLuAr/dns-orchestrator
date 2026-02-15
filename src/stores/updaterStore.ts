@@ -45,6 +45,7 @@ interface AndroidUpdate {
   version: string
   notes: string
   url: string // APK 下载 URL
+  signature: string // minisign 签名
 }
 
 /** 下载进度事件 */
@@ -145,6 +146,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
 
   setShowUpdateDialog: (show: boolean) => set({ showUpdateDialog: show }),
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-platform update check logic
   checkForUpdates: async () => {
     set({ checking: true, error: null, upToDate: false, isPlatformUnsupported: false })
 
@@ -246,6 +248,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
     }
   },
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-platform download with retry logic
   downloadAndInstall: async () => {
     const { available } = get()
     if (!available) return
@@ -289,6 +292,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             event: "Started" | "Progress" | "Finished"
             data: { content_length?: number; chunk_length?: number }
           }>()
+          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: progress event handler
           onProgress.onmessage = (event) => {
             if (event.event === "Started") {
               contentLength = event.data.content_length ?? 0
@@ -308,6 +312,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
           // 下载 APK
           apkPath = await invoke<string>("download_apk", {
             url: available.url,
+            signature: available.signature,
             onProgress,
           })
           logger.debug("APK downloaded to:", apkPath)

@@ -1,13 +1,13 @@
-//! 
+//!
 //! app.rs
 //! 应用主循环
-//! 
-//! 
-//! 
+//!
+//!
+//!
 //! 在应用启动时，创建终端并初始化为以下状态：
-//! 
+//!
 //! App {
-//! 
+//!
 //!     should_quit: bool = false,                      // 决定应用是否应该退出
 //!     focus: FocusPanel::Navigation,                  // 当前焦点在哪个面板
 //!     navigation: NavigationState{
@@ -16,14 +16,14 @@
 //!     },
 //!     current_page = Page::Home,                      // 当前应该显示哪个页面，默认为 Home
 //!     status_message = None,                          // 状态栏消息
-//! 
+//!
 //! }
-//! 
-//! 
+//!
+//!
 //! 主循环大约每 100 ms 执行一次（取决于有无事件）
 //! 应用的主循环中有：
 //! loop {
-//! 
+//!
 //!     terminal.draw(|f| view::render(&app , f))       // 渲染 UI
 //!     if app.should_quit{ break }                     // 检查 APP 是否应该退出
 //!     if let Some(event) = poll_event() {             // 轮询获取输入，在此等待 100ms

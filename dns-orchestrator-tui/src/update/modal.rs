@@ -1,8 +1,8 @@
 //! 弹窗更新逻辑
 
 use crate::message::ModalMessage;
-use crate::model::state::{get_all_providers, get_credential_fields, Modal, QueryToolType};
 use crate::model::App;
+use crate::model::state::{Modal, get_all_providers, get_credential_fields};
 
 /// 处理弹窗消息
 pub fn update(app: &mut App, msg: ModalMessage) {
@@ -20,7 +20,6 @@ pub fn update(app: &mut App, msg: ModalMessage) {
         Modal::HttpHeaderCheck { .. } => handle_http_header_check(app, msg),
         Modal::DnsPropagation { .. } => handle_dns_propagation(app, msg),
         Modal::DnssecCheck { .. } => handle_dnssec_check(app, msg),
-        Modal::QueryTool { .. } => handle_query_tool(app, msg),
         Modal::Error { .. } | Modal::Help => handle_simple_modal(app, msg),
         _ => {}
     }
@@ -70,7 +69,7 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
                     *provider_index -= 1;
                 }
                 // 重置凭证值（因为不同服务商有不同字段）
-                let new_credential_count = get_credential_fields(&providers[*provider_index]).len();
+                let new_credential_count = get_credential_fields(providers[*provider_index]).len();
                 *credential_values = vec![String::new(); new_credential_count];
             }
         }
@@ -79,7 +78,7 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
             if *focus == 0 {
                 *provider_index = (*provider_index + 1) % providers.len();
                 // 重置凭证值
-                let new_credential_count = get_credential_fields(&providers[*provider_index]).len();
+                let new_credential_count = get_credential_fields(providers[*provider_index]).len();
                 *credential_values = vec![String::new(); new_credential_count];
             }
         }
@@ -87,7 +86,7 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
         ModalMessage::Confirm => {
             // 验证必填字段
             let provider = &providers[*provider_index];
-            let fields = get_credential_fields(provider);
+            let fields = get_credential_fields(*provider);
 
             // 检查凭证字段是否填写
             let has_empty_credentials = credential_values
@@ -107,11 +106,11 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
                 name.clone()
             };
 
-            app.set_status(format!("Adding account...: {}...", account_name));
+            app.set_status(format!("Adding account...: {account_name}..."));
 
             // 暂时关闭弹窗并显示成功消息
             app.modal.close();
-            app.set_status(format!("Success...! \"{}\" ", account_name));
+            app.set_status(format!("Success...! \"{account_name}\" "));
         }
 
         ModalMessage::Input(ch) => {
@@ -141,16 +140,12 @@ fn handle_add_account(app: &mut App, msg: ModalMessage) {
             }
         }
 
-        ModalMessage::Delete => {
+        ModalMessage::Delete | ModalMessage::ToggleDeleteFocus => {
             // Delete 键暂时不处理（需要光标位置支持）
         }
 
         ModalMessage::ToggleSecrets => {
             *show_secrets = !*show_secrets;
-        }
-
-        ModalMessage::ToggleDeleteFocus => {
-            // 不适用于此弹窗
         }
     }
 }
@@ -174,12 +169,12 @@ fn handle_confirm_delete(app: &mut App, msg: ModalMessage) {
         }
 
         ModalMessage::ToggleDeleteFocus | ModalMessage::NextField | ModalMessage::PrevField => {
-            *focus = if *focus == 0 { 1 } else { 0 };
+            *focus = usize::from(*focus == 0);
         }
 
         ModalMessage::PrevProvider | ModalMessage::NextProvider => {
             // 左右键也可以切换焦点
-            *focus = if *focus == 0 { 1 } else { 0 };
+            *focus = usize::from(*focus == 0);
         }
 
         ModalMessage::Confirm => {
@@ -191,7 +186,7 @@ fn handle_confirm_delete(app: &mut App, msg: ModalMessage) {
 
                 app.modal.close();
                 // TODO: 调用 CoreService 删除
-                app.set_status(format!("Deleted{}: \"{}\"", item_type, item_name));
+                app.set_status(format!("Deleted{item_type}: \"{item_name}\""));
             } else {
                 // 取消
                 app.modal.close();
@@ -273,17 +268,15 @@ fn handle_dns_lookup(app: &mut App, msg: ModalMessage) {
             }
         }
 
-        ModalMessage::NextProvider => {
-            match *focus {
-                1 => {
-                    *record_type_index = (*record_type_index + 1) % record_types.len();
-                }
-                2 => {
-                    *dns_server_index = (*dns_server_index + 1) % dns_servers.len();
-                }
-                _ => {}
+        ModalMessage::NextProvider => match *focus {
+            1 => {
+                *record_type_index = (*record_type_index + 1) % record_types.len();
             }
-        }
+            2 => {
+                *dns_server_index = (*dns_server_index + 1) % dns_servers.len();
+            }
+            _ => {}
+        },
 
         ModalMessage::Confirm => {
             if domain.is_empty() {
@@ -297,13 +290,12 @@ fn handle_dns_lookup(app: &mut App, msg: ModalMessage) {
 
             // TODO: 实际执行 DNS 查询
             *result = Some(format!(
-                "DNS Lookup for {} (Type: {}, Server: {})\nResult: (To be implemented)",
-                domain, record_type, dns_server
+                "DNS Lookup for {domain} (Type: {record_type}, Server: {dns_server})\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let domain_clone = domain.clone();
-            app.set_status(format!("DNS query completed: {}", domain_clone));
+            app.set_status(format!("DNS query completed: {domain_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -348,13 +340,12 @@ fn handle_whois_lookup(app: &mut App, msg: ModalMessage) {
             *loading = true;
             // TODO: 实际执行 WHOIS 查询
             *result = Some(format!(
-                "WHOIS Lookup for {}\nResult: (To be implemented)",
-                domain
+                "WHOIS Lookup for {domain}\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let domain_clone = domain.clone();
-            app.set_status(format!("WHOIS query completed: {}", domain_clone));
+            app.set_status(format!("WHOIS query completed: {domain_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -395,13 +386,12 @@ fn handle_ssl_check(app: &mut App, msg: ModalMessage) {
             *loading = true;
             // TODO: 实际执行 SSL 证书检查
             *result = Some(format!(
-                "SSL Certificate Check for {}\nResult: (To be implemented)",
-                domain
+                "SSL Certificate Check for {domain}\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let domain_clone = domain.clone();
-            app.set_status(format!("SSL check completed: {}", domain_clone));
+            app.set_status(format!("SSL check completed: {domain_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -442,13 +432,12 @@ fn handle_ip_lookup(app: &mut App, msg: ModalMessage) {
             *loading = true;
             // TODO: 实际执行 IP 查询
             *result = Some(format!(
-                "IP Lookup for {}\nResult: (To be implemented)",
-                input
+                "IP Lookup for {input}\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let input_clone = input.clone();
-            app.set_status(format!("IP lookup completed: {}", input_clone));
+            app.set_status(format!("IP lookup completed: {input_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -523,13 +512,12 @@ fn handle_http_header_check(app: &mut App, msg: ModalMessage) {
 
             // TODO: 实际执行 HTTP 头检查
             *result = Some(format!(
-                "HTTP Header Check for {} (Method: {})\nResult: (To be implemented)",
-                url, method
+                "HTTP Header Check for {url} (Method: {method})\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let url_clone = url.clone();
-            app.set_status(format!("HTTP header check completed: {}", url_clone));
+            app.set_status(format!("HTTP header check completed: {url_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -610,13 +598,12 @@ fn handle_dns_propagation(app: &mut App, msg: ModalMessage) {
 
             // TODO: 实际执行 DNS 传播检查
             *result = Some(format!(
-                "DNS Propagation Check for {} (Type: {})\nResult: (To be implemented)",
-                domain, record_type
+                "DNS Propagation Check for {domain} (Type: {record_type})\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let domain_clone = domain.clone();
-            app.set_status(format!("DNS propagation check completed: {}", domain_clone));
+            app.set_status(format!("DNS propagation check completed: {domain_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -661,13 +648,12 @@ fn handle_dnssec_check(app: &mut App, msg: ModalMessage) {
             *loading = true;
             // TODO: 实际执行 DNSSEC 验证
             *result = Some(format!(
-                "DNSSEC Check for {}\nResult: (To be implemented)",
-                domain
+                "DNSSEC Check for {domain}\nResult: (To be implemented)"
             ));
             *loading = false;
 
             let domain_clone = domain.clone();
-            app.set_status(format!("DNSSEC check completed: {}", domain_clone));
+            app.set_status(format!("DNSSEC check completed: {domain_clone}"));
         }
 
         ModalMessage::Input(ch) => {
@@ -676,75 +662,6 @@ fn handle_dnssec_check(app: &mut App, msg: ModalMessage) {
 
         ModalMessage::Backspace => {
             domain.pop();
-        }
-
-        _ => {}
-    }
-}
-
-/// 处理通用查询工具弹窗
-fn handle_query_tool(app: &mut App, msg: ModalMessage) {
-    let Some(Modal::QueryTool {
-        query_type,
-        ref mut input,
-        ref mut result,
-        ref mut loading,
-    }) = app.modal.active
-    else {
-        return;
-    };
-
-    match msg {
-        ModalMessage::Close => {
-            app.modal.close();
-            app.clear_status();
-        }
-
-        ModalMessage::Confirm => {
-            if input.is_empty() {
-                app.set_status("Please enter a value");
-                return;
-            }
-
-            *loading = true;
-
-            // 根据工具类型生成不同的结果
-            let input_clone = input.clone();
-            *result = Some(match query_type {
-                QueryToolType::WhoisLookup => format!(
-                    "WHOIS Lookup for {}\nResult: (To be implemented)",
-                    input_clone
-                ),
-                QueryToolType::SslCheck => format!(
-                    "SSL Certificate Check for {}\nResult: (To be implemented)",
-                    input_clone
-                ),
-                QueryToolType::IpLookup => format!(
-                    "IP Lookup for {}\nResult: (To be implemented)",
-                    input_clone
-                ),
-                QueryToolType::DnssecCheck => format!(
-                    "DNSSEC Check for {}\nResult: (To be implemented)",
-                    input_clone
-                ),
-            });
-            *loading = false;
-
-            let status_msg = match query_type {
-                QueryToolType::WhoisLookup => format!("WHOIS query completed: {}", input_clone),
-                QueryToolType::SslCheck => format!("SSL check completed: {}", input_clone),
-                QueryToolType::IpLookup => format!("IP lookup completed: {}", input_clone),
-                QueryToolType::DnssecCheck => format!("DNSSEC check completed: {}", input_clone),
-            };
-            app.set_status(status_msg);
-        }
-
-        ModalMessage::Input(ch) => {
-            input.push(ch);
-        }
-
-        ModalMessage::Backspace => {
-            input.pop();
         }
 
         _ => {}

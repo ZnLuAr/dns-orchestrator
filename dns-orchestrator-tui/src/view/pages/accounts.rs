@@ -1,16 +1,16 @@
 //! 账号管理页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState},
-    Frame,
 };
 
 use crate::i18n::t;
-use crate::model::domain::ProviderType;
 use crate::model::App;
+use crate::model::domain::ProviderType;
 use crate::view::theme::colors;
 
 /// 渲染账号管理页面

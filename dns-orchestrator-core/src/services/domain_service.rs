@@ -1,26 +1,28 @@
-//! 域名管理服务
+//! Domain management service.
 
 use std::sync::Arc;
 
-use dns_orchestrator_provider::ProviderError;
-
-use crate::error::{CoreError, CoreResult};
+use crate::error::CoreResult;
 use crate::services::{DomainMetadataService, ServiceContext};
 use crate::types::{AppDomain, DomainMetadataKey, PaginatedResponse, PaginationParams};
 
-/// 域名管理服务
+/// Service for domain listing and lookup.
 pub struct DomainService {
     ctx: Arc<ServiceContext>,
+    metadata_service: Arc<DomainMetadataService>,
 }
 
 impl DomainService {
-    /// 创建域名服务实例
+    /// Creates a domain service.
     #[must_use]
-    pub fn new(ctx: Arc<ServiceContext>) -> Self {
-        Self { ctx }
+    pub fn new(ctx: Arc<ServiceContext>, metadata_service: Arc<DomainMetadataService>) -> Self {
+        Self {
+            ctx,
+            metadata_service,
+        }
     }
 
-    /// 列出账号下的所有域名（分页）
+    /// Lists all domains under an account (paginated).
     pub async fn list_domains(
         &self,
         account_id: &str,
@@ -42,16 +44,13 @@ impl DomainService {
                     .map(|d| AppDomain::from_provider(d, account_id.to_string()))
                     .collect();
 
-                // 批量加载元数据并合并
+                // Batch-load metadata and merge into each domain item.
                 let keys: Vec<(String, String)> = domains
                     .iter()
                     .map(|d| (d.account_id.clone(), d.id.clone()))
                     .collect();
 
-                let metadata_service =
-                    DomainMetadataService::new(Arc::clone(&self.ctx.domain_metadata_repository));
-
-                if let Ok(metadata_map) = metadata_service.get_metadata_batch(keys).await {
+                if let Ok(metadata_map) = self.metadata_service.get_metadata_batch(keys).await {
                     for domain in &mut domains {
                         let key =
                             DomainMetadataKey::new(domain.account_id.clone(), domain.id.clone());
@@ -68,11 +67,11 @@ impl DomainService {
                     lib_response.total_count,
                 ))
             }
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
-    /// 获取域名详情
+    /// Gets a single domain by ID.
     pub async fn get_domain(&self, account_id: &str, domain_id: &str) -> CoreResult<AppDomain> {
         let provider = self.ctx.get_provider(account_id).await?;
 
@@ -81,17 +80,7 @@ impl DomainService {
                 provider_domain,
                 account_id.to_string(),
             )),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
-    }
-
-    /// 处理 Provider 错误，如果是凭证失效则更新账户状态
-    async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
-        if let ProviderError::InvalidCredentials { .. } = &err {
-            self.ctx
-                .mark_account_invalid(account_id, "凭证已失效")
-                .await;
-        }
-        CoreError::Provider(err)
     }
 }

@@ -29,7 +29,6 @@
 //！│                                           └───────────────────┘           │
 //！└─────────────────────────────────────────────────────────────────────────────┘
 
-
 //!
 //! src/model/mod.rs
 //! Model 层：应用状态定义
@@ -48,7 +47,7 @@
 //!
 //!         pub mod domain;     // 领域模型（域名、DNS 记录等）
 //!         pub mod state;      // 页面数据状态
-//! 
+//!
 //!     值得一提的是，虽说 page.rs 与 state/ 都表示页面状态，但两者有不同：
 //!         - Page 是一个简单的枚举，表示当前应用处于哪个“页面”，相当于房间的门牌号，
 //!             只负责标识位置，不存储任何业务数据；
@@ -68,13 +67,13 @@
 //!             pub navigation: NavigationState,    // 导航状态
 //!             pub current_page: Page,             // 当前页面
 //!             pub status_message: Option<String>, // 状态栏消息（可选）
-//! 
+//!
 //!             // 以及各页面状态：
 //!             pub accounts: AccountsState,        // 账号页面状态
 //!             pub domains: DomainsState,          // 域名页面状态
 //!             pub dns_records: DnsRecordsState,   // DNS 记录 页面状态
 //!             pub toolbox: ToolboxState,          // 工具箱页面状态
-//! 
+//!
 //!             pub modal: ModalState               // 弹窗状态
 //!         }
 //!
@@ -204,8 +203,9 @@ pub mod domain;
 
 pub use app::App;
 pub use focus::FocusPanel;
-pub use navigation::{NavItem, NavItemId, NavigationState};
+pub use navigation::{NavItemId, NavigationState};
 pub use page::Page;
 pub use state::{
-    AccountsState, DnsRecordsState, DomainsState, Modal, ModalState, SettingsState, ToolboxState, ToolboxTab,
+    AccountsState, DnsRecordsState, DomainsState, ModalState, SettingsState, ToolboxState,
+    ToolboxTab,
 };

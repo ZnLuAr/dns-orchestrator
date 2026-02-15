@@ -1,11 +1,11 @@
 //! 首页视图
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 use crate::i18n::t;
@@ -38,7 +38,7 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled(
             format!("  {}", texts.home.welcome_desc),
-            Style::default().fg(c.fg),
+            Style::default().fg(c.muted),
         )),
         Line::from(""),
     ];
@@ -49,10 +49,7 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
     // 统计信息（目前是占位符）
     let stats_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(layout[1]);
 
     // 账号统计
@@ -63,8 +60,16 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
 
     let accounts_content = Paragraph::new(vec![
         Line::from(""),
-        Line::from(Span::styled("  0", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled(format!("  {}", texts.home.manage_accounts), Style::default().fg(c.muted))),
+        Line::from(Span::styled(
+            "  0",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!("  {}", texts.home.manage_accounts),
+            Style::default().fg(c.muted),
+        )),
     ])
     .block(accounts_block);
 
@@ -78,8 +83,16 @@ pub fn render(_app: &App, frame: &mut Frame, area: Rect) {
 
     let domains_content = Paragraph::new(vec![
         Line::from(""),
-        Line::from(Span::styled("  0", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled(format!("  {}", texts.home.manage_domains), Style::default().fg(c.muted))),
+        Line::from(Span::styled(
+            "  0",
+            Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!("  {}", texts.home.manage_domains),
+            Style::default().fg(c.muted),
+        )),
     ])
     .block(domains_block);
 

@@ -1,10 +1,10 @@
 //! 主布局渲染
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 use crate::i18n::t;
@@ -92,7 +92,7 @@ fn render_page_content(app: &App, frame: &mut Frame, area: Rect) {
     };
 
     let block = Block::default()
-        .title(format!(" {} ", page_title))
+        .title(format!(" {page_title} "))
         .title_style(Style::default().fg(c.fg).add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
         .border_style(border_style);

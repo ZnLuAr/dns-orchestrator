@@ -1,20 +1,20 @@
 //! 工具箱页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
 
-use crate::i18n::t;
 use crate::i18n::keys::ToolboxTabTexts;
-use crate::model::{App, ToolboxTab, ToolboxState};
+use crate::i18n::t;
+use crate::model::{App, ToolboxState, ToolboxTab};
 use crate::view::theme::colors;
 
 /// 获取工具箱标签页的翻译名称
-fn get_tab_name(tab: &ToolboxTab, tabs: &ToolboxTabTexts) -> &'static str {
+fn get_tab_name(tab: ToolboxTab, tabs: &ToolboxTabTexts) -> &'static str {
     match tab {
         ToolboxTab::Whois => tabs.whois,
         ToolboxTab::DnsLookup => tabs.dns_lookup,
@@ -61,7 +61,7 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         } else {
             Style::default().fg(c.muted)
         };
-        tab_spans.push(Span::styled(get_tab_name(tab, &texts.toolbox.tabs), style));
+        tab_spans.push(Span::styled(get_tab_name(*tab, &texts.toolbox.tabs), style));
     }
 
     // 右侧滚动指示器
@@ -163,7 +163,10 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}", texts.hints.keys.arrows_lr), Style::default().fg(Color::Yellow)),
+        Span::styled(
+            format!("  {}", texts.hints.keys.arrows_lr),
+            Style::default().fg(Color::Yellow),
+        ),
         Span::styled(
             format!(" {} | ", texts.hints.actions.switch_option),
             Style::default().fg(c.muted),
@@ -183,7 +186,7 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
             Style::default().fg(c.success),
         ));
         lines.push(Line::styled(
-            format!("  {}", result),
+            format!("  {result}"),
             Style::default().fg(c.fg),
         ));
     }

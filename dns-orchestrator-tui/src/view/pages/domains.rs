@@ -1,11 +1,11 @@
 //! 域名列表页面视图
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState},
-    Frame,
 };
 
 use crate::i18n::t;
@@ -55,7 +55,6 @@ fn render_list(app: &App, frame: &mut Frame, area: Rect) {
             let is_selected = i == app.domains.selected;
             let status_icon = match domain.status {
                 crate::model::domain::DomainStatus::Active => "●",
-                crate::model::domain::DomainStatus::Pending => "○",
                 _ => "○",
             };
             let status_color = match domain.status {

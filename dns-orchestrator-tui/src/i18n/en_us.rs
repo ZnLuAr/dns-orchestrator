@@ -1,6 +1,12 @@
 //! 英文翻译 (en-US)
 
-use super::keys::*;
+use super::keys::{
+    AccountsTexts, ActionTexts, AddAccountModalTexts, CommonTexts, ConfirmDeleteTexts,
+    DnsRecordsTexts, DomainsTexts, HelpActionTexts, HelpTexts, HintTexts, HomeTexts, KeyNames,
+    LanguageTexts, ModalTexts, NavTexts, PaginationTexts, SettingsTexts, StatusBarTexts,
+    ThemeTexts, ToolModalLabels, ToolModalPlaceholders, ToolModalStatus, ToolModalTitles,
+    ToolModalsTexts, ToolboxTabTexts, ToolboxTexts, Translations,
+};
 
 pub const TRANSLATIONS: Translations = Translations {
     // ========================================================================
@@ -171,7 +177,7 @@ pub const TRANSLATIONS: Translations = Translations {
             access_key_id: "Access Key ID",
             access_key_id_hint: "Enter the Access Key ID",
             secret_access_key: "Secret Access Key",
-            secret_access_key_hint: "Enter the Secret Access Key"
+            secret_access_key_hint: "Enter the Secret Access Key",
         },
 
         confirm_delete: ConfirmDeleteTexts {

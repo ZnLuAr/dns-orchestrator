@@ -109,7 +109,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -151,7 +151,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # Linux 构建
   release-linux:
@@ -185,7 +185,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -239,7 +239,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # MacOS 构建
   release-macos:
@@ -310,7 +310,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -361,7 +361,7 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.rust_target || 'default' }}
           path: |
-            src-tauri/target/release/bundle/
+            target/release/bundle/
 
   # Android 构建
   release-android:
@@ -397,7 +397,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -415,8 +415,8 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          mkdir -p src-tauri/gen/android/app
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > src-tauri/gen/android/app/release.keystore
+          mkdir -p dns-orchestrator-tauri/gen/android/app
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > dns-orchestrator-tauri/gen/android/app/release.keystore
 
       - name: Build Android APK
         env:
@@ -427,18 +427,37 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          pnpm tauri android build --apk true
+          pnpm tauri android build --apk
 
       - name: Rename APK
         if: github.event_name == 'push'
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"  # 去掉 v 前缀
-          APK_DIR="src-tauri/gen/android/app/build/outputs/apk/universal/release"
+          APK_DIR="dns-orchestrator-tauri/gen/android/app/build/outputs/apk/universal/release"
           APK_FILE=$(find "$APK_DIR" -name "*.apk" | head -1)
           if [ -n "$APK_FILE" ]; then
             mv "$APK_FILE" "$APK_DIR/DNS.Orchestrator_${VERSION}_android.apk"
             echo "Renamed to: DNS.Orchestrator_${VERSION}_android.apk"
+          fi
+
+      - name: Sign APK for updater
+        if: github.event_name == 'push'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          APK_DIR="dns-orchestrator-tauri/gen/android/app/build/outputs/apk/universal/release"
+          APK_FILE="${APK_DIR}/DNS.Orchestrator_${VERSION}_android.apk"
+          if [ -f "$APK_FILE" ]; then
+            pnpm tauri signer sign --private-key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$APK_FILE"
+            echo "APK signed, signature:"
+            cat "${APK_FILE}.sig"
+          else
+            echo "Error: APK file not found for signing!"
+            exit 1
           fi
 
       - name: Upload APK to Release
@@ -446,7 +465,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+            dns-orchestrator-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+            dns-orchestrator-tauri/gen/android/app/build/outputs/apk/universal/release/*.sig
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -456,7 +476,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+          path: dns-orchestrator-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
 
   # iOS 构建并上传到 TestFlight
   release-ios-testflight:
@@ -477,7 +497,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -529,7 +549,7 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
-          IPA_PATH=$(find src-tauri/gen/apple/build -name "*.ipa" | head -1)
+          IPA_PATH=$(find dns-orchestrator-tauri/gen/apple/build -name "*.ipa" | head -1)
           if [ -n "$IPA_PATH" ]; then
             xcrun altool --upload-app \
               --type ios \
@@ -539,7 +559,7 @@ jobs:
             echo "Uploaded $IPA_PATH to TestFlight"
           else
             echo "Error: IPA file not found!"
-            find src-tauri/gen/apple -name "*.ipa" -o -name "*.app"
+            find dns-orchestrator-tauri/gen/apple -name "*.ipa" -o -name "*.app"
             exit 1
           fi
 
@@ -548,19 +568,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: src-tauri/gen/apple/build/**/*.ipa
+          path: dns-orchestrator-tauri/gen/apple/build/**/*.ipa
           if-no-files-found: ignore
 
   # 更新 latest.json 添加 Android 平台
   update-latest-json:
     if: github.event_name == 'push'
-    needs:
-      [
-        release-windows,
-        release-macos,
-        release-linux,
-        release-android,
-      ]
+    needs: [release-windows, release-macos, release-linux, release-android]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -588,14 +602,29 @@ jobs:
             APK_NAME=$(gh release view ${{ github.ref_name }} --repo ${{ github.repository }} --json assets -q '.assets[] | select(.name | endswith(".apk")) | .name' | head -1)
 
             if [ -n "$APK_NAME" ]; then
-              APK_SIGNATURE="none"
               APK_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${APK_NAME}"
+
+              # 下载签名文件
+              SIG_NAME="${APK_NAME}.sig"
+              gh release download ${{ github.ref_name }} \
+                --repo ${{ github.repository }} \
+                --pattern "$SIG_NAME" \
+                --dir . || true
+
+              if [ -f "$SIG_NAME" ]; then
+                APK_SIGNATURE=$(cat "$SIG_NAME")
+                echo "Using minisign signature from $SIG_NAME"
+              else
+                echo "Error: Signature file $SIG_NAME not found in release!"
+                echo "Android update will not be verifiable. Aborting."
+                exit 1
+              fi
 
               # 使用 jq 添加 Android 平台
               jq --arg sig "$APK_SIGNATURE" --arg url "$APK_URL" '.platforms.android = {"signature": $sig, "url": $url}' latest.json > latest.json.tmp
               mv latest.json.tmp latest.json
 
-              echo "Updated latest.json with Android URL: $APK_URL"
+              echo "Updated latest.json with Android URL and signature"
               cat latest.json
             else
               echo "No APK found in release, skipping..."
@@ -612,3 +641,136 @@ jobs:
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 更新 Homebrew Cask
+  update-homebrew-cask:
+    if: github.event_name == 'push'
+    needs: [release-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download DMGs and calculate SHA256
+        id: sha256
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NO_V="${VERSION#v}"
+
+          gh release download "${VERSION}" --repo "${{ github.repository }}" \
+            --pattern "DNS.Orchestrator_${VERSION_NO_V}_aarch64.dmg" --output "arm64.dmg"
+          gh release download "${VERSION}" --repo "${{ github.repository }}" \
+            --pattern "DNS.Orchestrator_${VERSION_NO_V}_x64.dmg" --output "x64.dmg"
+
+          echo "arm64=$(sha256sum arm64.dmg | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "x64=$(sha256sum x64.dmg | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew Cask
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          script: |
+            const version = '${{ github.ref_name }}'.replace(/^v/, '');
+            const repo = '${{ github.repository }}';
+            const sha256 = {
+              arm64: '${{ steps.sha256.outputs.arm64 }}',
+              x64: '${{ steps.sha256.outputs.x64 }}'
+            };
+
+            const cask = `cask "dns-orchestrator" do
+              version "${version}"
+
+              on_arm do
+                sha256 "${sha256.arm64}"
+                url "https://github.com/${repo}/releases/download/v#{version}/DNS.Orchestrator_#{version}_aarch64.dmg"
+              end
+
+              on_intel do
+                sha256 "${sha256.x64}"
+                url "https://github.com/${repo}/releases/download/v#{version}/DNS.Orchestrator_#{version}_x64.dmg"
+              end
+
+              name "DNS Orchestrator"
+              desc "DNS configuration management tool"
+              homepage "https://github.com/${repo}"
+
+              app "DNS Orchestrator.app"
+
+              zap trash: [
+                "~/Library/Application Support/net.esaps.dns-orchestrator",
+                "~/Library/Caches/net.esaps.dns-orchestrator",
+                "~/Library/Preferences/net.esaps.dns-orchestrator.plist",
+              ]
+            end
+            `;
+
+            // Get current file SHA if exists
+            let fileSha;
+            try {
+              const { data } = await github.rest.repos.getContent({
+                owner: 'AptS-1547',
+                repo: 'homebrew-tap',
+                path: 'Casks/dns-orchestrator.rb'
+              });
+              fileSha = data.sha;
+            } catch (e) {
+              fileSha = undefined;
+            }
+
+            // Ensure Casks directory exists
+            if (!fileSha) {
+              try {
+                await github.rest.repos.getContent({
+                  owner: 'AptS-1547',
+                  repo: 'homebrew-tap',
+                  path: 'Casks'
+                });
+              } catch (e) {
+                // Casks dir doesn't exist, create with .gitkeep
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner: 'AptS-1547',
+                  repo: 'homebrew-tap',
+                  path: 'Casks/.gitkeep',
+                  message: 'chore: create Casks directory',
+                  content: Buffer.from('').toString('base64')
+                });
+              }
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: 'AptS-1547',
+              repo: 'homebrew-tap',
+              path: 'Casks/dns-orchestrator.rb',
+              message: `chore: bump dns-orchestrator to v${version}`,
+              content: Buffer.from(cask).toString('base64'),
+              sha: fileSha
+            });
+
+  # 发布 Release（所有构建完成后将 draft 改为正式发布）
+  publish-release:
+    if: github.event_name == 'push'
+    needs: [update-latest-json, update-homebrew-cask]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Publish draft release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const tagName = context.ref.replace('refs/tags/', '');
+            const draft = releases.find(r => r.tag_name === tagName && r.draft);
+            if (!draft) {
+              core.setFailed(`Draft release for ${tagName} not found`);
+              return;
+            }
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: draft.id,
+              draft: false,
+            });
+            core.info(`Published release ${tagName} (id: ${draft.id})`);

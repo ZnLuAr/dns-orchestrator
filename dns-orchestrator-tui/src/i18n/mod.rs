@@ -6,24 +6,19 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod en_us;
-mod zh_cn;
 pub mod keys;
+mod zh_cn;
 
 pub use keys::*;
 
 /// 支持的语言
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Language {
     /// 英语（美国）
+    #[default]
     EnUs,
     /// 简体中文（中国）
     ZhCn,
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Language::EnUs
-    }
 }
 
 impl Language {
@@ -58,6 +53,7 @@ impl Language {
     }
 
     /// 获取下一个语言（用于循环切换）
+    #[must_use]
     pub fn next(&self) -> Language {
         match self {
             Language::EnUs => Language::ZhCn,
@@ -66,6 +62,7 @@ impl Language {
     }
 
     /// 获取上一个语言（用于循环切换）
+    #[must_use]
     pub fn prev(&self) -> Language {
         match self {
             Language::EnUs => Language::ZhCn,

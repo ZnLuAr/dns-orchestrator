@@ -1,10 +1,12 @@
-//! DNSPod DnsProvider trait 实现
+//! `DNSPod` `DnsProvider` trait implementation
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{ProviderError, Result};
-use crate::providers::common::record_type_to_string;
+use crate::providers::common::{
+    parse_record_data_with_priority, record_data_to_value_priority, record_type_to_string,
+};
 use crate::traits::{DnsProvider, ErrorContext, ProviderErrorMapper};
 use crate::types::{
     CreateDnsRecordRequest, DnsRecord, DomainStatus, FieldType, PaginatedResponse,
@@ -18,116 +20,34 @@ use super::{
 };
 
 impl DnspodProvider {
-    /// 将 DNSPod 域名状态转换为内部状态
+    /// Get domain name information (use cache first)
+    async fn get_domain_cached(&self, domain_id: &str) -> Result<ProviderDomain> {
+        if let Some(domain) = self.domain_cache.get(domain_id) {
+            return Ok(domain);
+        }
+        let domain = self.get_domain(domain_id).await?;
+        self.domain_cache.insert(domain_id, &domain);
+        Ok(domain)
+    }
+
+    /// Convert `DNSPod` domain name status to internal status
     pub(crate) fn convert_domain_status(status: &str, dns_status: &str) -> DomainStatus {
         match (status, dns_status) {
             ("ENABLE" | "enable", "") => DomainStatus::Active,
             ("PAUSE" | "pause", _) => DomainStatus::Paused,
-            ("ENABLE" | "enable", "DNSERROR") => DomainStatus::Error,
-            ("SPAM" | "spam", _) => DomainStatus::Error,
+            ("ENABLE" | "enable", "DNSERROR") | ("SPAM" | "spam", _) => DomainStatus::Error,
             _ => DomainStatus::Unknown,
         }
     }
 
-    /// 解析 DNSPod 记录为 RecordData（使用 mx 字段作为 priority）
-    fn parse_record_data(record_type: &str, value: &str, mx: Option<u16>) -> Result<RecordData> {
-        match record_type {
-            "A" => Ok(RecordData::A {
-                address: value.to_string(),
-            }),
-            "AAAA" => Ok(RecordData::AAAA {
-                address: value.to_string(),
-            }),
-            "CNAME" => Ok(RecordData::CNAME {
-                target: value.to_string(),
-            }),
-            "MX" => Ok(RecordData::MX {
-                priority: mx.ok_or_else(|| ProviderError::ParseError {
-                    provider: "dnspod".to_string(),
-                    detail: "MX record missing priority field".to_string(),
-                })?,
-                exchange: value.to_string(),
-            }),
-            "TXT" => Ok(RecordData::TXT {
-                text: value.to_string(),
-            }),
-            "NS" => Ok(RecordData::NS {
-                nameserver: value.to_string(),
-            }),
-            "SRV" => {
-                // DNSPod SRV value 格式: "priority weight port target"（所有字段都在 value 中）
-                let parts: Vec<&str> = value.splitn(4, ' ').collect();
-                if parts.len() == 4 {
-                    Ok(RecordData::SRV {
-                        priority: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid SRV priority: '{}'", parts[0]),
-                        })?,
-                        weight: parts[1].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid SRV weight: '{}'", parts[1]),
-                        })?,
-                        port: parts[2].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid SRV port: '{}'", parts[2]),
-                        })?,
-                        target: parts[3].to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "dnspod".to_string(),
-                        detail: format!(
-                            "Invalid SRV record format: expected 'priority weight port target', got '{value}'"
-                        ),
-                    })
-                }
-            }
-            "CAA" => {
-                // DNSPod CAA value 格式: "flags tag value"
-                let parts: Vec<&str> = value.splitn(3, ' ').collect();
-                if parts.len() >= 3 {
-                    Ok(RecordData::CAA {
-                        flags: parts[0].parse().map_err(|_| ProviderError::ParseError {
-                            provider: "dnspod".to_string(),
-                            detail: format!("Invalid CAA flags: '{}'", parts[0]),
-                        })?,
-                        tag: parts[1].to_string(),
-                        value: parts[2].trim_matches('"').to_string(),
-                    })
-                } else {
-                    Err(ProviderError::ParseError {
-                        provider: "dnspod".to_string(),
-                        detail: format!(
-                            "Invalid CAA record format: expected 'flags tag value', got '{value}'"
-                        ),
-                    })
-                }
-            }
-            _ => Err(ProviderError::UnsupportedRecordType {
-                provider: "dnspod".to_string(),
-                record_type: record_type.to_string(),
-            }),
-        }
+    /// Parse `DNSPod` record as `RecordData` (use mx field as priority)
+    fn parse_record_data(record_type: &str, value: String, mx: Option<u16>) -> Result<RecordData> {
+        parse_record_data_with_priority(record_type, value, mx, "dnspod")
     }
 
-    /// 将 RecordData 转换为 DNSPod API 格式 (value, mx)
+    /// Convert `RecordData` to `DNSPod` API format (value, mx)
     fn record_data_to_api(data: &RecordData) -> (String, Option<u16>) {
-        match data {
-            RecordData::A { address } => (address.clone(), None),
-            RecordData::AAAA { address } => (address.clone(), None),
-            RecordData::CNAME { target } => (target.clone(), None),
-            RecordData::MX { priority, exchange } => (exchange.clone(), Some(*priority)),
-            RecordData::TXT { text } => (text.clone(), None),
-            RecordData::NS { nameserver } => (nameserver.clone(), None),
-            // DNSPod SRV：所有字段都在 Value 中（priority weight port target）
-            RecordData::SRV {
-                priority,
-                weight,
-                port,
-                target,
-            } => (format!("{priority} {weight} {port} {target}"), None),
-            RecordData::CAA { flags, tag, value } => (format!("{flags} {tag} \"{value}\""), None),
-        }
+        record_data_to_value_priority(data)
     }
 }
 
@@ -140,21 +60,21 @@ impl DnsProvider for DnspodProvider {
     fn metadata() -> ProviderMetadata {
         ProviderMetadata {
             id: ProviderType::Dnspod,
-            name: "腾讯云 DNSPod".to_string(),
-            description: "腾讯云 DNS 解析服务".to_string(),
+            name: "Tencent Cloud DNSPod".to_string(),
+            description: "Tencent Cloud DNS resolution service".to_string(),
             required_fields: vec![
                 ProviderCredentialField {
                     key: "secretId".to_string(),
                     label: "SecretId".to_string(),
                     field_type: FieldType::Text,
-                    placeholder: Some("输入 SecretId".to_string()),
+                    placeholder: Some("Enter SecretId".to_string()),
                     help_text: None,
                 },
                 ProviderCredentialField {
                     key: "secretKey".to_string(),
                     label: "SecretKey".to_string(),
                     field_type: FieldType::Password,
-                    placeholder: Some("输入 SecretKey".to_string()),
+                    placeholder: Some("Enter SecretKey".to_string()),
                     help_text: None,
                 },
             ],
@@ -186,10 +106,7 @@ impl DnsProvider for DnspodProvider {
         {
             Ok(_) => Ok(true),
             Err(ProviderError::InvalidCredentials { .. }) => Ok(false),
-            Err(e) => {
-                log::warn!("凭证验证失败: {e}");
-                Ok(false)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -205,11 +122,12 @@ impl DnsProvider for DnspodProvider {
             limit: u32,
         }
 
-        // 将 page/page_size 转换为 offset/limit
+        let params = params.validated(MAX_PAGE_SIZE);
+        // Convert page/page_size to offset/limit
         let offset = (params.page - 1) * params.page_size;
         let req = DescribeDomainListRequest {
             offset,
-            limit: params.page_size.min(MAX_PAGE_SIZE),
+            limit: params.page_size,
         };
 
         let response: DomainListResponse = self
@@ -242,10 +160,10 @@ impl DnsProvider for DnspodProvider {
         ))
     }
 
-    /// 使用 DescribeDomain API 直接获取域名信息
-    /// 注意：DNSPod API 需要域名名称，如果传入的是数字 ID 则 fallback 到列表查找
+    /// Use `DescribeDomain` API to directly obtain domain name information
+    /// Note: `DNSPod` API requires a domain name. If a numeric ID is passed in, it will fallback to the list to find it.
     async fn get_domain(&self, domain_id: &str) -> Result<ProviderDomain> {
-        // 如果 domain_id 包含 '.'，认为是域名名称，直接调用 API
+        // If domain_id contains '.', it is considered to be the domain name and the API is called directly
         if domain_id.contains('.') {
             #[derive(Serialize)]
             struct DescribeDomainRequest {
@@ -275,22 +193,28 @@ impl DnsProvider for DnspodProvider {
             });
         }
 
-        // Fallback: 数字 ID，从列表中查找
-        let params = PaginationParams {
-            page: 1,
-            page_size: 100,
-        };
-        let response = self.list_domains(&params).await?;
+        // Fallback: Numeric ID, paging search
+        let mut page = 1u32;
+        let page_size = 100u32;
+        loop {
+            let params = PaginationParams { page, page_size };
+            let response = self.list_domains(&params).await?;
 
-        response
-            .items
-            .into_iter()
-            .find(|d| d.id == domain_id)
-            .ok_or_else(|| ProviderError::DomainNotFound {
-                provider: self.provider_name().to_string(),
-                domain: domain_id.to_string(),
-                raw_message: None,
-            })
+            if let Some(found) = response.items.into_iter().find(|d| d.id == domain_id) {
+                return Ok(found);
+            }
+
+            if !response.has_more {
+                break;
+            }
+            page += 1;
+        }
+
+        Err(ProviderError::DomainNotFound {
+            provider: self.provider_name().to_string(),
+            domain: domain_id.to_string(),
+            raw_message: None,
+        })
     }
 
     async fn list_records(
@@ -312,13 +236,14 @@ impl DnsProvider for DnspodProvider {
             record_type: Option<String>,
         }
 
-        let domain_info = self.get_domain(domain_id).await?;
+        let params = params.validated(MAX_PAGE_SIZE);
+        let domain_info = self.get_domain_cached(domain_id).await?;
 
         let offset = (params.page - 1) * params.page_size;
         let req = DescribeRecordListRequest {
             domain: domain_info.name,
             offset,
-            limit: params.page_size.min(MAX_PAGE_SIZE),
+            limit: params.page_size,
             keyword: params.keyword.clone().filter(|k| !k.is_empty()),
             record_type: params
                 .record_type
@@ -346,7 +271,14 @@ impl DnsProvider for DnspodProvider {
                     .unwrap_or_default()
                     .into_iter()
                     .filter_map(|r| {
-                        let data = Self::parse_record_data(&r.record_type, &r.value, r.mx).ok()?;
+                        let data = match Self::parse_record_data(&r.record_type, r.value, r.mx) {
+                            Ok(data) => data,
+                            Err(ProviderError::UnsupportedRecordType { .. }) => return None,
+                            Err(e) => {
+                                log::warn!("[dnspod] Skipping record due to parse error: {e}");
+                                return None;
+                            }
+                        };
                         Some(DnsRecord {
                             id: r.record_id.to_string(),
                             domain_id: domain_id.to_string(),
@@ -404,9 +336,9 @@ impl DnsProvider for DnspodProvider {
             mx: Option<u16>,
         }
 
-        let domain_info = self.get_domain(&req.domain_id).await?;
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
-        // 从 RecordData 提取 value 和 mx
+        // Extract value and mx from RecordData
         let (value, mx) = Self::record_data_to_api(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 
@@ -474,9 +406,9 @@ impl DnsProvider for DnspodProvider {
                 raw_message: None,
             })?;
 
-        let domain_info = self.get_domain(&req.domain_id).await?;
+        let domain_info = self.get_domain_cached(&req.domain_id).await?;
 
-        // 从 RecordData 提取 value 和 mx
+        // Extract value and mx from RecordData
         let (value, mx) = Self::record_data_to_api(&req.data);
         let record_type = record_type_to_string(&req.data.record_type());
 
@@ -532,7 +464,7 @@ impl DnsProvider for DnspodProvider {
                 raw_message: None,
             })?;
 
-        let domain_info = self.get_domain(domain_id).await?;
+        let domain_info = self.get_domain_cached(domain_id).await?;
 
         let api_req = DeleteRecordRequest {
             domain: domain_info.name,

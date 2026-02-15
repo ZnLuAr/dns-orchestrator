@@ -229,6 +229,7 @@ export function DnsRecordTable({ accountId, domainId, supportsProxy }: DnsRecord
 
     return pages.map((p, i) =>
       p === "ellipsis" ? (
+        // biome-ignore lint/suspicious/noArrayIndexKey: ellipsis items have no unique identifier
         <PaginationItem key={`ellipsis-${i}`}>
           <PaginationEllipsis className="h-8 w-8" />
         </PaginationItem>
@@ -368,6 +369,7 @@ export function DnsRecordTable({ accountId, domainId, supportsProxy }: DnsRecord
                     </SelectTrigger>
                     <SelectContent className="max-h-[240px]">
                       {Array.from({ length: Math.ceil(totalCount / pageSize) }, (_, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: page numbers are stable and index-derived
                         <SelectItem key={i + 1} value={String(i + 1)}>
                           {t("common.pageWithNumber", { page: i + 1 })}
                         </SelectItem>

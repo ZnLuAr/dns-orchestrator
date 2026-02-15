@@ -1,16 +1,16 @@
 //! 左侧导航面板组件
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState},
-    Frame,
 };
 
 use crate::i18n::t;
-use crate::model::NavItemId;
 use crate::model::App;
+use crate::model::NavItemId;
 use crate::view::theme::colors;
 
 /// 渲染导航面板
@@ -66,9 +66,12 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(Style::default().bg(c.selected_bg).fg(c.selected_fg).add_modifier(Modifier::BOLD));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(c.selected_bg)
+            .fg(c.selected_fg)
+            .add_modifier(Modifier::BOLD),
+    );
 
     // 使用 ListState 来跟踪选中状态
     let mut state = ListState::default();

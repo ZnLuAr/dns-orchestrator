@@ -1,31 +1,31 @@
-//! DNS Orchestrator Core Library
+//! DNS Orchestrator core library.
 //!
-//! 提供 DNS 管理应用的核心业务逻辑，包括：
-//! - 账户管理 (Account Service)
-//! - 域名管理 (Domain Service)
-//! - DNS 记录管理 (DNS Service)
-//! - 工具箱 (Toolbox Service)
+//! Provides platform-agnostic DNS management business logic, including:
+//! - Account management
+//! - Domain listing and lookup
+//! - DNS record CRUD
+//! - Import/export and migration workflows
 //!
-//! 此库设计为平台无关，通过 trait 抽象存储层，
-//! 支持 Tauri (Desktop/Android) 和 Actix-Web 后端。
+//! Storage and runtime integrations are injected via traits, which allows the same core logic
+//! to run on Tauri (desktop/mobile) and Actix-Web backends.
 
+/// Cryptography helpers for import/export encryption.
 pub mod crypto;
+/// Unified error types used by the core library.
 pub mod error;
+/// Business services that orchestrate repositories and providers.
 pub mod services;
+/// Storage/runtime abstraction traits.
 pub mod traits;
+/// Shared core data structures and provider re-exports.
 pub mod types;
+/// Utility helpers.
 pub mod utils;
 
-// Re-export 常用类型
+#[cfg(test)]
+mod test_utils;
+
+// Re-export common entry points.
 pub use error::{CoreError, CoreResult};
 pub use services::ServiceContext;
-pub use traits::{AccountRepository, CredentialStore, ProviderRegistry};
-
-// Re-export provider 库的公共类型
-pub use dns_orchestrator_provider::{
-    BatchCreateFailure, BatchCreateResult, BatchDeleteFailure, BatchDeleteResult,
-    BatchUpdateFailure, BatchUpdateItem, BatchUpdateResult, CreateDnsRecordRequest, DnsProvider,
-    DnsRecord, DnsRecordType, DomainStatus, PaginatedResponse, PaginationParams,
-    ProviderCredentials, ProviderDomain, ProviderError, ProviderMetadata, ProviderType,
-    RecordQueryParams, UpdateDnsRecordRequest,
-};
+pub use traits::{AccountRepository, CredentialStore, DomainMetadataRepository, ProviderRegistry};

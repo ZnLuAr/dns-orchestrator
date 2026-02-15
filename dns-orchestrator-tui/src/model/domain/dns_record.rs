@@ -15,7 +15,7 @@ pub enum DnsRecordType {
 
 impl DnsRecordType {
     /// 获取记录类型名称（大写形式，用于显示）
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             DnsRecordType::A => "A",
             DnsRecordType::Aaaa => "AAAA",
@@ -88,11 +88,10 @@ impl RecordData {
     pub fn display_value(&self) -> String {
         match self {
             Self::A { address } | Self::Aaaa { address } => address.clone(),
-            Self::Cname { target } => target.clone(),
+            Self::Cname { target } | Self::Srv { target, .. } => target.clone(),
             Self::Mx { exchange, .. } => exchange.clone(),
             Self::Txt { text } => text.clone(),
             Self::Ns { nameserver } => nameserver.clone(),
-            Self::Srv { target, .. } => target.clone(),
             Self::Caa { value, .. } => value.clone(),
         }
     }

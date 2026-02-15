@@ -1,42 +1,42 @@
-//! 阿里云 HTTP 请求方法（重构版：使用通用 HTTP 工具）
+//! Alibaba Cloud HTTP request method (reconstructed version: using general HTTP tools)
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::error::{ProviderError, Result};
 use crate::http_client::HttpUtils;
 use crate::traits::{ErrorContext, ProviderErrorMapper, RawApiError};
 
 use super::{
-    ALIYUN_DNS_HOST, ALIYUN_DNS_VERSION, AliyunProvider, AliyunResponse, EMPTY_BODY_SHA256,
+    ALIYUN_DNS_HOST, ALIYUN_DNS_VERSION, AliyunProvider, EMPTY_BODY_SHA256,
     serialize_to_query_string,
 };
 
 impl AliyunProvider {
-    /// 执行阿里云 API 请求 (RPC 风格: 参数通过 query string 传递)
+    /// Execute Alibaba Cloud API request (RPC style: parameters are passed through query string)
     pub(crate) async fn request<T: for<'de> Deserialize<'de>, B: Serialize>(
         &self,
         action: &str,
         params: &B,
         ctx: ErrorContext,
     ) -> Result<T> {
-        // 1. 序列化参数为 query string
+        // 1. The serialization parameter is query string
         let query_string = serialize_to_query_string(params)?;
 
         let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let nonce = uuid::Uuid::new_v4().to_string();
 
-        // 2. 生成签名 (使用 query string)
+        // 2. Generate signature (using query string)
         let authorization = self.sign(action, &query_string, &timestamp, &nonce);
 
-        // 3. 构造 URL (参数在 query string 中)
+        // 3. Construct URL (parameters are in query string)
         let url = if query_string.is_empty() {
             format!("https://{ALIYUN_DNS_HOST}/")
         } else {
             format!("https://{ALIYUN_DNS_HOST}/?{query_string}")
         };
 
-        // 4. 发送请求 (body 为空，使用 HttpUtils)
+        // 4. Send request (body is empty, use HttpUtils)
         let request = self
             .client
             .post(&url)
@@ -48,24 +48,50 @@ impl AliyunProvider {
             .header("x-acs-content-sha256", EMPTY_BODY_SHA256)
             .header("Authorization", authorization);
 
-        let (_status, response_text) = HttpUtils::execute_request_with_retry(
+        let (status, response_text) = HttpUtils::execute_request_with_retry(
             request,
             self.provider_name(),
             "POST",
-            &format!("{} (Action: {})", url, action),
+            &format!("{url} (Action: {action})"),
             self.max_retries,
         )
         .await?;
 
-        // 5. 先检查是否有错误响应
-        if let Ok(error_response) = serde_json::from_str::<AliyunResponse<()>>(&response_text)
-            && let (Some(code), Some(message)) = (error_response.code, error_response.message)
-        {
-            log::error!("API 错误: {code} - {message}");
-            return Err(self.map_error(RawApiError::with_code(&code, &message), ctx));
+        // For HTTP 4xx/5xx errors, try parsing the JSON error body
+        if status >= 400 {
+            // Try to parse to Value and extract Code/Message
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&response_text)
+                && let (Some(code), Some(message)) = (
+                    value.get("Code").and_then(|v| v.as_str()),
+                    value.get("Message").and_then(|v| v.as_str()),
+                )
+            {
+                log::error!("API error: {code} - {message}");
+                return Err(self.map_error(RawApiError::with_code(code, message), ctx));
+            }
+            // Unable to resolve as structured error, returns generic NetworkError
+            return Err(ProviderError::NetworkError {
+                provider: self.provider_name().to_string(),
+                detail: format!("HTTP {status}: {response_text}"),
+            });
         }
 
-        // 6. 解析成功响应
-        HttpUtils::parse_json(&response_text, self.provider_name())
+        // 5. Parse to Value (only perform string parsing once)
+        let value: serde_json::Value = HttpUtils::parse_json(&response_text, self.provider_name())?;
+
+        // 6. Check for errors
+        if let (Some(code), Some(message)) = (
+            value.get("Code").and_then(|v| v.as_str()),
+            value.get("Message").and_then(|v| v.as_str()),
+        ) {
+            log::error!("API error: {code} - {message}");
+            return Err(self.map_error(RawApiError::with_code(code, message), ctx));
+        }
+
+        // 7. Convert to target type (Value → T, no need to re-tokenize)
+        serde_json::from_value(value).map_err(|e| ProviderError::ParseError {
+            provider: self.provider_name().to_string(),
+            detail: e.to_string(),
+        })
     }
 }

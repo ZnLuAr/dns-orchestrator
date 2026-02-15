@@ -1,4 +1,6 @@
-//! 共享测试工具和辅助函数
+//! Share testing tools and helper functions
+
+#![allow(dead_code)]
 
 use std::env;
 use std::sync::Arc;
@@ -8,7 +10,7 @@ use dns_orchestrator_provider::{
     RecordData, RecordQueryParams, create_provider,
 };
 
-/// 跳过测试的宏（当环境变量缺失时）
+/// Macro to skip testing (when environment variable is missing)
 #[macro_export]
 macro_rules! skip_if_no_credentials {
     ($($var:expr),+) => {
@@ -21,19 +23,65 @@ macro_rules! skip_if_no_credentials {
     };
 }
 
-/// 生成唯一的测试记录名称
+/// Assert that `Option` is `Some`, and unpack it to return the internal value (if it fails, the test will fail directly).
+#[macro_export]
+macro_rules! require_some {
+    ($expr:expr $(,)?) => {{
+        let opt = $expr;
+        assert!(opt.is_some(), "expected Some(..), got None");
+        let Some(val) = opt else {
+            return;
+        };
+        val
+    }};
+    ($expr:expr, $($msg:tt)+) => {{
+        let opt = $expr;
+        assert!(opt.is_some(), "{}", format_args!($($msg)+));
+        let Some(val) = opt else {
+            return;
+        };
+        val
+    }};
+}
+
+/// Assert that `Result` is `Ok`, and unpack and return the internal value (if it fails, the test will fail directly).
+#[macro_export]
+macro_rules! require_ok {
+    ($expr:expr $(,)?) => {{
+        let res = $expr;
+        assert!(res.is_ok(), "expected Ok(..), got {res:?}");
+        let Ok(val) = res else {
+            return;
+        };
+        val
+    }};
+    ($expr:expr, $($msg:tt)+) => {{
+        let res = $expr;
+        assert!(
+            res.is_ok(),
+            "{}: {res:?}",
+            format_args!($($msg)+)
+        );
+        let Ok(val) = res else {
+            return;
+        };
+        val
+    }};
+}
+
+/// Generate unique test record names
 pub fn generate_test_record_name() -> String {
     let uuid = uuid::Uuid::new_v4();
     format!("_test-{}", &uuid.to_string()[..8])
 }
 
-/// 生成 SRV 记录专用的测试名称（格式：_service._tcp）
+/// Generate SRV record-specific test name (format: _service._tcp)
 pub fn generate_srv_test_record_name() -> String {
     let uuid = uuid::Uuid::new_v4();
     format!("_test-{}._tcp", &uuid.to_string()[..8])
 }
 
-/// 支持测试的记录类型
+/// Supported record types for testing
 #[derive(Debug, Clone, Copy)]
 pub enum TestRecordType {
     A,
@@ -45,7 +93,7 @@ pub enum TestRecordType {
     Caa,
 }
 
-/// 获取测试记录数据（创建和更新）
+/// Get test record data (create and update)
 pub fn get_test_record_data(record_type: TestRecordType) -> (RecordData, RecordData) {
     match record_type {
         TestRecordType::A => (
@@ -119,7 +167,7 @@ pub fn get_test_record_data(record_type: TestRecordType) -> (RecordData, RecordD
     }
 }
 
-/// 测试上下文 - 封装 Provider 和测试域名
+/// Test context - encapsulating Provider and test domain name
 pub struct TestContext {
     pub provider: Arc<dyn DnsProvider>,
     pub domain: String,
@@ -127,7 +175,7 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    /// 创建 Cloudflare 测试上下文
+    /// Create a Cloudflare test context
     pub fn cloudflare() -> Option<Self> {
         let api_token = env::var("CLOUDFLARE_API_TOKEN").ok()?;
         let domain = env::var("TEST_DOMAIN").ok()?;
@@ -142,7 +190,7 @@ impl TestContext {
         })
     }
 
-    /// 创建 Aliyun 测试上下文
+    /// Create Aliyun test context
     pub fn aliyun() -> Option<Self> {
         let access_key_id = env::var("ALIYUN_ACCESS_KEY_ID").ok()?;
         let access_key_secret = env::var("ALIYUN_ACCESS_KEY_SECRET").ok()?;
@@ -161,7 +209,7 @@ impl TestContext {
         })
     }
 
-    /// 创建 DNSPod 测试上下文
+    /// Create `DNSPod` test context
     pub fn dnspod() -> Option<Self> {
         let secret_id = env::var("DNSPOD_SECRET_ID").ok()?;
         let secret_key = env::var("DNSPOD_SECRET_KEY").ok()?;
@@ -180,7 +228,7 @@ impl TestContext {
         })
     }
 
-    /// 创建 Huaweicloud 测试上下文
+    /// Create Huaweicloud test context
     pub fn huaweicloud() -> Option<Self> {
         let access_key_id = env::var("HUAWEICLOUD_ACCESS_KEY_ID").ok()?;
         let secret_access_key = env::var("HUAWEICLOUD_SECRET_ACCESS_KEY").ok()?;
@@ -199,7 +247,7 @@ impl TestContext {
         })
     }
 
-    /// 查找测试域名的 domain_id
+    /// Find the `domain_id` of the test domain name
     pub async fn find_domain_id(&mut self) -> Option<String> {
         if self.domain_id.is_some() {
             return self.domain_id.clone();
@@ -218,7 +266,7 @@ impl TestContext {
         None
     }
 
-    /// 创建测试记录并返回创建的记录
+    /// Create a test record and return the created record
     pub async fn create_test_record(&self, domain_id: &str) -> Option<DnsRecord> {
         let record_name = generate_test_record_name();
         let request = CreateDnsRecordRequest {
@@ -234,12 +282,12 @@ impl TestContext {
         self.provider.create_record(&request).await.ok()
     }
 
-    /// 清理测试记录
+    /// Clean test records
     pub async fn cleanup_record(&self, record_id: &str, domain_id: &str) {
         let _ = self.provider.delete_record(record_id, domain_id).await;
     }
 
-    /// 查找并清理所有测试记录（以 _test- 开头的记录）
+    /// Find and clean all test records (those starting with _test-)
     pub async fn cleanup_all_test_records(&self, domain_id: &str) {
         let params = RecordQueryParams {
             page: 1,

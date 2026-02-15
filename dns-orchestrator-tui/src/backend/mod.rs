@@ -39,10 +39,10 @@
 //!
 //! 有模块结构：
 //!     src/backend/mod.rs
-//!         mod core_service;               // 核心服务入口
-//!         mod credential_service;         // 凭证存储（keyring）
-//!         mod account_repository;         // 账号持久化（JSON 文件）
-//!         mod domain_metadata_repository; // 域名元数据存储（内存）
+//!         mod `core_service`;               // 核心服务入口
+//!         mod `credential_service`;         // 凭证存储（keyring）
+//!         mod `account_repository`;         // 账号持久化（JSON 文件）
+//!         mod `domain_metadata_repository`; // 域名元数据存储（内存）
 //!
 //!         mod account_service;            // 账号服务（Mock，用于测试）
 //!         mod config_service;             // 配置服务（Mock，用于测试）
@@ -66,8 +66,7 @@
 //!             6. 基于 ServiceContext 创建各种业务服务
 //!
 //!         提供的服务：
-//!             - account_lifecycle()   账号生命周期管理
-//!             - account_metadata()    账号元数据
+//!             - account()             账号管理（统一服务）
 //!             - domain()              域名管理
 //!             - dns()                 DNS 记录管理
 //!             - provider_metadata()   服务商元数据
@@ -154,11 +153,5 @@ mod credential_service;
 mod domain_metadata_repository;
 
 // 旧的 Mock 服务（保留用于测试）
-pub use account_service::{AccountService, MockAccountService};
-pub use config_service::{ConfigService, LocalConfigService};
 
 // 新的核心服务
-pub use account_repository::JsonAccountRepository;
-pub use core_service::CoreService;
-pub use credential_service::KeyringCredentialStore;
-pub use domain_metadata_repository::InMemoryDomainMetadataRepository;

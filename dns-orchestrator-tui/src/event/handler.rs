@@ -9,9 +9,6 @@ use crate::event::keymap::DefaultKeymap;
 use crate::message::{AppMessage, ContentMessage, ModalMessage, NavigationMessage};
 use crate::model::{App, Page};
 
-
-
-
 /// 轮询事件
 pub fn poll_event(timeout: Duration) -> Result<Option<Event>> {
     if event::poll(timeout)? {
@@ -21,20 +18,14 @@ pub fn poll_event(timeout: Duration) -> Result<Option<Event>> {
     }
 }
 
-
-
-
 /// 处理事件，返回对应的消息
+#[allow(clippy::needless_pass_by_value)]
 pub fn handle_event(event: Event, app: &App) -> AppMessage {
     match event {
-        Event::Key(key_event) => handle_key_event(key_event, app),      // 键盘事件
-        Event::Resize(_, _) => AppMessage::Noop,                                  // 终端窗口大小改变，自动重绘
+        Event::Key(key_event) => handle_key_event(key_event, app), // 键盘事件
         _ => AppMessage::Noop,
     }
 }
-
-
-
 
 /// 处理键盘事件
 fn handle_key_event(key: KeyEvent, app: &App) -> AppMessage {
@@ -54,7 +45,9 @@ fn handle_key_event(key: KeyEvent, app: &App) -> AppMessage {
         return AppMessage::Quit;
     }
 
-    if DefaultKeymap::HELP.matches(&key) || (key.modifiers.is_empty() && key.code == KeyCode::Char('?')) {
+    if DefaultKeymap::HELP.matches(&key)
+        || (key.modifiers.is_empty() && key.code == KeyCode::Char('?'))
+    {
         return AppMessage::ShowHelp;
     }
 
@@ -93,9 +86,7 @@ fn handle_navigation_keys(key: KeyEvent) -> AppMessage {
         }
 
         // ↓ 或 j: 下移
-        KeyCode::Down | KeyCode::Char('j') => {
-            AppMessage::Navigation(NavigationMessage::SelectNext)
-        }
+        KeyCode::Down | KeyCode::Char('j') => AppMessage::Navigation(NavigationMessage::SelectNext),
 
         // Enter: 确认选择
         KeyCode::Enter => AppMessage::Navigation(NavigationMessage::Confirm),
@@ -141,25 +132,15 @@ fn handle_content_keys(key: KeyEvent, app: &App) -> AppMessage {
 fn handle_list_keys(key: KeyEvent) -> AppMessage {
     match key.code {
         // ↑ 或 k: 上一项
-        KeyCode::Up | KeyCode::Char('k') => {
-            AppMessage::Content(ContentMessage::SelectPrevious)
-        }
+        KeyCode::Up | KeyCode::Char('k') => AppMessage::Content(ContentMessage::SelectPrevious),
         // ↓ 或 j: 下一项
-        KeyCode::Down | KeyCode::Char('j') => {
-            AppMessage::Content(ContentMessage::SelectNext)
-        }
+        KeyCode::Down | KeyCode::Char('j') => AppMessage::Content(ContentMessage::SelectNext),
         // Enter: 确认选择
-        KeyCode::Enter => {
-            AppMessage::Content(ContentMessage::Confirm)
-        }
+        KeyCode::Enter => AppMessage::Content(ContentMessage::Confirm),
         // Home: 跳到第一项
-        KeyCode::Home => {
-            AppMessage::Content(ContentMessage::SelectFirst)
-        }
+        KeyCode::Home => AppMessage::Content(ContentMessage::SelectFirst),
         // End: 跳到最后一项
-        KeyCode::End => {
-            AppMessage::Content(ContentMessage::SelectLast)
-        }
+        KeyCode::End => AppMessage::Content(ContentMessage::SelectLast),
         _ => AppMessage::Noop,
     }
 }
@@ -168,9 +149,7 @@ fn handle_list_keys(key: KeyEvent) -> AppMessage {
 fn handle_toolbox_keys(key: KeyEvent) -> AppMessage {
     match key.code {
         // Enter: 执行工具
-        KeyCode::Enter => {
-            AppMessage::Content(ContentMessage::Execute)
-        }
+        KeyCode::Enter => AppMessage::Content(ContentMessage::Execute),
         // ← 或 ↑ 或 k: 上一个工具
         KeyCode::Left | KeyCode::Up | KeyCode::Char('k') => {
             AppMessage::Content(ContentMessage::SelectPrevious)
@@ -189,10 +168,7 @@ fn handle_modal_keys(key: KeyEvent, app: &App) -> AppMessage {
 
     // Esc 和 Ctrl+C 始终可以关闭弹窗
     match (key.modifiers, key.code) {
-        (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
-            return AppMessage::Modal(ModalMessage::Close);
-        }
-        (KeyModifiers::NONE, KeyCode::Esc) => {
+        (KeyModifiers::CONTROL, KeyCode::Char('c')) | (KeyModifiers::NONE, KeyCode::Esc) => {
             return AppMessage::Modal(ModalMessage::Close);
         }
         _ => {}
@@ -210,8 +186,7 @@ fn handle_modal_keys(key: KeyEvent, app: &App) -> AppMessage {
         Modal::WhoisLookup { .. }
         | Modal::SslCheck { .. }
         | Modal::IpLookup { .. }
-        | Modal::DnssecCheck { .. }
-        | Modal::QueryTool { .. } => handle_simple_tool_keys(key),
+        | Modal::DnssecCheck { .. } => handle_simple_tool_keys(key),
         Modal::HttpHeaderCheck { focus, .. } => handle_http_header_check_keys(key, *focus),
         Modal::DnsPropagation { focus, .. } => handle_dns_propagation_keys(key, *focus),
         Modal::Help | Modal::Error { .. } => {
@@ -228,17 +203,11 @@ fn handle_modal_keys(key: KeyEvent, app: &App) -> AppMessage {
 /// 处理添加账号弹窗的按键
 fn handle_add_account_keys(key: KeyEvent, focus: usize) -> AppMessage {
     match key.code {
-        // Tab: 下一个字段
-        KeyCode::Tab => AppMessage::Modal(ModalMessage::NextField),
+        // Tab / ↓: 下一个字段
+        KeyCode::Tab | KeyCode::Down => AppMessage::Modal(ModalMessage::NextField),
 
-        // Shift+Tab: 上一个字段
-        KeyCode::BackTab => AppMessage::Modal(ModalMessage::PrevField),
-
-        // ↓: 下一个字段
-        KeyCode::Down => AppMessage::Modal(ModalMessage::NextField),
-
-        // ↑: 上一个字段
-        KeyCode::Up => AppMessage::Modal(ModalMessage::PrevField),
+        // Shift+Tab / ↑: 上一个字段
+        KeyCode::BackTab | KeyCode::Up => AppMessage::Modal(ModalMessage::PrevField),
 
         // ← →: 切换服务商（仅当焦点在服务商字段时）
         KeyCode::Left => {
@@ -357,9 +326,7 @@ fn handle_simple_tool_keys(key: KeyEvent) -> AppMessage {
         KeyCode::Delete => AppMessage::Modal(ModalMessage::Delete),
 
         // 字符输入
-        KeyCode::Char(ch) if key.modifiers.is_empty() => {
-            AppMessage::Modal(ModalMessage::Input(ch))
-        }
+        KeyCode::Char(ch) if key.modifiers.is_empty() => AppMessage::Modal(ModalMessage::Input(ch)),
 
         _ => AppMessage::Noop,
     }
@@ -455,21 +422,13 @@ fn handle_dns_propagation_keys(key: KeyEvent, focus: usize) -> AppMessage {
 fn handle_settings_keys(key: KeyEvent) -> AppMessage {
     match key.code {
         // ↑ 或 k: 上一个设置项
-        KeyCode::Up | KeyCode::Char('k') => {
-            AppMessage::Content(ContentMessage::SelectPrevious)
-        }
+        KeyCode::Up | KeyCode::Char('k') => AppMessage::Content(ContentMessage::SelectPrevious),
         // ↓ 或 j: 下一个设置项
-        KeyCode::Down | KeyCode::Char('j') => {
-            AppMessage::Content(ContentMessage::SelectNext)
-        }
+        KeyCode::Down | KeyCode::Char('j') => AppMessage::Content(ContentMessage::SelectNext),
         // ←: 切换到上一个值
-        KeyCode::Left => {
-            AppMessage::Content(ContentMessage::TogglePrev)
-        }
+        KeyCode::Left => AppMessage::Content(ContentMessage::TogglePrev),
         // →: 切换到下一个值
-        KeyCode::Right => {
-            AppMessage::Content(ContentMessage::ToggleNext)
-        }
+        KeyCode::Right => AppMessage::Content(ContentMessage::ToggleNext),
         _ => AppMessage::Noop,
     }
 }

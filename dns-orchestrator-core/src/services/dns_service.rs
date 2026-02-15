@@ -1,29 +1,30 @@
-//! DNS 记录管理服务
+//! DNS record management service
 
 use std::sync::Arc;
 
 use dns_orchestrator_provider::ProviderError;
+use futures::stream::{self, StreamExt};
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::CoreResult;
 use crate::services::ServiceContext;
 use crate::types::{
     BatchDeleteFailure, BatchDeleteRequest, BatchDeleteResult, CreateDnsRecordRequest, DnsRecord,
     DnsRecordType, PaginatedResponse, RecordQueryParams, UpdateDnsRecordRequest,
 };
 
-/// DNS 记录管理服务
+/// Service for DNS record operations.
 pub struct DnsService {
     ctx: Arc<ServiceContext>,
 }
 
 impl DnsService {
-    /// 创建 DNS 服务实例
+    /// Creates a DNS service.
     #[must_use]
     pub fn new(ctx: Arc<ServiceContext>) -> Self {
         Self { ctx }
     }
 
-    /// 列出域名下的所有 DNS 记录（分页 + 搜索）
+    /// Lists DNS records for a domain with pagination and filters.
     pub async fn list_records(
         &self,
         account_id: &str,
@@ -44,11 +45,11 @@ impl DnsService {
 
         match provider.list_records(domain_id, &params).await {
             Ok(response) => Ok(response),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
-    /// 创建 DNS 记录
+    /// Creates one DNS record.
     pub async fn create_record(
         &self,
         account_id: &str,
@@ -57,11 +58,11 @@ impl DnsService {
         let provider = self.ctx.get_provider(account_id).await?;
         match provider.create_record(&request).await {
             Ok(record) => Ok(record),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
-    /// 更新 DNS 记录
+    /// Updates one DNS record.
     pub async fn update_record(
         &self,
         account_id: &str,
@@ -71,11 +72,11 @@ impl DnsService {
         let provider = self.ctx.get_provider(account_id).await?;
         match provider.update_record(record_id, &request).await {
             Ok(record) => Ok(record),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
-    /// 删除 DNS 记录
+    /// Deletes one DNS record.
     pub async fn delete_record(
         &self,
         account_id: &str,
@@ -85,11 +86,13 @@ impl DnsService {
         let provider = self.ctx.get_provider(account_id).await?;
         match provider.delete_record(record_id, domain_id).await {
             Ok(()) => Ok(()),
-            Err(e) => Err(self.handle_provider_error(account_id, e).await),
+            Err(e) => Err(self.ctx.handle_provider_error(account_id, e).await),
         }
     }
 
-    /// 批量删除 DNS 记录
+    /// Deletes DNS records in batch.
+    ///
+    /// Deletions run concurrently with a bounded parallelism of `5`.
     pub async fn batch_delete_records(
         &self,
         account_id: &str,
@@ -97,37 +100,37 @@ impl DnsService {
     ) -> CoreResult<BatchDeleteResult> {
         let provider = self.ctx.get_provider(account_id).await?;
 
+        let domain_id = request.domain_id;
+        let results: Vec<Result<String, (String, ProviderError)>> =
+            stream::iter(request.record_ids)
+                .map(|record_id| {
+                    let provider = provider.clone();
+                    let domain_id = domain_id.clone();
+                    async move {
+                        match provider.delete_record(&record_id, &domain_id).await {
+                            Ok(()) => Ok(record_id),
+                            Err(e) => Err((record_id, e)),
+                        }
+                    }
+                })
+                .buffer_unordered(5)
+                .collect()
+                .await;
+
         let mut success_count = 0;
         let mut failures = Vec::new();
-
-        // 并行删除所有记录
-        let delete_futures: Vec<_> = request
-            .record_ids
-            .iter()
-            .map(|record_id| {
-                let provider = provider.clone();
-                let domain_id = request.domain_id.clone();
-                let record_id = record_id.clone();
-                async move {
-                    match provider.delete_record(&record_id, &domain_id).await {
-                        Ok(()) => Ok(record_id),
-                        Err(e) => Err((record_id, e)),
-                    }
-                }
-            })
-            .collect();
-
-        let results = futures::future::join_all(delete_futures).await;
+        let mut account_marked_invalid = false;
 
         for result in results {
             match result {
                 Ok(_) => success_count += 1,
                 Err((record_id, e)) => {
-                    // 检查是否是凭证失效
-                    if let ProviderError::InvalidCredentials { .. } = &e {
+                    if !account_marked_invalid && let ProviderError::InvalidCredentials { .. } = &e
+                    {
                         self.ctx
-                            .mark_account_invalid(account_id, "凭证已失效")
+                            .mark_account_invalid(account_id, "Credentials have expired")
                             .await;
+                        account_marked_invalid = true;
                     }
                     failures.push(BatchDeleteFailure {
                         record_id,
@@ -142,15 +145,5 @@ impl DnsService {
             failed_count: failures.len(),
             failures,
         })
-    }
-
-    /// 处理 Provider 错误，如果是凭证失效则更新账户状态
-    async fn handle_provider_error(&self, account_id: &str, err: ProviderError) -> CoreError {
-        if let ProviderError::InvalidCredentials { .. } = &err {
-            self.ctx
-                .mark_account_invalid(account_id, "凭证已失效")
-                .await;
-        }
-        CoreError::Provider(err)
     }
 }

@@ -66,6 +66,7 @@ interface DnsTableToolbarProps {
   onAddWizard: () => void
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: toolbar with responsive layout logic
 export function DnsTableToolbar({
   accountId,
   domainId,

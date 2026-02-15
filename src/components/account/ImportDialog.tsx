@@ -29,6 +29,7 @@ interface ImportDialogProps {
 
 type ImportStep = "select" | "password" | "preview" | "importing"
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step dialog with inherent branching
 export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDialogProps) {
   const { t } = useTranslation()
   const [step, setStep] = useState<ImportStep>("select")

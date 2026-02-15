@@ -2,9 +2,6 @@
 
 use crate::i18n::Language;
 
-
-
-
 /// 主题枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Theme {
@@ -20,7 +17,7 @@ impl Theme {
     }
 
     /// 获取下一个主题
-    pub fn next(&self) -> Theme {
+    pub fn next(self) -> Theme {
         match self {
             Theme::Dark => Theme::Light,
             Theme::Light => Theme::Dark,
@@ -28,13 +25,10 @@ impl Theme {
     }
 
     /// 获取上一个主题
-    pub fn prev(&self) -> Theme {
+    pub fn prev(self) -> Theme {
         self.next() // 只有两个选项，prev 和 next 相同
     }
 }
-
-
-
 
 /// 分页模式枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -51,7 +45,7 @@ impl PaginationMode {
     }
 
     /// 获取下一个分页模式
-    pub fn next(&self) -> PaginationMode {
+    pub fn next(self) -> PaginationMode {
         match self {
             PaginationMode::InfiniteScroll => PaginationMode::Traditional,
             PaginationMode::Traditional => PaginationMode::InfiniteScroll,
@@ -59,14 +53,10 @@ impl PaginationMode {
     }
 
     /// 获取上一个分页模式
-    pub fn prev(&self) -> PaginationMode {
+    pub fn prev(self) -> PaginationMode {
         self.next()
     }
 }
-
-
-
-
 
 /// 设置项枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,7 +77,7 @@ impl SettingItem {
     }
 
     /// 获取设置项的索引
-    pub fn index(&self) -> usize {
+    pub fn index(self) -> usize {
         match self {
             SettingItem::Theme => 0,
             SettingItem::Language => 1,
@@ -106,11 +96,8 @@ impl SettingItem {
     }
 }
 
-
-
-
 /// 设置页面状态
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SettingsState {
     /// 当前选中的设置项索引
     pub selected_index: usize,
@@ -122,17 +109,6 @@ pub struct SettingsState {
     pub pagination_mode: PaginationMode,
 }
 
-impl Default for SettingsState {
-    fn default() -> Self {
-        Self {
-            selected_index: 0,
-            theme: Theme::default(),
-            language: Language::default(),
-            pagination_mode: PaginationMode::default(),
-        }
-    }
-}
-
 impl SettingsState {
     /// 创建新的设置状态
     pub fn new() -> Self {
@@ -140,7 +116,7 @@ impl SettingsState {
     }
 
     /// 获取设置项数量
-    pub fn item_count(&self) -> usize {
+    pub fn item_count() -> usize {
         SettingItem::all().len()
     }
 
@@ -149,13 +125,13 @@ impl SettingsState {
         if self.selected_index > 0 {
             self.selected_index -= 1;
         } else {
-            self.selected_index = self.item_count() - 1;
+            self.selected_index = Self::item_count() - 1;
         }
     }
 
     /// 选择下一个设置项
     pub fn select_next(&mut self) {
-        if self.selected_index < self.item_count() - 1 {
+        if self.selected_index < Self::item_count() - 1 {
             self.selected_index += 1;
         } else {
             self.selected_index = 0;

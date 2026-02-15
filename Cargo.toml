@@ -1,0 +1,107 @@
+[workspace]
+members = [
+    "dns-orchestrator-app",
+    "dns-orchestrator-core",
+    "dns-orchestrator-provider",
+    "dns-orchestrator-toolbox",
+    "dns-orchestrator-tui",
+    "dns-orchestrator-web",
+    "dns-orchestrator-web/migration",
+    "dns-orchestrator-tauri",
+    "dns-orchestrator-tauri/tauri-plugin-apk-installer",
+    "dns-orchestrator-mcp",
+]
+resolver = "2"
+
+# ─── Profile ───────────────────────────────────────────────
+
+[profile.dev]
+opt-level = 1
+lto = false
+codegen-units = 16
+panic = "unwind"
+strip = false
+incremental = true
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
+[profile.release-debug]
+inherits = "release"
+codegen-units = 1
+debug = true
+strip = false
+lto = false
+
+# ─── Workspace Dependencies ────────────────────────────────
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async
+async-trait = "0.1"
+tokio = { version = "1" }
+futures = "0.3"
+
+# Error handling
+thiserror = "2"
+
+# Time & ID
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Logging
+log = "0.4"
+
+# HTTP
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+
+# Crypto
+sha2 = "0.10"
+hex = "0.4"
+
+# URL
+urlencoding = "2.1"
+
+# ORM
+sea-orm = { version = "2.0.0-rc.32", default-features = false }
+sea-orm-migration = { version = "~2.0.0-rc.32", default-features = false }
+
+# Tauri
+tauri = "2"
+tauri-build = { version = "2", features = [] }
+
+# Internal crates
+dns-orchestrator-app = { path = "dns-orchestrator-app", default-features = false }
+dns-orchestrator-core = { path = "dns-orchestrator-core", default-features = false }
+dns-orchestrator-provider = { path = "dns-orchestrator-provider", default-features = false }
+dns-orchestrator-toolbox = { path = "dns-orchestrator-toolbox", default-features = false }
+migration = { path = "dns-orchestrator-web/migration" }
+tauri-plugin-apk-installer = { path = "dns-orchestrator-tauri/tauri-plugin-apk-installer" }
+
+# ─── Workspace Lints ───────────────────────────────────────
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_imports = "warn"
+unused_variables = "warn"
+dead_code = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "allow", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+too_many_lines = "allow"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"

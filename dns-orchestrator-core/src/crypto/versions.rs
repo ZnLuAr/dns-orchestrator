@@ -1,27 +1,33 @@
-//! 加密算法版本管理
+//! Encryption version configuration.
 //!
-//! 定义每个文件版本对应的加密参数（隐式契约）
+//! Maps file format versions to encryption parameters.
 //!
-//! 设计原则：
-//! - 文件版本号不暴露加密参数，参数在代码中隐式定义
-//! - Version 1: PBKDF2-HMAC-SHA256, 100,000 次迭代
-//! - Version 2: PBKDF2-HMAC-SHA256, 600,000 次迭代（OWASP 2023 推荐）
-//! - 将来可扩展到 Version 3（Argon2 等算法）
+//! Design principles:
+//! - File versions do not expose crypto parameters directly; parameters are defined in code.
+//! - Version 1: PBKDF2-HMAC-SHA256, 100,000 iterations
+//! - Version 2: PBKDF2-HMAC-SHA256, 600,000 iterations (OWASP 2023 recommendation)
+//! - Future versions may switch algorithms (for example Argon2)
 
-/// Version 1: PBKDF2-HMAC-SHA256, 100,000 次迭代
+/// Version 1: PBKDF2-HMAC-SHA256, 100,000 iterations
 const VERSION_1_ITERATIONS: u32 = 100_000;
 
-/// Version 2: PBKDF2-HMAC-SHA256, 600,000 次迭代（OWASP 2023 推荐）
+/// Version 2: PBKDF2-HMAC-SHA256, 600,000 iterations (OWASP 2023 recommendation).
 const VERSION_2_ITERATIONS: u32 = 600_000;
 
-/// 当前文件格式版本号
+/// Current file format version.
 ///
-/// 修改此常量即可切换版本（迭代次数会自动从版本号派生）
+/// Change this constant to switch versions; iteration count is derived automatically.
 pub const CURRENT_FILE_VERSION: u32 = 2;
 
-/// 获取当前版本的迭代次数（编译时计算）
+/// Returns the iteration count of the current version (resolved at compile time).
 ///
-/// 从 `CURRENT_FILE_VERSION` 自动派生，确保加密和解密使用相同参数
+/// Derived from `CURRENT_FILE_VERSION` so encryption/decryption use the same parameters.
+///
+/// # Panics
+/// Panics at compile time if `CURRENT_FILE_VERSION` does not map to a known iteration count.
+/// This is intentional: the const fn is evaluated at compile time, so an invalid version
+/// will cause a build failure rather than a runtime error.
+#[allow(clippy::panic)]
 pub const fn get_current_iterations() -> u32 {
     match get_pbkdf2_iterations(CURRENT_FILE_VERSION) {
         Some(iterations) => iterations,
@@ -29,18 +35,44 @@ pub const fn get_current_iterations() -> u32 {
     }
 }
 
-/// 获取指定文件版本的 PBKDF2 迭代次数
+/// Returns the PBKDF2 iteration count for a file version.
 ///
 /// # Arguments
-/// * `version` - 文件版本号
+/// * `version` - File version number.
 ///
 /// # Returns
-/// - `Some(iterations)` - 该版本对应的迭代次数
-/// - `None` - 不支持的版本号
+/// - `Some(iterations)` - Iteration count for the version.
+/// - `None` - Unsupported version.
 pub const fn get_pbkdf2_iterations(version: u32) -> Option<u32> {
     match version {
         1 => Some(VERSION_1_ITERATIONS),
         2 => Some(VERSION_2_ITERATIONS),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_1_iterations() {
+        assert_eq!(get_pbkdf2_iterations(1), Some(100_000));
+    }
+
+    #[test]
+    fn version_2_iterations() {
+        assert_eq!(get_pbkdf2_iterations(2), Some(600_000));
+    }
+
+    #[test]
+    fn unknown_version_returns_none() {
+        assert_eq!(get_pbkdf2_iterations(0), None);
+        assert_eq!(get_pbkdf2_iterations(99), None);
+    }
+
+    #[test]
+    fn current_version_is_2() {
+        assert_eq!(CURRENT_FILE_VERSION, 2);
     }
 }

@@ -1,6 +1,8 @@
-//! 凭证格式迁移服务（v1.7.0）
+//! Credential format migration service (v1.7.0)
 //!
-//! 负责将旧格式凭证（HashMap<String, `HashMap`<String, String>>）迁移到新格式（ProviderCredentials）
+//! Migrates legacy credentials
+//! (`HashMap<String, HashMap<String, String>>`)
+//! into typed `ProviderCredentials`.
 
 use dns_orchestrator_provider::{ProviderCredentials, ProviderType};
 use std::collections::HashMap;
@@ -9,13 +11,14 @@ use std::sync::Arc;
 use crate::error::{CoreError, CoreResult};
 use crate::traits::{AccountRepository, CredentialStore};
 
-/// 迁移服务
+/// Service for credential format migration.
 pub struct MigrationService {
     credential_store: Arc<dyn CredentialStore>,
     account_repository: Arc<dyn AccountRepository>,
 }
 
 impl MigrationService {
+    /// Creates a migration service.
     pub fn new(
         credential_store: Arc<dyn CredentialStore>,
         account_repository: Arc<dyn AccountRepository>,
@@ -26,48 +29,49 @@ impl MigrationService {
         }
     }
 
-    /// 检查并执行迁移（如果需要）
+    /// Checks credential format and runs migration if needed.
     ///
-    /// 返回迁移结果，如果已是新格式则返回 `NotNeeded`
+    /// Returns [`MigrationResult::NotNeeded`] when data is already in the new format.
     pub async fn migrate_if_needed(&self) -> CoreResult<MigrationResult> {
-        // 尝试加载凭证
+        // Attempt to load credentials using the new format path.
         match self.credential_store.load_all().await {
             Ok(_) => {
-                log::info!("凭证已是新格式，无需迁移");
+                log::info!("Credentials are already in the new format; migration not needed");
                 Ok(MigrationResult::NotNeeded)
             }
             Err(CoreError::MigrationRequired) => {
-                log::info!("检测到旧格式凭证，开始迁移...");
+                log::info!("Legacy credential format detected, starting migration...");
                 self.perform_migration().await
             }
             Err(e) => Err(e),
         }
     }
 
-    /// 执行迁移
+    /// Executes migration from legacy JSON format to typed credentials.
     ///
-    /// 注意：备份逻辑已在 Tauri 层实现（src-tauri/src/lib.rs），
-    /// 在调用 `migrate_if_needed()` 之前执行。
+    /// Backup logic is implemented in the Tauri layer (`src-tauri/src/lib.rs`)
+    /// and should run before calling `migrate_if_needed()`.
     async fn perform_migration(&self) -> CoreResult<MigrationResult> {
-        // 1. 加载原始 JSON（备份已在调用此方法前由 Tauri 层完成）
+        // 1. Load legacy raw JSON (backup should already exist).
         let raw_json = self.credential_store.load_raw_json().await?;
 
-        // 2. 解析旧格式
-        let old_creds: HashMap<String, HashMap<String, String>> =
-            serde_json::from_str(&raw_json)
-                .map_err(|e| CoreError::MigrationFailed(format!("解析旧格式失败: {e}")))?;
+        // 2. Parse legacy credential format.
+        let old_creds: HashMap<String, HashMap<String, String>> = serde_json::from_str(&raw_json)
+            .map_err(|e| {
+            CoreError::MigrationFailed(format!("Failed to parse legacy format: {e}"))
+        })?;
 
         if old_creds.is_empty() {
-            log::info!("旧凭证为空，无需迁移");
+            log::info!("Legacy credentials are empty; migration not needed");
             return Ok(MigrationResult::NotNeeded);
         }
 
-        // 3. 获取账户 provider 信息
+        // 3. Load account -> provider mapping.
         let accounts = self.account_repository.find_all().await?;
         let account_providers: HashMap<String, ProviderType> =
             accounts.into_iter().map(|a| (a.id, a.provider)).collect();
 
-        // 4. 转换凭证
+        // 4. Convert legacy credential maps to typed credentials.
         let mut new_creds = HashMap::new();
         let mut failed_accounts = Vec::new();
 
@@ -78,21 +82,21 @@ impl MigrationService {
                         new_creds.insert(account_id.clone(), provider_creds);
                     }
                     Err(e) => {
-                        log::warn!("账户 {account_id} 凭证转换失败: {e}");
-                        failed_accounts.push((account_id, format!("转换失败: {e}")));
+                        log::warn!("Failed to convert credentials for account {account_id}: {e}");
+                        failed_accounts.push((account_id, format!("Conversion failed: {e}")));
                     }
                 }
             } else {
-                log::warn!("找不到账户 {account_id} 的元数据，跳过迁移");
-                failed_accounts.push((account_id, "账户元数据缺失".to_string()));
+                log::warn!("Account metadata not found for {account_id}, skipping migration");
+                failed_accounts.push((account_id, "Missing account metadata".to_string()));
             }
         }
 
-        // 5. 保存新格式
+        // 5. Save converted credentials using the new storage shape.
         if !new_creds.is_empty() {
             self.credential_store.save_all(&new_creds).await?;
             log::info!(
-                "凭证迁移完成：成功 {} 个，失败 {} 个",
+                "Credential migration completed: {} succeeded, {} failed",
                 new_creds.len(),
                 failed_accounts.len()
             );
@@ -104,22 +108,22 @@ impl MigrationService {
         })
     }
 
-    // 注意：backup_credentials 方法已移除
-    // 备份逻辑现在在 Tauri 层实现（src-tauri/src/lib.rs），
-    // 因为 MigrationService 位于平台无关的 Core 层，不应访问文件系统。
+    // `backup_credentials` was intentionally removed.
+    // Backup is handled in the Tauri layer (`src-tauri/src/lib.rs`) because
+    // this core service is platform-agnostic and must not access the file system.
 }
 
-/// 迁移结果
+/// Migration result.
 #[derive(Debug)]
 pub enum MigrationResult {
-    /// 不需要迁移（已是新格式或空数据）
+    /// No migration required (already migrated or empty data).
     NotNeeded,
 
-    /// 迁移成功
+    /// Migration completed.
     Success {
-        /// 成功迁移的账户数量
+        /// Number of accounts migrated successfully.
         migrated_count: usize,
-        /// 失败的账户列表 (`account_id`, `error_reason`)
+        /// Failed account list as (`account_id`, `error_reason`).
         failed_accounts: Vec<(String, String)>,
     },
 }

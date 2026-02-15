@@ -1,87 +1,110 @@
-//! 统一错误类型定义
+//! Unified core error definitions.
 
 use serde::Serialize;
 use thiserror::Error;
 
-// Re-export 库错误类型
+// Re-export provider library error types.
 pub use dns_orchestrator_provider::{CredentialValidationError, ProviderError};
 
-/// 核心层错误类型
+/// Error type for the core layer.
 #[derive(Error, Debug, Serialize)]
 #[serde(tag = "code", content = "details")]
 pub enum CoreError {
-    /// Provider 未找到
+    /// Provider was not found.
     #[error("Provider not found: {0}")]
     ProviderNotFound(String),
 
-    /// 账户未找到
+    /// Account was not found.
     #[error("Account not found: {0}")]
     AccountNotFound(String),
 
-    /// 域名未找到
+    /// Domain was not found.
     #[error("Domain not found: {0}")]
     DomainNotFound(String),
 
-    /// 记录未找到
+    /// DNS record was not found.
     #[error("Record not found: {0}")]
     RecordNotFound(String),
 
-    /// 凭证存储错误
+    /// Credential storage error.
     #[error("Credential error: {0}")]
     CredentialError(String),
 
-    /// 凭证验证错误（结构化，支持字段级别错误）
+    /// Credential validation error (structured, field-level details supported).
     #[error("{0}")]
     CredentialValidation(CredentialValidationError),
 
-    /// API 错误
+    /// Provider API error.
     #[error("API error: {provider} - {message}")]
     ApiError { provider: String, message: String },
 
-    /// 凭证无效
+    /// Invalid credentials.
     #[error("Invalid credentials for: {0}")]
     InvalidCredentials(String),
 
-    /// 序列化错误
+    /// Serialization/deserialization error.
     #[error("Serialization error: {0}")]
     SerializationError(String),
 
-    /// 验证错误
+    /// Validation error.
     #[error("Validation error: {0}")]
     ValidationError(String),
 
-    /// 导入导出错误
+    /// Import/export error.
     #[error("Import/Export error: {0}")]
     ImportExportError(String),
 
-    /// 没有选中任何账号（导出时）
+    /// No account selected (during export).
     #[error("No accounts selected")]
     NoAccountsSelected,
 
-    /// 不支持的文件版本（导入时）
+    /// Unsupported file version (during import).
     #[error("Unsupported file version")]
     UnsupportedFileVersion,
 
-    /// 存储层错误
+    /// Storage layer error.
     #[error("Storage error: {0}")]
     StorageError(String),
 
-    /// 网络错误
+    /// Network error.
     #[error("Network error: {0}")]
     NetworkError(String),
 
-    /// 需要迁移数据格式（v1.7.0 凭证格式升级）
+    /// Data format migration required (v1.7.0 credential format upgrade).
     #[error("Credential data migration required")]
     MigrationRequired,
 
-    /// 迁移失败
+    /// Migration failed.
     #[error("Migration failed: {0}")]
     MigrationFailed(String),
 
-    /// Provider 错误（从库转换）
+    /// Provider library error.
     #[error("{0}")]
     Provider(#[from] ProviderError),
 }
 
-/// 核心层 Result 类型别名
+impl CoreError {
+    /// Returns whether this error is expected (user input, missing resource, etc.).
+    ///
+    /// Use `warn` when this returns `true`, and `error` otherwise.
+    /// Keep this method updated when adding new variants.
+    #[must_use]
+    pub fn is_expected(&self) -> bool {
+        match self {
+            Self::AccountNotFound(_)
+            | Self::DomainNotFound(_)
+            | Self::RecordNotFound(_)
+            | Self::ProviderNotFound(_)
+            | Self::ValidationError(_)
+            | Self::NoAccountsSelected
+            | Self::UnsupportedFileVersion
+            | Self::CredentialValidation(_)
+            | Self::InvalidCredentials(_) => true,
+            Self::Provider(e) => e.is_expected(),
+            _ => false,
+        }
+    }
+}
+
+/// `Result` alias used by the core layer.
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

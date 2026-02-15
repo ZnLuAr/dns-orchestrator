@@ -81,7 +81,7 @@ fn handle_select_previous(app: &mut App) {
         Page::Settings => {
             app.settings.select_previous();
         }
-        _ => {}
+        Page::Home => {}
     }
 }
 
@@ -102,7 +102,7 @@ fn handle_select_next(app: &mut App) {
         Page::Settings => {
             app.settings.select_next();
         }
-        _ => {}
+        Page::Home => {}
     }
 }
 
@@ -151,7 +151,8 @@ fn handle_confirm(app: &mut App) {
                 let domain_id = domain.id.clone();
 
                 // 设置 DNS 记录页面的域名信息
-                app.dns_records.set_domain(account_id.clone(), domain_id.clone());
+                app.dns_records
+                    .set_domain(account_id.clone(), domain_id.clone());
                 app.dns_records.load_mock_data();
 
                 // 切换页面
@@ -219,14 +220,16 @@ fn handle_delete(app: &mut App) {
     match &app.current_page {
         Page::Accounts => {
             if let Some(account) = app.accounts.selected_account() {
-                app.modal.show_confirm_delete("account", &account.name, &account.id);
+                app.modal
+                    .show_confirm_delete("account", &account.name, &account.id);
             } else {
                 app.set_status("No account selected");
             }
         }
         Page::DnsRecords { .. } => {
             if let Some(record) = app.dns_records.selected_record() {
-                app.modal.show_confirm_delete("DNS record", &record.name, &record.id);
+                app.modal
+                    .show_confirm_delete("DNS record", &record.name, &record.id);
             } else {
                 app.set_status("No record selected");
             }

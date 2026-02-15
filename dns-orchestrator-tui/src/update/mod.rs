@@ -29,7 +29,6 @@
 //！│                                           └───────────────────┘           │
 //！└─────────────────────────────────────────────────────────────────────────────┘
 
-
 //!
 //! src/update/mod.rs
 //! Update 层：状态更新逻辑
@@ -99,10 +98,7 @@
 //!
 //! Update 完成后，控制权返回主循环（app.rs）。
 //! 下一轮循环时，View 层会读取更新后的 Model 来重新渲染。
-//! 
-
-
-
+//!
 
 mod content;
 mod modal;
@@ -110,9 +106,6 @@ mod navigation;
 
 use crate::message::AppMessage;
 use crate::model::{App, NavItemId, Page};
-
-
-
 
 /// 处理应用消息，更新状态
 pub fn update(app: &mut App, msg: AppMessage) {
@@ -180,5 +173,3 @@ fn page_from_nav_id(id: NavItemId) -> Page {
         NavItemId::Settings => Page::Settings,
     }
 }
-
-pub use navigation::update as update_navigation;

@@ -1,63 +1,63 @@
-//! 账户相关类型定义
+//! Account-related types.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use dns_orchestrator_provider::{ProviderCredentials, ProviderType};
 
-/// 账户状态
+/// Account status.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AccountStatus {
-    /// 活跃状态
+    /// Account is active.
     Active,
-    /// 错误状态（凭证失效等）
+    /// Account is in error state (for example invalid credentials).
     Error,
 }
 
-/// 账户信息
+/// Account metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
-    /// 账户 ID (UUID)
+    /// Account ID (UUID)
     pub id: String,
-    /// 账户名称
+    /// Account name
     pub name: String,
-    /// DNS 服务商类型
+    /// DNS provider type
     pub provider: ProviderType,
-    /// 创建时间
+    /// Created timestamp.
     #[serde(rename = "createdAt")]
     #[serde(with = "crate::utils::datetime")]
     pub created_at: DateTime<Utc>,
-    /// 更新时间
+    /// Updated timestamp.
     #[serde(rename = "updatedAt")]
     #[serde(with = "crate::utils::datetime")]
     pub updated_at: DateTime<Utc>,
-    /// 账户状态
+    /// Account status
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<AccountStatus>,
-    /// 错误信息（状态为 Error 时）
+    /// Error message (when the status is Error)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
-/// 创建账户请求（v1.7.0 类型安全重构）
+/// Request payload for creating an account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAccountRequest {
-    /// 账户名称
+    /// Account name
     pub name: String,
-    /// DNS 服务商类型
+    /// DNS provider type
     pub provider: ProviderType,
-    /// 凭证（结构化类型）
+    /// Structured credentials.
     pub credentials: ProviderCredentials,
 }
 
-/// 更新账户请求（v1.7.0 类型安全重构）
+/// Request payload for updating an account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateAccountRequest {
-    /// 账户 ID
+    /// Account ID
     pub id: String,
-    /// 新的账户名称（可选）
+    /// New account name (optional)
     pub name: Option<String>,
-    /// 新的凭证（可选，提供时会覆盖原有凭证）
+    /// New credentials (optional, will overwrite the original credentials when provided)
     pub credentials: Option<ProviderCredentials>,
 }

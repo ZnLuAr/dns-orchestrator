@@ -117,12 +117,10 @@ export function Sidebar({ currentView, onNavigate, isMobile = false, onClose }: 
             collapsed ? "justify-center p-3" : "justify-between px-4 py-3"
           )}
         >
-          <div
+          <button
+            type="button"
             className={cn("flex items-center gap-2", collapsed && "justify-center")}
             onClick={() => handleNavigate("main")}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && handleNavigate("main")}
           >
             <Globe className="h-6 w-6 shrink-0 text-primary" />
             {!collapsed && (
@@ -130,9 +128,7 @@ export function Sidebar({ currentView, onNavigate, isMobile = false, onClose }: 
                 {t("common.appName")}
               </span>
             )}
-          </div>
-
-          {/* 折叠按钮 - 仅桌面端显示 */}
+          </button>
           {!(isMobile || collapsed) && (
             <Tooltip>
               <TooltipTrigger asChild>
