@@ -11,7 +11,8 @@ use ratatui::{
 use crate::i18n::t;
 use crate::model::App;
 use crate::model::state::{
-    Modal, get_all_dns_servers, get_all_providers, get_all_record_types, get_credential_fields,
+    Modal, QueryToolType, get_all_dns_servers, get_all_providers, get_all_record_types,
+    get_credential_fields,
 };
 use crate::view::theme::colors;
 
@@ -68,6 +69,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         Modal::HttpHeaderCheck { .. } => render_http_header_check(frame, modal),
         Modal::DnsPropagation { .. } => render_dns_propagation(frame, modal),
         Modal::DnssecCheck { .. } => render_dnssec_check(frame, modal),
+        Modal::QueryTool { .. } => render_query_tool(frame, modal),
         Modal::Error { title, message } => render_error(frame, title, message),
         Modal::Help => render_help(frame),
         _ => {}
@@ -1207,4 +1209,113 @@ fn render_dnssec_check(frame: &mut Frame, modal: &Modal) {
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
+}
+
+/// 通用简单工具弹窗渲染函数
+fn render_simple_tool_modal(
+    frame: &mut Frame,
+    modal: &Modal,
+    title: &str,
+    label: &str,
+    placeholder: &str,
+) {
+    let Modal::QueryTool {
+        input, result, loading, ..
+    } = modal
+    else {
+        return;
+    };
+
+    let texts = t();
+    let c = colors();
+
+    let height = 15;
+    let area = centered_rect(50, height, frame.area());
+
+    // 清除弹窗区域
+    frame.render_widget(Clear, area);
+
+    // 创建边框
+    let block = Block::default()
+        .title(format!(" {} ", title))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(c.highlight))
+        .style(Style::default().bg(c.bg));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // 构建弹窗内容
+    let mut lines = vec![];
+
+    // 输入框标签
+    lines.push(Line::from(vec![Span::styled(
+        label,
+        Style::default().fg(c.highlight).add_modifier(Modifier::BOLD),
+    )]));
+
+    // 输入框
+    let mut input_spans = vec![Span::styled("  ", Style::default())];
+    input_spans.extend(render_input_with_cursor(
+        input,
+        placeholder,
+        true,
+    ));
+    lines.push(Line::from(input_spans));
+    lines.push(Line::from(""));
+
+    // 查询结果
+    if *loading {
+        lines.push(Line::styled(
+            texts.modal.tools.status.querying,
+            Style::default().fg(Color::Yellow),
+        ));
+    } else if let Some(res) = result {
+        lines.push(Line::styled(
+            texts.modal.tools.result_label.to_string(),
+            Style::default().fg(c.success).add_modifier(Modifier::BOLD),
+        ));
+        for line in res.lines() {
+            lines.push(Line::from(line));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        format!(
+            " {}: {} | {}: {} ",
+            texts.hints.keys.enter, texts.common.check, texts.hints.keys.esc, texts.common.close
+        ),
+        Style::default().fg(c.muted),
+    ));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// 渲染通用查询工具弹窗
+fn render_query_tool(frame: &mut Frame, modal: &Modal) {
+    let Modal::QueryTool { query_type, .. } = modal else {
+        return;
+    };
+
+    let texts = t();
+    let title = match query_type {
+        QueryToolType::WhoisLookup => texts.modal.tools.titles.whois,
+        QueryToolType::SslCheck => texts.modal.tools.titles.ssl_check,
+        QueryToolType::IpLookup => texts.modal.tools.titles.ip_lookup,
+        QueryToolType::DnssecCheck => texts.modal.tools.titles.dnssec,
+    };
+
+    let label = match query_type {
+        QueryToolType::IpLookup => texts.modal.tools.labels.ip_or_domain,
+        _ => texts.modal.tools.labels.domain,
+    };
+
+    let placeholder = match query_type {
+        QueryToolType::IpLookup => texts.modal.tools.placeholders.enter_ip_or_domain,
+        _ => texts.modal.tools.placeholders.enter_domain,
+    };
+
+    render_simple_tool_modal(frame, modal, title, label, placeholder);
 }

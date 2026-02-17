@@ -186,7 +186,8 @@ fn handle_modal_keys(key: KeyEvent, app: &App) -> AppMessage {
         Modal::WhoisLookup { .. }
         | Modal::SslCheck { .. }
         | Modal::IpLookup { .. }
-        | Modal::DnssecCheck { .. } => handle_simple_tool_keys(key),
+        | Modal::DnssecCheck { .. }
+        | Modal::QueryTool { .. } => handle_simple_tool_keys(key),
         Modal::HttpHeaderCheck { focus, .. } => handle_http_header_check_keys(key, *focus),
         Modal::DnsPropagation { focus, .. } => handle_dns_propagation_keys(key, *focus),
         Modal::Help | Modal::Error { .. } => {

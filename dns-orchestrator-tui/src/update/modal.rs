@@ -20,6 +20,7 @@ pub fn update(app: &mut App, msg: ModalMessage) {
         Modal::HttpHeaderCheck { .. } => handle_http_header_check(app, msg),
         Modal::DnsPropagation { .. } => handle_dns_propagation(app, msg),
         Modal::DnssecCheck { .. } => handle_dnssec_check(app, msg),
+        Modal::QueryTool { .. } => handle_query_tool(app, msg),
         Modal::Error { .. } | Modal::Help => handle_simple_modal(app, msg),
         _ => {}
     }
@@ -662,6 +663,60 @@ fn handle_dnssec_check(app: &mut App, msg: ModalMessage) {
 
         ModalMessage::Backspace => {
             domain.pop();
+        }
+
+        _ => {}
+    }
+}
+
+/// 处理通用查询工具弹窗
+fn handle_query_tool(app: &mut App, msg: ModalMessage) {
+    let Some(Modal::QueryTool {
+        query_type,
+        ref mut input,
+        ref mut result,
+        ref mut loading,
+    }) = app.modal.active
+    else {
+        return;
+    };
+
+    match msg {
+        ModalMessage::Close => {
+            app.modal.close();
+            app.clear_status();
+        }
+
+        ModalMessage::Confirm => {
+            if input.is_empty() {
+                app.set_status("Please enter a domain name or IP address");
+                return;
+            }
+
+            *loading = true;
+            let tool_name = match query_type {
+                crate::model::state::QueryToolType::WhoisLookup => "WHOIS Lookup",
+                crate::model::state::QueryToolType::SslCheck => "SSL Certificate Check",
+                crate::model::state::QueryToolType::IpLookup => "IP Lookup",
+                crate::model::state::QueryToolType::DnssecCheck => "DNSSEC Check",
+            };
+            // TODO: 实际执行查询
+            *result = Some(format!(
+                "{} for {input}\nResult: (To be implemented)",
+                tool_name
+            ));
+            *loading = false;
+
+            let input_clone = input.clone();
+            app.set_status(format!("{} completed: {input_clone}", tool_name));
+        }
+
+        ModalMessage::Input(ch) => {
+            input.push(ch);
+        }
+
+        ModalMessage::Backspace => {
+            input.pop();
         }
 
         _ => {}
