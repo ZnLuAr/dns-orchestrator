@@ -59,7 +59,7 @@ impl ThemeColors {
             success: Color::Rgb(78, 201, 176),
             warning: Color::Rgb(206, 145, 120),
             error: Color::Rgb(244, 135, 113),
-            muted: Color::Rgb(176, 176, 176),
+            muted: Color::Rgb(128, 128, 128),
         }
     }
 
