@@ -11,7 +11,7 @@ use ratatui::{
 use crate::i18n::t;
 use crate::model::App;
 use crate::model::state::{
-    Modal, QueryToolType, get_all_dns_servers, get_all_providers, get_all_record_types,
+    Modal, get_all_dns_servers, get_all_providers, get_all_record_types,
     get_credential_fields,
 };
 use crate::view::theme::colors;
@@ -1218,6 +1218,8 @@ fn render_simple_tool_modal(
     title: &str,
     label: &str,
     placeholder: &str,
+    status_text: &str,
+    action_text: &str,
 ) {
     let Modal::QueryTool {
         input, result, loading, ..
@@ -1267,7 +1269,7 @@ fn render_simple_tool_modal(
     // 查询结果
     if *loading {
         lines.push(Line::styled(
-            texts.modal.tools.status.querying,
+            status_text,
             Style::default().fg(Color::Yellow),
         ));
     } else if let Some(res) = result {
@@ -1284,7 +1286,7 @@ fn render_simple_tool_modal(
     lines.push(Line::styled(
         format!(
             " {}: {} | {}: {} ",
-            texts.hints.keys.enter, texts.common.check, texts.hints.keys.esc, texts.common.close
+            texts.hints.keys.enter, action_text, texts.hints.keys.esc, texts.common.close
         ),
         Style::default().fg(c.muted),
     ));
@@ -1300,22 +1302,11 @@ fn render_query_tool(frame: &mut Frame, modal: &Modal) {
     };
 
     let texts = t();
-    let title = match query_type {
-        QueryToolType::WhoisLookup => texts.modal.tools.titles.whois,
-        QueryToolType::SslCheck => texts.modal.tools.titles.ssl_check,
-        QueryToolType::IpLookup => texts.modal.tools.titles.ip_lookup,
-        QueryToolType::DnssecCheck => texts.modal.tools.titles.dnssec,
-    };
+    let title = query_type.title(&texts.modal.tools.titles);
+    let label = query_type.label(&texts.modal.tools.labels);
+    let placeholder = query_type.placeholder(&texts.modal.tools.placeholders);
+    let status_text = query_type.status_text(&texts.modal.tools.status);
+    let action_text = query_type.action_text(&texts.common);
 
-    let label = match query_type {
-        QueryToolType::IpLookup => texts.modal.tools.labels.ip_or_domain,
-        _ => texts.modal.tools.labels.domain,
-    };
-
-    let placeholder = match query_type {
-        QueryToolType::IpLookup => texts.modal.tools.placeholders.enter_ip_or_domain,
-        _ => texts.modal.tools.placeholders.enter_domain,
-    };
-
-    render_simple_tool_modal(frame, modal, title, label, placeholder);
+    render_simple_tool_modal(frame, modal, title, label, placeholder, status_text, action_text);
 }

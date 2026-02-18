@@ -223,6 +223,53 @@ impl QueryToolType {
             Self::WhoisLookup => "query",
         }
     }
+
+    // ============ 直接返回翻译文本的方法 ============
+
+    /// 获取工具标题的翻译文本
+    pub fn title(self, titles: &crate::i18n::keys::ToolModalTitles) -> &'static str {
+        match self {
+            Self::WhoisLookup => titles.whois,
+            Self::SslCheck => titles.ssl_check,
+            Self::IpLookup => titles.ip_lookup,
+            Self::DnssecCheck => titles.dnssec,
+        }
+    }
+
+    /// 获取输入框标签的翻译文本
+    pub fn label(self, labels: &crate::i18n::keys::ToolModalLabels) -> &'static str {
+        match self {
+            Self::IpLookup => labels.ip_or_domain,
+            _ => labels.domain,
+        }
+    }
+
+    /// 获取占位符的翻译文本
+    pub fn placeholder(self, placeholders: &crate::i18n::keys::ToolModalPlaceholders) -> &'static str {
+        match self {
+            Self::IpLookup => placeholders.enter_ip_or_domain,
+            _ => placeholders.enter_domain,
+        }
+    }
+
+    /// 获取加载状态的翻译文本
+    pub fn status_text(self, status: &crate::i18n::keys::ToolModalStatus) -> &'static str {
+        match self {
+            Self::WhoisLookup => status.querying,
+            Self::SslCheck => status.checking,
+            Self::IpLookup => status.looking_up,
+            Self::DnssecCheck => status.checking_dnssec,
+        }
+    }
+
+    /// 获取操作文本的翻译文本
+    pub fn action_text(self, common: &crate::i18n::keys::CommonTexts) -> &'static str {
+        match self {
+            Self::SslCheck | Self::DnssecCheck => common.check,
+            Self::IpLookup => common.lookup,
+            Self::WhoisLookup => common.query,
+        }
+    }
 }
 
 /// 弹窗类型

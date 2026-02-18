@@ -694,12 +694,8 @@ fn handle_query_tool(app: &mut App, msg: ModalMessage) {
             }
 
             *loading = true;
-            let tool_name = match query_type {
-                crate::model::state::QueryToolType::WhoisLookup => "WHOIS Lookup",
-                crate::model::state::QueryToolType::SslCheck => "SSL Certificate Check",
-                crate::model::state::QueryToolType::IpLookup => "IP Lookup",
-                crate::model::state::QueryToolType::DnssecCheck => "DNSSEC Check",
-            };
+            let texts = crate::i18n::t();
+            let tool_name = query_type.title(&texts.modal.tools.titles);
             // TODO: 实际执行查询
             *result = Some(format!(
                 "{} for {input}\nResult: (To be implemented)",
